@@ -353,7 +353,9 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <AuthenticatedLayout>
-                      <SemanticSearch />
+                      <SuspenseWrapper message="Cargando búsqueda IA...">
+                        <SemanticSearch />
+                      </SuspenseWrapper>
                     </AuthenticatedLayout>
                   </ProtectedRoute>
                 }
