@@ -1,13 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
-import { SUPABASE_CONFIG, APP_CONFIG } from '../config/constants.js'
+import { APP_CONFIG } from '../config/constants.js'
 
-// Usar variables de entorno reales - NO SIMULADAS
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || SUPABASE_CONFIG.URL
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || SUPABASE_CONFIG.ANON_KEY
+// Usar variables de entorno reales - NO valores de fallback
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
+const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY
 
-// Validar configuración de Supabase
+// Validar configuración de Supabase (advertencia en lugar de error)
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing Supabase configuration. Please check your environment variables.')
+  console.warn('⚠️ Missing Supabase configuration. Please check your environment variables.')
+  console.warn('   - REACT_APP_SUPABASE_URL:', SUPABASE_URL ? 'Present' : 'Missing')
+  console.warn('   - REACT_APP_SUPABASE_ANON_KEY:', SUPABASE_ANON_KEY ? 'Present' : 'Missing')
 }
 
 // Create and export the Supabase client con opciones optimizadas y REALES
@@ -42,8 +44,8 @@ export const supabase = createClient(
     },
     global: {
       headers: {
-        'X-Client-Info': `${APP_CONFIG.NAME}/${APP_CONFIG.VERSION}`,
-        'X-Forced-Project': 'tmqglnycivlcjijoymwe'
+        'X-Client-Info': `${APP_CONFIG.NAME}/${APP_CONFIG.VERSION}`
+        // Eliminado X-Forced-Project para evitar conflictos de CORS
       }
     },
     db: {
@@ -57,9 +59,9 @@ export const supabase = createClient(
   }
 )
 
-// Export configuration for reference
+// Export configuration for reference (usando variables reales)
 export const config = {
-  url: SUPABASE_CONFIG.URL,
-  anonKey: SUPABASE_CONFIG.ANON_KEY,
-  environment: APP_CONFIG.NODE_ENV
+  url: SUPABASE_URL,
+  anonKey: SUPABASE_ANON_KEY,
+  environment: process.env.NODE_ENV || 'development'
 }
