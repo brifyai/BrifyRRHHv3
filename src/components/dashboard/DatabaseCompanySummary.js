@@ -107,6 +107,12 @@ const DatabaseCompanySummary = () => {
     }
   }, []) // Dependencias vacías porque no usa props ni state
 
+  // ✅ CRÍTICO: useEffect para cargar datos al montar el componente
+  useEffect(() => {
+    console.log('🔄 DatabaseCompanySummary: Componente montado, cargando datos iniciales...')
+    loadCompanyData()
+  }, [loadCompanyData])
+
   const syncWithDashboard = async () => {
     try {
       setSyncing(true)
