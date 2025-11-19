@@ -184,42 +184,50 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/plans" 
+            <Route
+              path="/plans"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Plans />
+                    <SuspenseWrapper message="Cargando planes...">
+                      <Plans />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/folders" 
+            <Route
+              path="/folders"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Folders />
+                    <SuspenseWrapper message="Cargando carpetas...">
+                      <Folders />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/files" 
+            <Route
+              path="/files"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Files />
+                    <SuspenseWrapper message="Cargando archivos...">
+                      <Files />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/perfil"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Profile />
+                    <SuspenseWrapper message="Cargando perfil...">
+                      <Profile />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -229,7 +237,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings />
+                    <SuspenseWrapper message="Cargando configuración...">
+                      <Settings />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -239,7 +249,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="companies" />
+                    <SuspenseWrapper message="Cargando empresas...">
+                      <Settings activeTab="companies" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -249,7 +261,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="companies" companyId={true} />
+                    <SuspenseWrapper message="Cargando empresa...">
+                      <Settings activeTab="companies" companyId={true} />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -259,7 +273,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="users" />
+                    <SuspenseWrapper message="Cargando usuarios...">
+                      <Settings activeTab="users" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -269,7 +285,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="general" />
+                    <SuspenseWrapper message="Cargando configuración general...">
+                      <Settings activeTab="general" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -279,7 +297,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="notifications" />
+                    <SuspenseWrapper message="Cargando notificaciones...">
+                      <Settings activeTab="notifications" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -289,7 +309,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="security" />
+                    <SuspenseWrapper message="Cargando seguridad...">
+                      <Settings activeTab="security" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -299,7 +321,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="integrations" />
+                    <SuspenseWrapper message="Cargando integraciones...">
+                      <Settings activeTab="integrations" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -309,7 +333,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <Settings activeTab="database" />
+                    <SuspenseWrapper message="Cargando base de datos...">
+                      <Settings activeTab="database" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
