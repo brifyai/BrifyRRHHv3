@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 
 // Componente funcional para el contenido del error
-const ErrorFallback = ({ error, resetError, goHome }) => {
+const ErrorFallback = ({ error, errorInfo, resetError, goHome }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 px-4">
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center space-y-6">
@@ -21,8 +21,7 @@ const ErrorFallback = ({ error, resetError, goHome }) => {
             Ha ocurrido un error inesperado. Estamos trabajando para solucionarlo.
           </p>
           
-          {/* Detalles del error (solo en desarrollo) */}
-          {/* MOSTRAR ERROR SIEMPRE (incluso en producción para debug) */}
+          {/* Detalles del error (Debug Mode) */}
           {error && (
             <details className="text-left bg-red-50 border border-red-200 rounded-lg p-3 mb-4" open>
               <summary className="cursor-pointer text-sm font-medium text-red-800 mb-2">
