@@ -106,12 +106,15 @@ class OrganizedDatabaseService {
       // Obtener empresas básicas
       const allCompanies = await this.getCompanies();
       
-      // ✅ FILTRAR SOLO EMPRESAS ACTIVAS
-      const companies = allCompanies.filter(c => c.status === 'active');
-      console.log('🔍 DEBUG: getCompaniesWithStats() - Empresas obtenidas:', allCompanies.length, '- Activas:', companies.length);
+      // ✅ FILTRAR EMPRESAS ACTIVAS (incluyendo empresas sin status definido para compatibilidad)
+      const companies = allCompanies.filter(c => {
+        // Incluir si status es 'active' O si no tiene status definido (null/undefined)
+        return c.status === 'active' || c.status === null || c.status === undefined;
+      });
+      console.log('🔍 DEBUG: getCompaniesWithStats() - Empresas obtenidas:', allCompanies.length, '- Activas (incl. sin status):', companies.length);
       
       if (companies.length === 0) {
-        console.log('⚠️ DEBUG: getCompaniesWithStats() - No hay empresas, retornando array vacío');
+        console.log('⚠️ DEBUG: getCompaniesWithStats() - No hay empresas activas, retornando array vacío');
         return [];
       }
 
