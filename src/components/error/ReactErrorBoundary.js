@@ -22,14 +22,35 @@ const ErrorFallback = ({ error, resetError, goHome }) => {
           </p>
           
           {/* Detalles del error (solo en desarrollo) */}
-          {process.env.NODE_ENV === 'development' && error && (
-            <details className="text-left bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+          {/* MOSTRAR ERROR SIEMPRE (incluso en producción para debug) */}
+          {error && (
+            <details className="text-left bg-red-50 border border-red-200 rounded-lg p-3 mb-4" open>
               <summary className="cursor-pointer text-sm font-medium text-red-800 mb-2">
-                Ver detalles del error
+                🐛 Detalles del error (Debug Mode)
               </summary>
-              <pre className="text-xs text-red-700 overflow-auto max-h-32">
+              <pre className="text-xs text-red-700 overflow-auto max-h-64 whitespace-pre-wrap">
                 {error.toString()}
+                {errorInfo && `\n\nStack:\n${errorInfo.componentStack}`}
               </pre>
+              <button
+                onClick={() => {
+                  // Enviar error a endpoint de logging
+                  fetch('https://hook.eu2.make.com/your-webhook-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      error: error.toString(),
+                      stack: errorInfo?.componentStack,
+                      url: window.location.href,
+                      timestamp: new Date().toISOString(),
+                      userAgent: navigator.userAgent
+                    })
+                  }).catch(() => console.log('No se pudo enviar log'));
+                }}
+                className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+              >
+                Enviar Error a Soporte
+              </button>
             </details>
           )}
         </div>
