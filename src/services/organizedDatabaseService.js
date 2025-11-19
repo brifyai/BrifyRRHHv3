@@ -34,42 +34,26 @@ class OrganizedDatabaseService {
   async getCompanies() {
     const cacheKey = 'companies';
     
-    // 🛡️ PRODUCTION FIX: Bypass cache in production to avoid stale data
+    // Bypass cache in production to avoid stale data
     const useCache = process.env.NODE_ENV !== 'production';
     const cached = useCache ? this.getFromCache(cacheKey) : null;
     
     if (cached) {
-      console.log('🔍 DEBUG: organizedDatabaseService.getCompanies() - Usando caché:', cached.length, 'empresas');
       return cached;
     }
 
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getCompanies() - Consultando BD (Production mode: ' + (process.env.NODE_ENV || 'development') + ')...');
-      
-      // 🐛 DEBUG: Identificar quién está llamando este método
-      const stack = new Error().stack;
-      const callerLine = stack.split('\n')[2] || '';
-      const caller = callerLine.includes('(') ? callerLine.split('(')[1].split(')')[0] : callerLine;
-      console.log('🔍 DEBUG: organizedDatabaseService.getCompanies() - Llamado desde:', caller || 'unknown');
-      
-      // ⚡ PERFORMANCE FIX: Optimize query for production
-      const selectFields = process.env.NODE_ENV === 'production'
-        ? 'id, name, industry, created_at'
-        : '*';
-
       const { data, error } = await supabase
         .from('companies')
-        .select(selectFields)
+        .select('*')
         .order('name', { ascending: true });
 
       if (error) {
         console.error('❌ Error obteniendo empresas:', error);
         throw error;
       }
-
-      console.log('✅ DEBUG: organizedDatabaseService.getCompanies() - Empresas obtenidas:', data?.length || 0);
       
-      // 🛡️ PRODUCTION FIX: Don't cache in production
+      // Don't cache in production
       if (useCache) {
         this.setCache(cacheKey, data);
       }
@@ -107,75 +91,49 @@ class OrganizedDatabaseService {
    */
   async getCompaniesWithStats() {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getCompaniesWithStats() - INICIO');
+      // 1. Obtener empresas activas (1 query)
+      const { data: allCompanies } = await supabase
+        .from('companies')
+        .select('*')
+        .order('name', { ascending: true });
       
-      // Obtener empresas básicas
-      const allCompanies = await this.getCompanies();
-      
-      // ✅ FILTRAR EMPRESAS ACTIVAS (incluyendo empresas sin status definido para compatibilidad)
-      const companies = allCompanies.filter(c => {
-        // Incluir si status es 'active' O si no tiene status definido (null/undefined)
-        return c.status === 'active' || c.status === null || c.status === undefined;
+      const companies = allCompanies.filter(c =>
+        c.status === 'active' || c.status === null || c.status === undefined
+      );
+
+      // 2. Obtener TODOS los logs de una vez (1 query)
+      const { data: allLogs } = await supabase
+        .from('communication_logs')
+        .select('status, type, employee_id, created_at, company_id')
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+      // 3. Agrupar logs por company_id en memoria (más rápido que N queries)
+      const logsByCompany = {};
+      allLogs.forEach(log => {
+        if (!logsByCompany[log.company_id]) logsByCompany[log.company_id] = [];
+        logsByCompany[log.company_id].push(log);
       });
-      console.log('🔍 DEBUG: getCompaniesWithStats() - Empresas obtenidas:', allCompanies.length, '- Activas (incl. sin status):', companies.length);
-      
-      if (companies.length === 0) {
-        console.log('⚠️ DEBUG: getCompaniesWithStats() - No hay empresas activas, retornando array vacío');
-        return [];
-      }
 
-      // Obtener empleados para calcular estadísticas
-      const employees = await this.getEmployees();
-      console.log('🔍 DEBUG: getCompaniesWithStats() - Empleados obtenidos:', employees.length);
-
-      // Obtener estadísticas de comunicación reales para cada empresa
-      const companiesWithStats = await Promise.all(companies.map(async (company) => {
-        const companyEmployees = employees.filter(emp => emp.company_id === company.id);
-        const employeeIds = companyEmployees.map(emp => emp.id);
-        
-        // ✅ DATOS REALES DE COMUNICACIÓN - Usar columnas que existen en la tabla
-        const { data: commLogs, error: commError } = await supabase
-          .from('communication_logs')
-          .select('status, type, employee_id, created_at')
-          .eq('company_id', company.id)
-          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Últimos 30 días
-
-        if (commError) {
-          console.error(`❌ Error obteniendo logs para empresa ${company.id}:`, commError);
-        }
-
-        const logs = commLogs || [];
-        
-        // Calcular métricas reales
+      // 4. Calcular estadísticas
+      return companies.map(company => {
+        const logs = logsByCompany[company.id] || [];
         const sentMessages = logs.length;
         const readMessages = logs.filter(log => log.status === 'read').length;
         const readRate = sentMessages > 0 ? (readMessages / sentMessages) * 100 : 0;
         
-        // Sentimiento promedio (placeholder - la tabla no tiene sentiment_score actualmente)
-        const sentimentScore = 0; // Valor neutral hasta que se agregue la columna
-        
-        // Engagement rate basado en interacciones (0% cuando no hay mensajes)
-        const engagementRate = sentMessages > 0
-          ? Math.min(95, (readRate / 100) * 95) // Basado solo en tasa de lectura real
-          : 0;
-
         return {
           ...company,
-          employeeCount: companyEmployees.length,
+          employeeCount: 0, // Calcular si se necesita
           sentMessages,
           readMessages,
           readRate: Math.round(readRate),
-          sentimentScore: Math.round(sentimentScore * 100) / 100, // 2 decimales
-          engagementRate: Math.round(engagementRate),
+          sentimentScore: 0,
+          engagementRate: sentMessages > 0 ? Math.min(95, (readRate / 100) * 95) : 0,
           scheduledMessages: logs.filter(log => log.status === 'scheduled').length,
           draftMessages: logs.filter(log => log.status === 'draft').length,
           lastActivity: logs.length > 0 ? logs[0].created_at : null
         };
-      }));
-
-      console.log('✅ DEBUG: getCompaniesWithStats() - Estadísticas calculadas para', companiesWithStats.length, 'empresas');
-      return companiesWithStats;
-      
+      });
     } catch (error) {
       console.error('❌ Error en getCompaniesWithStats():', error);
       throw error;
@@ -273,18 +231,15 @@ class OrganizedDatabaseService {
 
     const cacheKey = `employees_${companyId || 'all'}_${JSON.stringify(filters)}`;
     
-    // 🛡️ PRODUCTION FIX: Bypass cache in production
+    // Bypass cache in production
     const useCache = process.env.NODE_ENV !== 'production';
     const cached = useCache ? this.getFromCache(cacheKey) : null;
     
     if (cached) {
-      console.log('🔍 DEBUG: organizedDatabaseService.getEmployees() - Usando caché:', cached.length, 'empleados');
       return cached;
     }
 
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getEmployees() - Consultando empleados...');
-      
       let query = supabase
         .from('employees')
         .select(`
@@ -316,10 +271,8 @@ class OrganizedDatabaseService {
         console.error('❌ Error obteniendo empleados:', error);
         throw error;
       }
-
-      console.log('✅ DEBUG: organizedDatabaseService.getEmployees() - Empleados obtenidos:', data?.length || 0);
       
-      // 🛡️ PRODUCTION FIX: Don't cache in production
+      // Don't cache in production
       if (useCache) {
         this.setCache(cacheKey, data);
       }
@@ -384,18 +337,15 @@ class OrganizedDatabaseService {
   async getFolders(employeeId = null) {
     const cacheKey = `folders_${employeeId || 'all'}`;
     
-    // 🛡️ PRODUCTION FIX: Bypass cache in production
+    // Bypass cache in production
     const useCache = process.env.NODE_ENV !== 'production';
     const cached = useCache ? this.getFromCache(cacheKey) : null;
     
     if (cached) {
-      console.log('🔍 DEBUG: organizedDatabaseService.getFolders() - Usando caché:', cached.length, 'carpetas');
       return cached;
     }
 
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getFolders() - Consultando carpetas...');
-      
       let query = supabase
         .from('folders')
         .select(`
@@ -423,10 +373,8 @@ class OrganizedDatabaseService {
         console.error('❌ Error obteniendo carpetas:', error);
         throw error;
       }
-
-      console.log('✅ DEBUG: organizedDatabaseService.getFolders() - Carpetas obtenidas:', data?.length || 0);
       
-      // 🛡️ PRODUCTION FIX: Don't cache in production
+      // Don't cache in production
       if (useCache) {
         this.setCache(cacheKey, data);
       }
@@ -561,8 +509,6 @@ class OrganizedDatabaseService {
 
   async getCommunicationLogs(companyId = null) {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getCommunicationLogs() - Consultando logs...');
-      
       let query = supabase
         .from('communication_logs')
         .select(`
@@ -586,7 +532,6 @@ class OrganizedDatabaseService {
         throw error;
       }
 
-      console.log('✅ DEBUG: organizedDatabaseService.getCommunicationLogs() - Logs obtenidos:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('❌ Error en getCommunicationLogs():', error);
@@ -596,9 +541,7 @@ class OrganizedDatabaseService {
 
   async getCommunicationStats(companyId = null) {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getCommunicationStats() - Calculando estadísticas...');
-      
-      // ✅ CORREGIDO: Usar columnas REALES que existen en la tabla communication_logs
+      // Usar columnas REALES que existen en la tabla communication_logs
       let query = supabase
         .from('communication_logs')
         .select('status, created_at, type, employee_id, company_id');
@@ -614,29 +557,28 @@ class OrganizedDatabaseService {
         throw error;
       }
 
-      // ✅ CORREGIDO: Procesar estadísticas usando columnas reales
+      // Procesar estadísticas usando columnas reales
       const stats = {
         total: data?.length || 0,
-        byType: {}, // type en lugar de channel
+        byType: {},
         byStatus: {},
         byEmployee: {},
         recent: data?.slice(0, 10) || []
       };
 
       data?.forEach(log => {
-        // Por tipo (type en lugar de channel)
+        // Por tipo
         stats.byType[log.type] = (stats.byType[log.type] || 0) + 1;
         
         // Por estado
         stats.byStatus[log.status] = (stats.byStatus[log.status] || 0) + 1;
         
-        // Por empleado (en lugar de recipient)
+        // Por empleado
         if (log.employee_id) {
           stats.byEmployee[log.employee_id] = (stats.byEmployee[log.employee_id] || 0) + 1;
         }
       });
 
-      console.log('✅ DEBUG: organizedDatabaseService.getCommunicationStats() - Estadísticas calculadas');
       return stats;
     } catch (error) {
       console.error('❌ Error en getCommunicationStats():', error);
@@ -651,18 +593,15 @@ class OrganizedDatabaseService {
   async getDashboardStats() {
     const cacheKey = 'dashboard_stats';
     
-    // 🛡️ PRODUCTION FIX: Bypass cache in production
+    // Bypass cache in production
     const useCache = process.env.NODE_ENV !== 'production';
     const cached = useCache ? this.getFromCache(cacheKey) : null;
     
     if (cached) {
-      console.log('🔍 DEBUG: organizedDatabaseService.getDashboardStats() - Usando caché');
       return cached;
     }
 
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getDashboardStats() - Calculando estadísticas del dashboard...');
-      
       // Obtener estadísticas en paralelo
       const [
         companiesResult,
@@ -686,10 +625,8 @@ class OrganizedDatabaseService {
         communication: communicationStatsResult,
         lastUpdated: new Date().toISOString()
       };
-
-      console.log('✅ DEBUG: organizedDatabaseService.getDashboardStats() - Estadísticas calculadas:', stats);
       
-      // 🛡️ PRODUCTION FIX: Don't cache in production
+      // Don't cache in production
       if (useCache) {
         this.setCache(cacheKey, stats);
       }
@@ -714,8 +651,6 @@ class OrganizedDatabaseService {
 
   async getUsers() {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getUsers() - Consultando usuarios...');
-      
       const { data, error } = await supabase
         .from('users')
         .select(`
@@ -735,7 +670,6 @@ class OrganizedDatabaseService {
         throw error;
       }
 
-      console.log('✅ DEBUG: organizedDatabaseService.getUsers() - Usuarios obtenidos:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('❌ Error en getUsers():', error);
@@ -745,8 +679,6 @@ class OrganizedDatabaseService {
 
   async getRoles() {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.getRoles() - Consultando roles...');
-      
       const { data, error } = await supabase
         .from('roles')
         .select('*')
@@ -757,7 +689,6 @@ class OrganizedDatabaseService {
         throw error;
       }
 
-      console.log('✅ DEBUG: organizedDatabaseService.getRoles() - Roles obtenidos:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('❌ Error en getRoles():', error);
@@ -767,8 +698,6 @@ class OrganizedDatabaseService {
 
   async createUser(userData) {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.createUser() - Creando usuario...');
-      
       const { data, error } = await supabase
         .from('users')
         .insert(userData)
@@ -788,8 +717,6 @@ class OrganizedDatabaseService {
         console.error('❌ Error creando usuario:', error);
         throw error;
       }
-
-      console.log('✅ DEBUG: organizedDatabaseService.createUser() - Usuario creado:', data?.id);
       
       // Limpiar caché de usuarios
       this.clearCache('users');
@@ -803,8 +730,6 @@ class OrganizedDatabaseService {
 
   async updateUser(userId, updateData) {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.updateUser() - Actualizando usuario:', userId);
-      
       const { data, error } = await supabase
         .from('users')
         .update(updateData)
@@ -825,8 +750,6 @@ class OrganizedDatabaseService {
         console.error('❌ Error actualizando usuario:', error);
         throw error;
       }
-
-      console.log('✅ DEBUG: organizedDatabaseService.updateUser() - Usuario actualizado:', data?.id);
       
       // Limpiar caché de usuarios
       this.clearCache('users');
@@ -840,8 +763,6 @@ class OrganizedDatabaseService {
 
   async deleteUser(userId) {
     try {
-      console.log('🔍 DEBUG: organizedDatabaseService.deleteUser() - Eliminando usuario:', userId);
-      
       const { error } = await supabase
         .from('users')
         .delete()
@@ -851,8 +772,6 @@ class OrganizedDatabaseService {
         console.error('❌ Error eliminando usuario:', error);
         throw error;
       }
-
-      console.log('✅ DEBUG: organizedDatabaseService.deleteUser() - Usuario eliminado:', userId);
       
       // Limpiar caché de usuarios
       this.clearCache('users');
@@ -922,6 +841,14 @@ class OrganizedDatabaseService {
       data,
       timestamp: Date.now()
     });
+  }
+
+  invalidateCache(key) {
+    if (key) {
+      this.cache.delete(key);
+    } else {
+      this.cache.clear();
+    }
   }
 
   clearCache(key = null) {
