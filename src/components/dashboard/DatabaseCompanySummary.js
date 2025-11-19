@@ -233,24 +233,14 @@ const DatabaseCompanySummary = () => {
           <div>
             <div className="text-3xl font-bold text-orange-600 mb-1">
               {(() => {
-                // Calcular sentimiento promedio global desde localStorage
-                try {
-                  const storedSentimentData = localStorage.getItem('reportsSentimentData');
-                  if (storedSentimentData) {
-                    const sentimentData = JSON.parse(storedSentimentData);
-                    if (sentimentData && sentimentData.sentimentByCompany) {
-                      const sentiments = Object.values(sentimentData.sentimentByCompany)
-                        .map(company => company.average || 0)
-                        .filter(sentiment => sentiment !== 0);
-
-                      if (sentiments.length > 0) {
-                        const avgSentiment = sentiments.reduce((sum, sentiment) => sum + sentiment, 0) / sentiments.length;
-                        return avgSentiment.toFixed(2);
-                      }
-                    }
-                  }
-                } catch (error) {
-                  console.log('Error calculating global sentiment:', error);
+                // ✅ Calcular sentimiento promedio global desde datos reales de empresas
+                const sentiments = companies
+                  .map(company => company.sentimentScore || 0)
+                  .filter(sentiment => sentiment !== 0);
+                
+                if (sentiments.length > 0) {
+                  const avgSentiment = sentiments.reduce((sum, sentiment) => sum + sentiment, 0) / sentiments.length;
+                  return avgSentiment.toFixed(2);
                 }
                 return '0.00';
               })()}

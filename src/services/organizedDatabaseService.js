@@ -122,29 +122,53 @@ class OrganizedDatabaseService {
       const employees = await this.getEmployees();
       console.log('🔍 DEBUG: getCompaniesWithStats() - Empleados obtenidos:', employees.length);
 
-      // Calcular estadísticas por empresa
-      const companiesWithStats = companies.map(company => {
+      // Obtener estadísticas de comunicación reales para cada empresa
+      const companiesWithStats = await Promise.all(companies.map(async (company) => {
         const companyEmployees = employees.filter(emp => emp.company_id === company.id);
+        const employeeIds = companyEmployees.map(emp => emp.id);
         
-        // Calcular estadísticas básicas
-        const employeeCount = companyEmployees.length;
-        const sentMessages = Math.floor(Math.random() * 1000) + 100; // Placeholder
-        const readMessages = Math.floor(sentMessages * 0.8); // 80% de lectura
-        const sentimentScore = (Math.random() - 0.5) * 2; // Entre -1 y 1
-        const engagementRate = Math.floor(Math.random() * 30) + 70; // Entre 70-100%
+        // ✅ DATOS REALES DE COMUNICACIÓN
+        const { data: commLogs, error: commError } = await supabase
+          .from('communication_logs')
+          .select('status, type, employee_id, created_at')
+          .eq('company_id', company.id)
+          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Últimos 30 días
+
+        if (commError) {
+          console.error(`❌ Error obteniendo logs para empresa ${company.id}:`, commError);
+        }
+
+        const logs = commLogs || [];
         
+        // Calcular métricas reales
+        const sentMessages = logs.length;
+        const readMessages = logs.filter(log => log.status === 'read' || log.status === 'delivered').length;
+        const readRate = sentMessages > 0 ? (readMessages / sentMessages) * 100 : 0;
+        
+        // Sentimiento promedio (si existe el campo en la tabla)
+        const sentimentLogs = logs.filter(log => log.sentiment !== undefined);
+        const sentimentScore = sentimentLogs.length > 0
+          ? sentimentLogs.reduce((sum, log) => sum + (log.sentiment || 0), 0) / sentimentLogs.length
+          : 0;
+        
+        // Engagement rate basado en interacciones
+        const engagementRate = sentMessages > 0
+          ? Math.min(95, 70 + (readRate / 100) * 25) // Base 70% + bonus por lectura
+          : 0;
+
         return {
           ...company,
-          employeeCount,
+          employeeCount: companyEmployees.length,
           sentMessages,
           readMessages,
-          sentimentScore,
-          engagementRate,
-          scheduledMessages: Math.floor(Math.random() * 50),
-          draftMessages: Math.floor(Math.random() * 20),
-          nextScheduledDate: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+          readRate: Math.round(readRate),
+          sentimentScore: Math.round(sentimentScore * 100) / 100, // 2 decimales
+          engagementRate: Math.round(engagementRate),
+          scheduledMessages: logs.filter(log => log.status === 'scheduled').length,
+          draftMessages: logs.filter(log => log.status === 'draft').length,
+          lastActivity: logs.length > 0 ? logs[0].created_at : null
         };
-      });
+      }));
 
       console.log('✅ DEBUG: getCompaniesWithStats() - Estadísticas calculadas para', companiesWithStats.length, 'empresas');
       return companiesWithStats;
