@@ -805,11 +805,7 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 placeholder="Ej: Empresa XYZ"
                 required
-                disabled={isCompanySpecificMode}
               />
-              {isCompanySpecificMode && (
-                <p className="text-xs text-gray-500 mt-1">El nombre no se puede editar en modo específico</p>
-              )}
             </div>
 
             <div>
@@ -824,7 +820,6 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
                     checked={formData.status === 'active'}
                     onChange={() => handleInputChange('status', 'active')}
                     className="text-blue-600 focus:ring-blue-500"
-                    disabled={isCompanySpecificMode}
                   />
                   <span className="ml-2 text-sm text-gray-700">Activa</span>
                 </label>
@@ -835,14 +830,10 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
                     checked={formData.status === 'inactive'}
                     onChange={() => handleInputChange('status', 'inactive')}
                     className="text-blue-600 focus:ring-blue-500"
-                    disabled={isCompanySpecificMode}
                   />
                   <span className="ml-2 text-sm text-gray-700">Inactiva</span>
                 </label>
               </div>
-              {isCompanySpecificMode && (
-                <p className="text-xs text-gray-500 mt-1">El estado no se puede editar en modo específico</p>
-              )}
             </div>
           </div>
 
@@ -856,11 +847,7 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
               rows={3}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
               placeholder="Descripción opcional de la empresa"
-              disabled={isCompanySpecificMode}
             />
-            {isCompanySpecificMode && (
-              <p className="text-xs text-gray-500 mt-1">La descripción no se puede editar en modo específico</p>
-            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -875,11 +862,7 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
                 onChange={(e) => handleInputChange('telegram_bot', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 placeholder="https://t.me/tu_bot"
-                disabled={isCompanySpecificMode}
               />
-              {isCompanySpecificMode && (
-                <p className="text-xs text-gray-500 mt-1">El bot de Telegram no se puede editar en modo específico</p>
-              )}
             </div>
 
             <div>
@@ -893,11 +876,7 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
                 onChange={(e) => handleInputChange('whatsapp_number', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 placeholder="+56912345678"
-                disabled={isCompanySpecificMode}
               />
-              {isCompanySpecificMode && (
-                <p className="text-xs text-gray-500 mt-1">El número de WhatsApp no se puede editar en modo específico</p>
-              )}
             </div>
           </div>
         </div>

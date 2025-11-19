@@ -46,6 +46,12 @@ class OrganizedDatabaseService {
     try {
       console.log('🔍 DEBUG: organizedDatabaseService.getCompanies() - Consultando BD (Production mode: ' + (process.env.NODE_ENV || 'development') + ')...');
       
+      // 🐛 DEBUG: Identificar quién está llamando este método
+      const stack = new Error().stack;
+      const callerLine = stack.split('\n')[2] || '';
+      const caller = callerLine.includes('(') ? callerLine.split('(')[1].split(')')[0] : callerLine;
+      console.log('🔍 DEBUG: organizedDatabaseService.getCompanies() - Llamado desde:', caller || 'unknown');
+      
       // ⚡ PERFORMANCE FIX: Optimize query for production
       const selectFields = process.env.NODE_ENV === 'production'
         ? 'id, name, industry, created_at'
@@ -127,10 +133,10 @@ class OrganizedDatabaseService {
         const companyEmployees = employees.filter(emp => emp.company_id === company.id);
         const employeeIds = companyEmployees.map(emp => emp.id);
         
-        // ✅ DATOS REALES DE COMUNICACIÓN
+        // ✅ DATOS REALES DE COMUNICACIÓN - Usar columnas que existen en la tabla
         const { data: commLogs, error: commError } = await supabase
           .from('communication_logs')
-          .select('status, channel_id, recipient_ids, created_at')
+          .select('status, type, employee_id, created_at')
           .eq('company_id', company.id)
           .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Últimos 30 días
 
@@ -148,9 +154,9 @@ class OrganizedDatabaseService {
         // Sentimiento promedio (placeholder - la tabla no tiene sentiment_score actualmente)
         const sentimentScore = 0; // Valor neutral hasta que se agregue la columna
         
-        // Engagement rate basado en interacciones
+        // Engagement rate basado en interacciones (0% cuando no hay mensajes)
         const engagementRate = sentMessages > 0
-          ? Math.min(95, 70 + (readRate / 100) * 25) // Base 70% + bonus por lectura
+          ? Math.min(95, (readRate / 100) * 95) // Basado solo en tasa de lectura real
           : 0;
 
         return {
