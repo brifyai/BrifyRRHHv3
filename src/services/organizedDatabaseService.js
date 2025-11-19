@@ -130,7 +130,7 @@ class OrganizedDatabaseService {
         // ✅ DATOS REALES DE COMUNICACIÓN
         const { data: commLogs, error: commError } = await supabase
           .from('communication_logs')
-          .select('status, type, employee_id, created_at')
+          .select('status, channel_id, recipient_ids, created_at')
           .eq('company_id', company.id)
           .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Últimos 30 días
 
@@ -142,14 +142,11 @@ class OrganizedDatabaseService {
         
         // Calcular métricas reales
         const sentMessages = logs.length;
-        const readMessages = logs.filter(log => log.status === 'read' || log.status === 'delivered').length;
+        const readMessages = logs.filter(log => log.status === 'read').length;
         const readRate = sentMessages > 0 ? (readMessages / sentMessages) * 100 : 0;
         
-        // Sentimiento promedio (si existe el campo en la tabla)
-        const sentimentLogs = logs.filter(log => log.sentiment !== undefined);
-        const sentimentScore = sentimentLogs.length > 0
-          ? sentimentLogs.reduce((sum, log) => sum + (log.sentiment || 0), 0) / sentimentLogs.length
-          : 0;
+        // Sentimiento promedio (placeholder - la tabla no tiene sentiment_score actualmente)
+        const sentimentScore = 0; // Valor neutral hasta que se agregue la columna
         
         // Engagement rate basado en interacciones
         const engagementRate = sentMessages > 0
