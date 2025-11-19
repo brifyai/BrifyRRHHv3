@@ -1,24 +1,25 @@
 import React, { Suspense } from 'react';
 import EnhancedLoadingSpinner from './EnhancedLoadingSpinner.js';
 
-const SuspenseWrapper = ({ 
-  children, 
+// ✅ CORREGIDO: Extraer el fallback a una función fuera del componente
+const DefaultFallback = ({ message, fullScreen }) => (
+  <EnhancedLoadingSpinner
+    message={message}
+    size="large"
+    fullScreen={fullScreen}
+    showProgress={true}
+  />
+);
+
+const SuspenseWrapper = ({
+  children,
   fallback = null,
   message = "Cargando componente...",
-  fullScreen = false 
+  fullScreen = false
 }) => {
-  // Si no se proporciona un fallback personalizado, usar el EnhancedLoadingSpinner
-  const defaultFallback = fallback || (
-    <EnhancedLoadingSpinner 
-      message={message}
-      size="large"
-      fullScreen={fullScreen}
-      showProgress={true}
-    />
-  );
-
+  // ✅ CORREGIDO: Usar el fallback directamente en Suspense
   return (
-    <Suspense fallback={defaultFallback}>
+    <Suspense fallback={fallback || <DefaultFallback message={message} fullScreen={fullScreen} />}>
       {children}
     </Suspense>
   );
