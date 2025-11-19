@@ -73,9 +73,6 @@ const CompanyCard = React.memo(({ company, isFlipped, onToggleFlip }) => {
                 <h4 className="text-lg font-bold text-gray-900 leading-tight">
                   {company.name}
                 </h4>
-                <p className="text-sm text-gray-500">
-                  ID: {company.id.slice(0, 8)}...
-                </p>
               </div>
             </div>
             <div className="text-right">
