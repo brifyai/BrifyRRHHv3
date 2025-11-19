@@ -117,7 +117,7 @@ useEffect(() => {
       });
       loadFoldersForCurrentPage();
     }
-  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length, loadFoldersForCurrentPage]);
+  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length]);
 
   // Actualizar totalItems cuando cambian los filtros o la búsqueda (sin limpiar carpetas)
   useEffect(() => {
