@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
 import {
@@ -24,13 +24,7 @@ const UserManagement = () => {
   const [editingUser, setEditingUser] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -48,7 +42,11 @@ useEffect(() => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleCreateUser = () => {
     setEditingUser(null)
