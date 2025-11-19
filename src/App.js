@@ -374,22 +374,26 @@ function App() {
               />
               {/* Ruta de prueba de colores */}
               {/* Rutas de comunicación interna - Sistema moderno unificado */}
-            <Route 
-              path="/communication" 
+            <Route
+              path="/communication"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="dashboard" />
+                    <SuspenseWrapper message="Cargando dashboard de comunicaciones...">
+                      <WebrifyCommunicationDashboard activeTab="dashboard" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/base-de-datos"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="dashboard" />
+                    <SuspenseWrapper message="Cargando base de datos...">
+                      <WebrifyCommunicationDashboard activeTab="dashboard" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -399,60 +403,72 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="database" />
+                    <SuspenseWrapper message="Cargando base de datos...">
+                      <WebrifyCommunicationDashboard activeTab="database" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/communication/send" 
+            <Route
+              path="/communication/send"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="send" />
+                    <SuspenseWrapper message="Cargando envío de mensajes...">
+                      <WebrifyCommunicationDashboard activeTab="send" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/communication/folders" 
+            <Route
+              path="/communication/folders"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="folders" />
+                    <SuspenseWrapper message="Cargando carpetas...">
+                      <WebrifyCommunicationDashboard activeTab="folders" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/communication/templates" 
+            <Route
+              path="/communication/templates"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="templates" />
+                    <SuspenseWrapper message="Cargando plantillas...">
+                      <WebrifyCommunicationDashboard activeTab="templates" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/communication/bulk-upload" 
+            <Route
+              path="/communication/bulk-upload"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="bulk-upload" />
+                    <SuspenseWrapper message="Cargando carga masiva...">
+                      <WebrifyCommunicationDashboard activeTab="bulk-upload" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="/communication/reports" 
+            <Route
+              path="/communication/reports"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WebrifyCommunicationDashboard activeTab="reports" />
+                    <SuspenseWrapper message="Cargando reportes...">
+                      <WebrifyCommunicationDashboard activeTab="reports" />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
 
 
