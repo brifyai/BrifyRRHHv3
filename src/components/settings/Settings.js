@@ -151,7 +151,7 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
         // Cargar la empresa específica para editar
         const loadSpecificCompany = async () => {
           try {
-            const companiesData = await organizedDatabaseService.getCompanies()
+            const companiesData = await companySyncService.getCompanies()
             const specificCompany = companiesData.find(c => c.id === companyIdFromUrl)
             if (specificCompany) {
               setEditingCompany(specificCompany)
@@ -179,40 +179,54 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     }
   }, [propCompanyId, location.pathname, companies.length])
 
+  // ✅ FIX MINIFICACIÓN: Mover loadData ANTES de useEffect con useCallback
+  const loadData = useCallback(async () => {
+    try {
+      // Cargar datos de forma secuencial para evitar parpadeo
+      await loadCompanies()
+      
+      // Cargar configuraciones locales en paralelo (no causan re-renders significativos)
+      await Promise.all([
+        loadNotificationSettings(),
+        loadSecuritySettings(),
+        loadActiveSessions(),
+        loadSecurityLogs(),
+        loadBackupSettings(),
+        loadHierarchyMode(),
+        checkGoogleDriveConnection(),
+        checkBrevoConfiguration(),
+        checkGroqConfiguration(),
+        checkWhatsAppConfiguration(),
+        checkWhatsAppOfficialConfiguration(),
+        checkWhatsAppWahaConfiguration(),
+        checkTelegramConfiguration()
+      ])
+    } catch (error) {
+      console.error('Error loading settings data:', error)
+    }
+  }, [
+    loadCompanies,
+    loadNotificationSettings,
+    loadSecuritySettings,
+    loadActiveSessions,
+    loadSecurityLogs,
+    loadBackupSettings,
+    loadHierarchyMode,
+    checkGoogleDriveConnection,
+    checkBrevoConfiguration,
+    checkGroqConfiguration,
+    checkWhatsAppConfiguration,
+    checkWhatsAppOfficialConfiguration,
+    checkWhatsAppWahaConfiguration,
+    checkTelegramConfiguration
+  ])
+
   useEffect(() => {
     // Evitar ejecución múltiple si no hay usuario
     if (!user?.id) return
     
     // Usar un flag para evitar ejecuciones duplicadas
     let isMounted = true
-    
-    const loadData = async () => {
-      try {
-        // Cargar datos de forma secuencial para evitar parpadeo
-        await loadCompanies()
-        
-        if (!isMounted) return
-        
-        // Cargar configuraciones locales en paralelo (no causan re-renders significativos)
-        await Promise.all([
-          loadNotificationSettings(),
-          loadSecuritySettings(),
-          loadActiveSessions(),
-          loadSecurityLogs(),
-          loadBackupSettings(),
-          loadHierarchyMode(),
-          checkGoogleDriveConnection(),
-          checkBrevoConfiguration(),
-          checkGroqConfiguration(),
-          checkWhatsAppConfiguration(),
-          checkWhatsAppOfficialConfiguration(),
-          checkWhatsAppWahaConfiguration(),
-          checkTelegramConfiguration()
-        ])
-      } catch (error) {
-        console.error('Error loading settings data:', error)
-      }
-    }
     
     if (isMounted) {
       loadData()
@@ -221,8 +235,7 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     return () => {
       isMounted = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]) // Mantener solo la dependencia esencial para evitar ciclos infinitos
+  }, [user?.id, loadData]) // Incluir loadData en dependencias
 
   // Eliminado el useEffect que causaba parpadeo - ahora el tab se maneja de forma estática
 
@@ -831,8 +844,18 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     try {
       setLoading(true)
 
-      // Usar el servicio de base de datos organizada para cargar empresas reales
-      const companiesData = await organizedDatabaseService.getCompanies()
+      // Invalidar caché para forzar lectura fresca de Supabase
+      companySyncService.invalidateCache('companies_all')
+      
+      // Usar el servicio de sincronización para cargar empresas (maneja caché e invalidación)
+      const companiesData = await companySyncService.getCompanies()
+      
+      // 🐛 DEBUG: Verificar valores reales de status
+      console.log('=== DEBUG: Empresas cargadas ===')
+      companiesData?.forEach(company => {
+        console.log(`Empresa: ${company.name}, Status: "${company.status}" (${typeof company.status})`)
+      })
+      
       setCompanies(companiesData || [])
 
     } catch (error) {
@@ -920,6 +943,10 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       await companySyncService.updateCompany(company.id, {
         status: newStatus
       })
+      
+      // Invalidar caché para forcer lectura fresca de Supabase
+      companySyncService.invalidateCache('companies_all')
+      companySyncService.invalidateCache('company_' + company.id)
       
       // Actualizar estado local
       setCompanies(prev => prev.map(c =>
