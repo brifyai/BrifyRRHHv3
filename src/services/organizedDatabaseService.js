@@ -48,7 +48,7 @@ class OrganizedDatabaseService {
       
       // ⚡ PERFORMANCE FIX: Optimize query for production
       const selectFields = process.env.NODE_ENV === 'production'
-        ? 'id, name, industry, employee_count, created_at'
+        ? 'id, name, industry, created_at'
         : '*';
 
       const { data, error } = await supabase
