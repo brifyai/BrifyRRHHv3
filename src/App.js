@@ -11,6 +11,8 @@ import './lib/forcedSupabaseClient.js'
 import LoadingSpinner from './components/common/LoadingSpinner.js'
 import Navbar from './components/layout/Navbar.js'
 import GoogleAuthCallback from './components/auth/GoogleAuthCallback.js'
+import ReactErrorBoundary from './components/error/ReactErrorBoundary.js'
+import SuspenseWrapper from './components/common/SuspenseWrapper.js'
 
 // Componentes grandes - Lazy Loading para reducir bundle size
 const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword.js'))
@@ -22,8 +24,6 @@ const Profile = lazy(() => import('./components/profile/Profile.js'))
 const SemanticSearch = lazy(() => import('./components/embeddings/SemanticSearch.js'))
 const Abogado = lazy(() => import('./components/legal/Abogado.js'))
 const HomeStaffHubSEO = lazy(() => import('./components/home/HomeStaffHubSEO.js'))
-const ReactErrorBoundary = lazy(() => import('./components/error/ReactErrorBoundary.js'))
-const SuspenseWrapper = lazy(() => import('./components/common/SuspenseWrapper.js'))
 const LoginUltraModern = lazy(() => import('./components/auth/LoginRedesigned.js'))
 const RegisterInnovador = lazy(() => import('./components/auth/RegisterInnovador.js'))
 const ModernDashboard = lazy(() => import('./components/dashboard/ModernDashboardRedesigned.js'))
