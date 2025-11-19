@@ -333,6 +333,24 @@ const ModernDashboardRedesigned = () => {
       }
     }
   }, [user, userProfile]) // eslint-disable-line react-hooks/exhaustive-deps
+  // ✅ POLLING: Actualizar datos cada 30 segundos para tiempo real
+  useEffect(() => {
+    if (!user || !userProfile) return;
+    
+    console.log('⏰ Dashboard: Iniciando polling cada 30 segundos');
+    const interval = setInterval(() => {
+      console.log('🔄 Dashboard: Polling activo - recargando datos...');
+      // Invalidar caché antes de recargar
+      cacheRef.current.isValid = false;
+      loadDashboardData();
+    }, 30000); // 30 segundos
+
+    return () => {
+      console.log('⏰ Dashboard: Deteniendo polling');
+      clearInterval(interval);
+    };
+  }, [user, userProfile, loadDashboardData]);
+
 
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 Bytes'

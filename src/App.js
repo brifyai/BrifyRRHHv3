@@ -365,7 +365,9 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <AuthenticatedLayout>
-                      <Abogado />
+                      <SuspenseWrapper message="Cargando asistente legal...">
+                        <Abogado />
+                      </SuspenseWrapper>
                     </AuthenticatedLayout>
                   </ProtectedRoute>
                 }
@@ -461,7 +463,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <BrevoStatisticsDashboard />
+                    <SuspenseWrapper message="Cargando estadísticas de Brevo...">
+                      <BrevoStatisticsDashboard />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -473,7 +477,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <BrevoTemplatesManager />
+                    <SuspenseWrapper message="Cargando gestor de plantillas...">
+                      <BrevoTemplatesManager />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -528,15 +534,17 @@ function App() {
             />
 
             {/* Ruta de prueba de empresas y empleados */}
-            <Route 
-              path="/test-company-employee" 
+            <Route
+              path="/test-company-employee"
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <CompanyEmployeeTest />
+                    <SuspenseWrapper message="Cargando prueba de empresa/empleado...">
+                      <CompanyEmployeeTest />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
-              } 
+              }
             />
             
             {/* Ruta de prueba de sincronización de empresas */}
@@ -545,7 +553,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <CompanySyncTest />
+                    <SuspenseWrapper message="Cargando prueba de sincronización...">
+                      <CompanySyncTest />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
@@ -557,7 +567,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AuthenticatedLayout>
-                    <WhatsAppAPITest />
+                    <SuspenseWrapper message="Cargando prueba de WhatsApp...">
+                      <WhatsAppAPITest />
+                    </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
