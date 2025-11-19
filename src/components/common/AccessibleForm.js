@@ -425,22 +425,7 @@ const AccessibleForm = ({
 /**
  * Componente de campo de formulario accesible
  */
-export const AccessibleField = ({
-  label,
-  name,
-  type = 'text',
-  required = false,
-  placeholder,
-  autoComplete,
-  ariaLabel,
-  ariaDescribedBy,
-  className = '',
-  ...props
-}) => {
-  const fieldId = `field-${name}`;
-  const errorId = `${name}-error`;
-  
-  return (
+export  return (
     <div className="form-field" style={{ marginBottom: '1rem' }}>
       {label && (
         <label 
@@ -499,19 +484,7 @@ export const AccessibleField = ({
 /**
  * Componente de select accesible
  */
-export const AccessibleSelect = ({
-  label,
-  name,
-  options = [],
-  required = false,
-  placeholder,
-  ariaLabel,
-  className = '',
-  ...props
-}) => {
-  const fieldId = `select-${name}`;
-  
-  return (
+export  return (
     <div className="form-field" style={{ marginBottom: '1rem' }}>
       {label && (
         <label 
@@ -583,19 +556,7 @@ export const AccessibleSelect = ({
 /**
  * Componente de textarea accesible
  */
-export const AccessibleTextarea = ({
-  label,
-  name,
-  required = false,
-  placeholder,
-  rows = 4,
-  maxLength,
-  ariaLabel,
-  className = '',
-  ...props
-}) => {
-  const fieldId = `textarea-${name}`;
-  const characterCountId = `${name}-char-count`;
+export  const characterCountId = `${name}-char-count`;
   
   return (
     <div className="form-field" style={{ marginBottom: '1rem' }}>

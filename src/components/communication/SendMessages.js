@@ -1234,10 +1234,7 @@ const SendMessages = () => {
         <script>
           function updateVideoPlatform() {
             const calendarSelect = document.getElementById('appointment-calendar');
-            const platformSelect = document.getElementById('appointment-platform');
-            const selectedCalendar = calendarSelect.value;
-
-            if (selectedCalendar === 'google-calendar') {
+            const platformSelect = document.getElementById('appointment-platform');            if (selectedCalendar === 'google-calendar') {
               platformSelect.value = 'google-meet';
             } else if (selectedCalendar === 'microsoft-365') {
               platformSelect.value = 'microsoft-teams';

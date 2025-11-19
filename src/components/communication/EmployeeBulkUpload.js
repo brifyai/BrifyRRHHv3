@@ -24,7 +24,7 @@ const EmployeeBulkUpload = () => {
 
   useEffect(() => {
     loadCompanies();
-  }, []);
+  }, [loadCompanies]);
 
   const loadCompanies = async () => {
     try {

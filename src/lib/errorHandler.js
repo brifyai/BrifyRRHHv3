@@ -239,38 +239,31 @@ class ErrorHandler {
 const errorHandler = new ErrorHandler();
 
 // Métodos de conveniencia para tipos comunes de errores
-export const createNetworkError = (message, context = {}) => {
-  return new AppError(message, ErrorType.NETWORK, ErrorSeverity.HIGH, context);
-};
+export const createNetworkError = (message, context = {}) =>
+  new AppError(message, ErrorType.NETWORK, ErrorSeverity.HIGH, context);
 
-export const createDatabaseError = (message, context = {}) => {
-  return new AppError(message, ErrorType.DATABASE, ErrorSeverity.HIGH, context);
-};
+export const createDatabaseError = (message, context = {}) =>
+  new AppError(message, ErrorType.DATABASE, ErrorSeverity.CRITICAL, context);
 
-export const createAuthError = (message, context = {}) => {
-  return new AppError(message, ErrorType.AUTHENTICATION, ErrorSeverity.MEDIUM, context);
-};
+export const createAuthError = (message, context = {}) =>
+  new AppError(message, ErrorType.AUTHENTICATION, ErrorSeverity.HIGH, context);
 
-export const createValidationError = (message, context = {}) => {
-  return new AppError(message, ErrorType.VALIDATION, ErrorSeverity.LOW, context);
-};
+export const createValidationError = (message, context = {}) =>
+  new AppError(message, ErrorType.VALIDATION, ErrorSeverity.MEDIUM, context);
 
-export const createBusinessLogicError = (message, context = {}) => {
-  return new AppError(message, ErrorType.BUSINESS_LOGIC, ErrorSeverity.MEDIUM, context);
-};
+export const createBusinessLogicError = (message, context = {}) =>
+  new AppError(message, ErrorType.BUSINESS_LOGIC, ErrorSeverity.MEDIUM, context);
 
-export const createUIError = (message, context = {}) => {
-  return new AppError(message, ErrorType.UI, ErrorSeverity.LOW, context);
-};
+export const createUIError = (message, context = {}) =>
+  new AppError(message, ErrorType.UI, ErrorSeverity.LOW, context);
 
-export const createCriticalError = (message, context = {}) => {
-  return new AppError(message, ErrorType.SYSTEM, ErrorSeverity.CRITICAL, context);
-};
+export const createCriticalError = (message, context = {}) =>
+  new AppError(message, ErrorType.SYSTEM, ErrorSeverity.CRITICAL, context);
 
 // Función helper para manejar errores en async/await
-export const safeAsync = async (asyncFn, context = {}) => {
+export const safeAsync = async (promise, context = {}) => {
   try {
-    const result = await asyncFn();
+    const result = await promise;
     return { success: true, data: result, error: null };
   } catch (error) {
     const structuredError = errorHandler.handleError(error, context);
@@ -279,9 +272,9 @@ export const safeAsync = async (asyncFn, context = {}) => {
 };
 
 // Función helper para manejar errores en funciones síncronas
-export const safeSync = (syncFn, context = {}) => {
+export const safeSync = (fn, context = {}) => {
   try {
-    const result = syncFn();
+    const result = fn();
     return { success: true, data: result, error: null };
   } catch (error) {
     const structuredError = errorHandler.handleError(error, context);

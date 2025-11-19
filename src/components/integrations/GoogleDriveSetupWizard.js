@@ -172,10 +172,9 @@ const GoogleDriveSetupWizard = () => {
 
       {/* Steps */}
       <div className="space-y-4">
-        {steps.map((step, index) => {
-          const status = getStepStatus(step.id);
-          const isActive = status === 'active';
-          const isCompleted = status === 'completed';
+        {steps.map((step, index) => {          const stepStatus = getStepStatus(step.id);
+          const isActive = stepStatus === 'active';
+          const isCompleted = stepStatus === 'completed';
 
           return (
             <div

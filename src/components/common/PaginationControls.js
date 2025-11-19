@@ -193,14 +193,7 @@ const PaginationControls = ({
 /**
  * Versión simplificada para navegación básica
  */
-export const SimplePagination = ({
-  currentPage,
-  totalPages,
-  onPageChange,
-  className = ''
-}) => {
-  const hasPrevious = currentPage > 1;
-  const hasNext = currentPage < totalPages;
+export  const hasNext = currentPage < totalPages;
 
   return (
     <div className={`flex items-center justify-between ${className}`}>

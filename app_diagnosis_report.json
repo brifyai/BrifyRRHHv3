@@ -1,0 +1,54 @@
+{
+  "git": {
+    "status": "?? app_diagnosis_report.json\n?? check_netlify_route.mjs\n?? diagnose_app_status.mjs\n?? diagnose_company_cards.mjs\n?? diagnose_netlify_error.mjs\n?? inspect_schema.mjs\n?? seed_companies.mjs\n?? seed_companies_server.mjs\n?? test_env.mjs",
+    "lastCommit": "e9f1a9d fix: add missing useEffect to load company data on mount in DatabaseCompanySummary",
+    "branch": "main",
+    "remote": "origin\thttps://github.com/brifyai/BrifyRRHHv3.git (fetch)"
+  },
+  "database": {},
+  "environment": {
+    "REACT_APP_SUPABASE_URL": "Missing/Invalid",
+    "REACT_APP_SUPABASE_ANON_KEY": "Missing/Invalid",
+    "REACT_APP_GOOGLE_CLIENT_ID": "Missing/Invalid",
+    "REACT_APP_ENVIRONMENT": "Missing/Invalid",
+    "REACT_APP_NETLIFY_URL": "Missing/Invalid"
+  },
+  "build": {
+    "directoryExists": true,
+    "size": "7 archivos         23.463 bytes\r\n               3 archivos         16.931 bytes\r\n               0 archivos              0 bytes\r\n               6 archivos        168.110 bytes\r\n              61 archivos      5.496.768 bytes\r\n              77 archivos      5.705.272 bytes\r\n              14 dirs  888.007.270.400 bytes libres",
+    "version": "0.1.0",
+    "scripts": [
+      "start",
+      "server",
+      "dev",
+      "dev:win",
+      "build",
+      "test",
+      "test:sentiment",
+      "eject",
+      "start:prod",
+      "build:prod",
+      "deploy:check",
+      "deploy:prepare",
+      "deploy:netlify",
+      "deploy:backend",
+      "deploy:full",
+      "prod:test",
+      "prod:verify"
+    ]
+  },
+  "issues": [
+    "DB companies: Missing Supabase configuration. Please check your environment variables.",
+    "DB employees: Missing Supabase configuration. Please check your environment variables.",
+    "DB folders: Missing Supabase configuration. Please check your environment variables.",
+    "DB documents: Missing Supabase configuration. Please check your environment variables.",
+    "DB communication_logs: Missing Supabase configuration. Please check your environment variables.",
+    "DB users: Missing Supabase configuration. Please check your environment variables.",
+    "Database: Missing Supabase configuration. Please check your environment variables.",
+    "Env REACT_APP_SUPABASE_URL: Not configured",
+    "Env REACT_APP_SUPABASE_ANON_KEY: Not configured",
+    "Env REACT_APP_GOOGLE_CLIENT_ID: Not configured",
+    "Env REACT_APP_ENVIRONMENT: Not configured",
+    "Env REACT_APP_NETLIFY_URL: Not configured"
+  ]
+}

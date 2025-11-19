@@ -432,10 +432,7 @@ class EmbeddingsService {
         console.warn('Error getting token usage:', tokenError);
       }
 
-      const tokensUsed = tokenUsage?.tokens_used || 0;
-      const totalTokensFromPlan = tokenUsage?.total_tokens || 0;
-
-      // Obtener información del usuario y su plan
+      const tokensUsed = tokenUsage?.tokens_used || 0;      // Obtener información del usuario y su plan
       console.log('EmbeddingsService: Fetching user and plan data for userId:', userId);
       const { data: user, error: userError } = await supabase
         .from('users')

@@ -887,11 +887,7 @@ useEffect(() => {
     }
   };
 
-  // Calcular filteredEmployees para el conteo total
-  const filteredEmployeesForCount = employees.filter(employee => {
-    if (!employee?.email) return false;
-
-    const companyName = (employee.company && employee.company.name) || (employee.companies && employee.companies.name) || '';
+  // Calcular filteredEmployees para el conteo total    const companyName = (employee.company && employee.company.name) || (employee.companies && employee.companies.name) || '';
     const term = (searchTerm || '').toLowerCase();
 
     const matchesSearch =

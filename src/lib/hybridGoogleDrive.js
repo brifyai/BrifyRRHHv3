@@ -246,4 +246,4 @@ class HybridGoogleDrive {
   }
 }
 
-export const hybridGoogleDrive = new HybridGoogleDrive();
+export

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { hybridGoogleDrive } from '../../lib/hybridGoogleDrive.js';
+import googleDriveConsolidatedService from '../../lib/googleDriveConsolidated.js';
 
 const GoogleDriveLocalTest = () => {
   const [status, setStatus] = useState('No inicializado');
@@ -20,16 +20,23 @@ useEffect(() => {
       setError(null);
       setStatus('Inicializando...');
       
-      const initialized = await hybridGoogleDrive.initialize();
+      // Obtener userId del usuario autenticado (simulado para prueba)
+      // En un componente real, esto vendría de useAuth o similar
+      const userId = 'test-user-id'; // Placeholder para prueba
+      
+      const initialized = await googleDriveConsolidatedService.initialize(userId);
       
       if (initialized) {
         setStatus('✅ Inicializado correctamente');
-        const info = hybridGoogleDrive.getServiceInfo();
-        const stats = hybridGoogleDrive.getStats();
+        
+        // Obtener estadísticas del servicio
+        const connectionStatus = await googleDriveConsolidatedService.getConnectionStatus();
         
         setServiceInfo({
-          ...info,
-          ...stats
+          service: 'GoogleDriveConsolidated',
+          connected: connectionStatus.connected,
+          email: connectionStatus.email,
+          ...connectionStatus
         });
         
         // Cargar archivos iniciales
@@ -48,7 +55,7 @@ useEffect(() => {
 
   const loadFiles = async () => {
     try {
-      const fileList = await hybridGoogleDrive.listFiles();
+      const fileList = await googleDriveConsolidatedService.listFiles();
       setFiles(fileList);
     } catch (error) {
       console.error('Error cargando archivos:', error);
@@ -60,7 +67,7 @@ useEffect(() => {
     try {
       setLoading(true);
       const folderName = `Carpeta Prueba ${new Date().toLocaleTimeString()}`;
-      const folder = await hybridGoogleDrive.createFolder(folderName);
+      const folder = await googleDriveConsolidatedService.createFolder(folderName);
       console.log('Carpeta creada:', folder);
       await loadFiles();
     } catch (error) {
@@ -79,7 +86,7 @@ useEffect(() => {
         type: 'text/plain'
       });
       
-      const uploadedFile = await hybridGoogleDrive.uploadFile(testFile);
+      const uploadedFile = await googleDriveConsolidatedService.uploadFile(testFile);
       console.log('Archivo subido:', uploadedFile);
       await loadFiles();
     } catch (error) {
@@ -91,7 +98,8 @@ useEffect(() => {
   };
 
   const clearStorage = () => {
-    hybridGoogleDrive.clearLocalStorage();
+    // El servicio consolidado no tiene clearLocalStorage
+    // Limpiamos los archivos y reinicializamos
     setFiles([]);
     initializeService();
   };
@@ -123,19 +131,14 @@ useEffect(() => {
                 <span className="font-medium">Servicio:</span> {serviceInfo.service}
               </div>
               <div>
-                <span className="font-medium">Es Real:</span> {serviceInfo.isReal ? 'Sí' : 'No'}
+                <span className="font-medium">Conectado:</span> {serviceInfo.connected ? 'Sí' : 'No'}
               </div>
               <div>
-                <span className="font-medium">Archivos:</span> {serviceInfo.files || 0}
+                <span className="font-medium">Email:</span> {serviceInfo.email || 'No conectado'}
               </div>
               <div>
-                <span className="font-medium">Carpetas:</span> {serviceInfo.folders || 0}
+                <span className="font-medium">Última Sincronización:</span> {serviceInfo.lastSync ? new Date(serviceInfo.lastSync).toLocaleString() : 'Nunca'}
               </div>
-              {serviceInfo.totalSizeFormatted && (
-                <div className="col-span-2">
-                  <span className="font-medium">Tamaño Total:</span> {serviceInfo.totalSizeFormatted}
-                </div>
-              )}
             </div>
           )}
         </div>

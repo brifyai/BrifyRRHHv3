@@ -186,9 +186,7 @@ const OptimizedLoader = ({
 /**
  * Hook personalizado para manejar estados de carga optimizados
  */
-export const useOptimizedLoading = (initialLoading = false) => {
-  const [loading, setLoading] = useState(initialLoading);
-  const [loadingMessage, setLoadingMessage] = useState('Cargando...');
+export  const [loadingMessage, setLoadingMessage] = useState('Cargando...');
   const [startTime, setStartTime] = useState(null);
   const timeoutRef = useRef(null);
 

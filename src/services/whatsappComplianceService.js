@@ -200,10 +200,7 @@ class WhatsAppComplianceService {
     if (cached !== null) return cached;
 
     try {
-      const now = new Date();
-      const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-
-      // Buscar última interacción del usuario
+      const now = new Date();      // Buscar última interacción del usuario
       const { data, error } = await supabase
         .from('whatsapp_logs')
         .select('created_at, direction, message_type')

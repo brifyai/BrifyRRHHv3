@@ -230,13 +230,9 @@ class DatabaseEmployeeService {
 
   // Obtener próximo mensaje programado
   async getNextScheduledMessage(companyId) {
-    try {
-      // Como no hay tabla de mensajes, retornamos null
-      return null;
-    } catch (error) {
-      console.error('Error obteniendo próximo mensaje programado:', error);
-      throw error;
-    }
+    // Como no hay tabla de mensajes, retornamos null
+    // Función placeholder para futura implementación
+    return null;
   }
 
   // Obtener estadísticas generales para el dashboard

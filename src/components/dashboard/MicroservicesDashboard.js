@@ -18,7 +18,7 @@ const MicroservicesDashboard = () => {
   // 1. CARGAR EMPRESAS AL MONTAR
   useEffect(() => {
     loadCompanies();
-  }, []);
+  }, [loadCompanies]);
 
   // 2. SUSCRIBIRSE A NOTIFICACIONES EN TIEMPO REAL
   useEffect(() => {
@@ -479,17 +479,7 @@ const MicroservicesDashboard = () => {
   );
 };
 
-// Componente auxiliar para mostrar estado
-const StatusBadge = ({ status }) => {
-  const styles = {
-    queued: 'bg-gray-200 text-gray-700',
-    processing: 'bg-blue-200 text-blue-700 animate-pulse',
-    completed: 'bg-green-200 text-green-700',
-    error: 'bg-red-200 text-red-700',
-    cancelled: 'bg-yellow-200 text-yellow-700'
-  };
-
-  const labels = {
+// Componente auxiliar para mostrar estado  const labels = {
     queued: 'En Cola',
     processing: 'Procesando',
     completed: 'Completado',

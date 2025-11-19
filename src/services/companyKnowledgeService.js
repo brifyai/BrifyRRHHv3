@@ -112,10 +112,7 @@ class CompanyKnowledgeService {
    */
   async createDriveFolderStructure(companyData, userId) {
     try {
-      const companyName = companyData.name.replace(/[^a-zA-Z0-9s]/g, '').trim();
-      const timestamp = new Date().toISOString().split('T')[0];
-      
-      // 1. Carpeta principal de la empresa
+      const companyName = companyData.name.replace(/[^a-zA-Z0-9s]/g, '').trim();      // 1. Carpeta principal de la empresa
       const mainFolder = await googleDriveService.createFolder(
         `${companyName} - Base de Conocimiento`
       );

@@ -306,10 +306,7 @@ Proporciona solo el mensaje mejorado, sin explicaciones adicionales.`;
       }
       
       // Analizar características comunes de los destinatarios
-      const commonDepartments = [...new Set(targetRecipients.map(r => r.department))];
-      const commonLevels = [...new Set(targetRecipients.map(r => r.level))];
-      
-      // Si hay un departamento dominante, personalizar para ese grupo
+      const commonDepartments = [...new Set(targetRecipients.map(r => r.department))];      // Si hay un departamento dominante, personalizar para ese grupo
       if (commonDepartments.length === 1 && commonDepartments[0]) {
         const deptPersonalization = await this.personalizeForDepartment(
           message, 
@@ -523,10 +520,7 @@ Proporciona solo el mensaje adaptado, sin explicaciones adicionales.`;
       // Obtener historial conversacional del usuario
       const userHistory = this.conversationHistory.get(userId) || [];
       
-      // Obtener preferencias del usuario
-      const userPrefs = this.userPreferences.get(userId) || {};
-      
-      // Analizar sentimiento del mensaje
+      // Obtener preferencias del usuario      // Analizar sentimiento del mensaje
       const sentimentAnalysis = await groqService.analyzeSentiment(userMessage);
       
       // Generar respuesta usando GROQ con contexto completo

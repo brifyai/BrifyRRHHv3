@@ -84,15 +84,14 @@ export const validateGoogleDriveConfig = () => {
 /**
  * Obtiene la URL de autorización de Google
  */
-export const getGoogleAuthUrl = (state = '') => {
+export const getGoogleAuthUrl = () => {
   const params = new URLSearchParams({
     client_id: GOOGLE_DRIVE_CONFIG.clientId,
     redirect_uri: GOOGLE_DRIVE_CONFIG.redirectUri,
-    response_type: 'code',
     scope: GOOGLE_DRIVE_CONFIG.scopes.join(' '),
+    response_type: 'code',
     access_type: 'offline',
-    prompt: 'consent',
-    state: state || Math.random().toString(36).substring(7)
+    prompt: 'consent'
   });
   
   return `${GOOGLE_DRIVE_CONFIG.oauth.authorizationUrl}?${params.toString()}`;
@@ -101,14 +100,12 @@ export const getGoogleAuthUrl = (state = '') => {
 /**
  * Obtiene información del ambiente
  */
-export const getEnvironmentInfo = () => {
-  return {
-    isProduction,
-    isNetlify,
-    isLocal: !isProduction && !isNetlify,
-    baseUrl: GOOGLE_DRIVE_CONFIG.baseUrl,
-    redirectUri: GOOGLE_DRIVE_CONFIG.redirectUri
-  };
-};
+export const getEnvironmentInfo = () => ({
+  isProduction,
+  isNetlify,
+  baseUrl: GOOGLE_DRIVE_CONFIG.baseUrl,
+  redirectUri: GOOGLE_DRIVE_CONFIG.redirectUri,
+  debug: GOOGLE_DRIVE_CONFIG.debug
+});
 
 export default GOOGLE_DRIVE_CONFIG;

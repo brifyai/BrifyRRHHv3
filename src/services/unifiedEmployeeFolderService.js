@@ -6,13 +6,13 @@
 import { supabase } from '../lib/supabaseClient.js'
 import superLockService from '../lib/superLockService.js'
 import organizedDatabaseService from './organizedDatabaseService.js'
-import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js'
+import googleDriveConsolidatedService from '../lib/googleDriveConsolidated.js'
 import logger from '../lib/logger.js'
 
 class UnifiedEmployeeFolderService {
   constructor() {
     this.initialized = false
-    this.hybridDriveInitialized = false
+    this.driveInitialized = false
     this.supabase = supabase
   }
 
@@ -44,22 +44,21 @@ class UnifiedEmployeeFolderService {
   }
 
   /**
-   * INICIALIZAR HYBRID DRIVE
+   * INICIALIZAR GOOGLE DRIVE CONSOLIDADO
    */
-  async initializeHybridDrive() {
-    if (this.hybridDriveInitialized) return true
+  async initializeGoogleDrive(userId) {
+    if (this.driveInitialized) return true
     
     try {
-      const success = await hybridGoogleDrive.initialize()
+      const success = await googleDriveConsolidatedService.initialize(userId)
       if (success) {
-        this.hybridDriveInitialized = true
-        const serviceInfo = hybridGoogleDrive.getServiceInfo()
-        console.log(`✅ ${serviceInfo.service} inicializado para servicio unificado`)
+        this.driveInitialized = true
+        console.log(`✅ GoogleDriveConsolidated inicializado para servicio unificado`)
         return true
       }
       return false
     } catch (error) {
-      console.error('❌ Error inicializando Hybrid Drive:', error)
+      console.error('❌ Error inicializando Google Drive Consolidado:', error)
       return false
     }
   }
@@ -67,11 +66,12 @@ class UnifiedEmployeeFolderService {
   /**
    * CREAR CARPETA CON SUPER LOCK OBLIGATORIO
    */
-  async createEmployeeFolder(employeeEmail, employeeData) {
+  async createEmployeeFolder(employeeEmail, employeeData, userId) {
     return await superLockService.withSuperLock(
       employeeEmail,
       async () => {
         await this.initialize()
+        await this.initializeGoogleDrive(userId)
         
         // 1. VERIFICAR SI YA EXISTE EN SUPABASE
         const existingSupabase = await this.checkSupabaseExists(employeeEmail)
@@ -101,7 +101,7 @@ class UnifiedEmployeeFolderService {
         }
 
         // 3. CREAR NUEVA CARPETA
-        const newFolder = await this.createNewFolder(employeeEmail, employeeData)
+        const newFolder = await this.createNewFolder(employeeEmail, employeeData, userId)
         return {
           folder: newFolder,
           created: true,
@@ -141,17 +141,16 @@ class UnifiedEmployeeFolderService {
    */
   async checkDriveExists(employeeEmail, employeeName) {
     try {
-      if (!this.hybridDriveInitialized) {
+      if (!this.driveInitialized) {
         console.log(`⚠️ Drive no inicializado para ${employeeEmail}`)
         return null
       }
 
-      const serviceInfo = hybridGoogleDrive.getServiceInfo()
       const companyName = 'Empresa' // Se puede obtener de employeeData
       
       // Buscar carpeta principal de la empresa
       const parentFolderName = `Empleados - ${companyName}`
-      const folders = await hybridGoogleDrive.listFiles()
+      const folders = await googleDriveConsolidatedService.listFiles()
       const parentFolder = folders.find(folder =>
         folder.name === parentFolderName &&
         folder.mimeType === 'application/vnd.google-apps.folder'
@@ -164,7 +163,7 @@ class UnifiedEmployeeFolderService {
 
       // Buscar carpeta del empleado
       const folderName = `${employeeName} (${employeeEmail})`
-      const employeeFiles = await hybridGoogleDrive.listFiles(parentFolder.id)
+      const employeeFiles = await googleDriveConsolidatedService.listFiles(parentFolder.id)
       const existingFolder = employeeFiles.find(file =>
         file.name === folderName &&
         file.mimeType === 'application/vnd.google-apps.folder'
@@ -180,12 +179,12 @@ class UnifiedEmployeeFolderService {
   /**
    * CREAR NUEVA CARPETA
    */
-  async createNewFolder(employeeEmail, employeeData) {
+  async createNewFolder(employeeEmail, employeeData, userId) {
     try {
       const companyName = await this.getCompanyName(employeeData.company_id)
       
       // 1. CREAR CARPETA EN GOOGLE DRIVE
-      const driveFolder = await this.createDriveFolder(employeeEmail, employeeData.name, companyName)
+      const driveFolder = await this.createDriveFolder(employeeEmail, employeeData.name, companyName, userId)
       
       // 2. CREAR REGISTRO EN SUPABASE
       const supabaseRecord = await this.createSupabaseRecord(
@@ -196,7 +195,7 @@ class UnifiedEmployeeFolderService {
       )
       
       // 3. COMPARTIR CARPETA
-      await this.shareDriveFolder(driveFolder.id, employeeEmail)
+      await this.shareDriveFolder(driveFolder.id, employeeEmail, userId)
       
       console.log(`✅ Carpeta creada exitosamente para ${employeeEmail}`)
       return supabaseRecord
@@ -209,16 +208,16 @@ class UnifiedEmployeeFolderService {
   /**
    * CREAR CARPETA EN GOOGLE DRIVE
    */
-  async createDriveFolder(employeeEmail, employeeName, companyName) {
+  async createDriveFolder(employeeEmail, employeeName, companyName, userId) {
     try {
       const parentFolderName = `Empleados - ${companyName}`
       
       // Buscar o crear carpeta principal
-      let parentFolder = await this.findOrCreateParentFolder(parentFolderName)
+      let parentFolder = await this.findOrCreateParentFolder(parentFolderName, userId)
       
       // Crear carpeta del empleado
       const folderName = `${employeeName} (${employeeEmail})`
-      const employeeFolder = await hybridGoogleDrive.createFolder(folderName, parentFolder.id)
+      const employeeFolder = await googleDriveConsolidatedService.createFolder(folderName, parentFolder.id)
       
       return employeeFolder
     } catch (error) {
@@ -230,9 +229,9 @@ class UnifiedEmployeeFolderService {
   /**
    * BUSCAR O CREAR CARPETA PRINCIPAL
    */
-  async findOrCreateParentFolder(folderName) {
+  async findOrCreateParentFolder(folderName, userId) {
     try {
-      const folders = await hybridGoogleDrive.listFiles()
+      const folders = await googleDriveConsolidatedService.listFiles()
       const parentFolder = folders.find(folder =>
         folder.name === folderName &&
         folder.mimeType === 'application/vnd.google-apps.folder'
@@ -241,7 +240,7 @@ class UnifiedEmployeeFolderService {
       if (parentFolder) {
         return parentFolder
       } else {
-        return await hybridGoogleDrive.createFolder(folderName)
+        return await googleDriveConsolidatedService.createFolder(folderName)
       }
     } catch (error) {
       console.error(`❌ Error buscando/creando carpeta principal ${folderName}:`, error)
@@ -303,9 +302,9 @@ class UnifiedEmployeeFolderService {
   /**
    * COMPARTIR CARPETA
    */
-  async shareDriveFolder(folderId, employeeEmail) {
+  async shareDriveFolder(folderId, employeeEmail, userId) {
     try {
-      await hybridGoogleDrive.shareFolder(folderId, employeeEmail, 'writer')
+      await googleDriveConsolidatedService.shareFolder(folderId, employeeEmail, 'writer')
       console.log(`📤 Carpeta compartida con ${employeeEmail}`)
     } catch (error) {
       console.warn(`⚠️ No se pudo compartir carpeta con ${employeeEmail}:`, error.message)
@@ -359,7 +358,7 @@ class UnifiedEmployeeFolderService {
   /**
    * CREAR CARPETAS PARA TODOS LOS EMPLEADOS
    */
-  async createFoldersForAllEmployees() {
+  async createFoldersForAllEmployees(userId) {
     try {
       console.log('🚀 Iniciando creación masiva con servicio unificado...')
       
@@ -377,7 +376,7 @@ class UnifiedEmployeeFolderService {
         }
 
         try {
-          const result = await this.createEmployeeFolder(employee.email, employee)
+          const result = await this.createEmployeeFolder(employee.email, employee, userId)
           
           if (result.created) {
             if (result.newlyCreated) {

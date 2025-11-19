@@ -32,11 +32,7 @@ import trendsAnalysisService from '../../services/trendsAnalysisService.js';
 import ProductionDatabaseDebugger from '../debug/ProductionDatabaseDebugger.js';
 import ProductionEnvChecker from '../debug/ProductionEnvChecker.js';
 import Swal from 'sweetalert2';
-import withReactContent from 'sweetalert2-react-content';
-
-const MySwal = withReactContent(Swal);
-
-// LOG EXTREMO - Función para debuggear
+import withReactContent from 'sweetalert2-react-content';// LOG EXTREMO - Función para debuggear
 const EXTREME_LOG = (label, data) => {
   console.log(`🔍 [EXTREME DEBUG] ${label}:`, JSON.parse(JSON.stringify(data)));
 };

@@ -39,7 +39,7 @@ const WhatsAppSetupWizard = () => {
   // Cargar empresas al montar
   React.useEffect(() => {
     loadCompanies();
-  }, []);
+  }, [loadCompanies]);
 
   const loadCompanies = async () => {
     try {

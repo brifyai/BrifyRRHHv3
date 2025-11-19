@@ -67,9 +67,7 @@ async function processGoogleCalendarNotification(notification, req) {
     // En las notificaciones de Google Calendar Push, solo obtenemos headers con metadatos
     // Necesitamos hacer una petición a la Calendar API para obtener los detalles del evento
 
-    const channelId = req.headers['x-goog-channel-id'];
-    const resourceId = req.headers['x-goog-resource-id'];
-    const resourceState = req.headers['x-goog-resource-state'];
+    const channelId = req.headers['x-goog-channel-id'];    const resourceState = req.headers['x-goog-resource-state'];
 
     if (!channelId) {
       console.error('❌ No es una notificación válida de Google Calendar: falta x-goog-channel-id');
@@ -192,9 +190,7 @@ async function processCalendarEvent(event, userId) {
   try {
     const eventId = event.id;
     const summary = event.summary || 'Sin título';
-    const startTime = event.start?.dateTime || event.start?.date;
-    const endTime = event.end?.dateTime || event.end?.date;
-    const description = event.description || '';
+    const startTime = event.start?.dateTime || event.start?.date;    const description = event.description || '';
     const location = event.location || '';
 
     console.log('📅 Procesando evento:', summary, 'ID:', eventId);

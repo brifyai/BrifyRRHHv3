@@ -28,7 +28,7 @@ const EmployeeFolderManager = () => {
   // Cargar carpetas al montar el componente
   useEffect(() => {
     loadFolders();
-  }, []);
+  }, [loadFolders]);
 
   const loadFolders = async () => {
     try {

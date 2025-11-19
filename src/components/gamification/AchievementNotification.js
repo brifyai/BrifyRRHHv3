@@ -197,10 +197,7 @@ const AchievementNotification = ({ user, employeeId, onDismiss }) => {
 };
 
 // Componente para mostrar notificaciones de puntos
-export const PointsNotification = ({ points, activity, isVisible, onDismiss }) => {
-  if (!isVisible) return null;
-
-  const getActivityIcon = (activityType) => {
+export  const getActivityIcon = (activityType) => {
     switch (activityType) {
       case 'message_sent':
         return <GiftIcon className="h-5 w-5 text-green-600" />;
@@ -253,14 +250,7 @@ export const PointsNotification = ({ points, activity, isVisible, onDismiss }) =
 };
 
 // Hook personalizado para manejar notificaciones de gamificación
-export const useGamificationNotifications = (user, employeeId) => {
-  const [pointsNotification, setPointsNotification] = useState({
-    isVisible: false,
-    points: 0,
-    activity: ''
-  });
-
-  const showPointsNotification = (points, activity) => {
+export  const showPointsNotification = (points, activity) => {
     setPointsNotification({
       isVisible: true,
       points,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { hybridGoogleDrive } from '../../lib/hybridGoogleDrive.js';
+import googleDriveConsolidatedService from '../../lib/googleDriveConsolidated.js';
 
 const GoogleDriveProductionDiagnosis = () => {
   const [diagnosis, setDiagnosis] = useState({
@@ -61,17 +61,19 @@ useEffect(() => {
     try {
       console.log('🔍 Iniciando diagnóstico del servicio de Google Drive...');
       
-      const initialized = await hybridGoogleDrive.initialize();
+      const userId = 'test-user-id'; // Placeholder
+      const initialized = await googleDriveConsolidatedService.initialize(userId);
       
       if (initialized) {
-        const serviceInfo = hybridGoogleDrive.getServiceInfo();
-        const stats = hybridGoogleDrive.getStats();
+        const connectionStatus = await googleDriveConsolidatedService.getConnectionStatus();
         
         setDiagnosis(prev => ({
           ...prev,
           serviceInfo: {
-            ...serviceInfo,
-            ...stats
+            service: 'GoogleDriveConsolidated',
+            connected: connectionStatus.connected,
+            email: connectionStatus.email,
+            ...connectionStatus
           }
         }));
       }

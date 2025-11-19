@@ -57,7 +57,7 @@ const MultiWhatsAppManager = () => {
     loadConfigurations();
     loadCompanies();
     loadTemplates();
-  }, []);
+  }, [loadCompanies]);
 
   const loadConfigurations = async () => {
     try {

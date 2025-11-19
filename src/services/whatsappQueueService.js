@@ -244,10 +244,7 @@ class WhatsAppQueueService {
    * @param {Object} config - Configuración de WhatsApp
    */
   async checkRateLimits(config) {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-
-    // Verificar límites diarios
+    const now = new Date();    // Verificar límites diarios
     if (config.messages_sent_today >= config.daily_limit) {
       throw new Error(`Límite diario alcanzado (${config.daily_limit} mensajes)`);
     }

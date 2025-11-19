@@ -125,12 +125,7 @@ export const errorHandlingConfig = {
 /**
  * Inicializa el sistema de manejo de errores con la configuración
  */
-export const initializeErrorHandling = () => {
-  try {
-    // Configurar el logger
-    logger.configure(errorHandlingConfig.logger);
-
-    // Configurar el manejador de errores
+export    // Configurar el manejador de errores
     errorHandler.configure(errorHandlingConfig.errorHandler);
 
     // Suscribirse a errores globales
@@ -311,11 +306,7 @@ const sendErrorReport = async () => {
 /**
  * Utilidades para manejo de errores específicos de la aplicación
  */
-export const AppErrorUtils = {
-  // Crear error de red
-  createNetworkError: (message, context = {}) => {
-    return errorHandler.createError(message, 'NETWORK', 'HIGH', context);
-  },
+export  },
 
   // Crear error de base de datos
   createDatabaseError: (message, context = {}) => {

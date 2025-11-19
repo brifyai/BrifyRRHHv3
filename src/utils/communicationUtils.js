@@ -24,7 +24,7 @@ export const getSimulatedWhatsApp = (employee) => {
 };
 
 export const getSimulatedTelegram = (employee) => {
-  // Usar el mismo hash para consistencia
+  // Usar un hash simple del ID para generar un número consistente
   const hash = employee.id.split('-').join('').slice(0, 8);
   const numericId = parseInt(hash, 16) || parseInt(employee.id) || 0;
   const enabled = numericId % 10 < 7; // 70% habilitado
@@ -34,8 +34,7 @@ export const getSimulatedTelegram = (employee) => {
   };
 };
 
-export const getSimulatedSMS = (employee) => {
-  const whatsappData = getSimulatedWhatsApp(employee);
+export const getSimulatedSMS = (employee, whatsappData) => {
   return {
     enabled: whatsappData.enabled, // SMS usa el mismo número que WhatsApp
     phone: whatsappData.phone
@@ -43,7 +42,7 @@ export const getSimulatedSMS = (employee) => {
 };
 
 export const getSimulatedMailing = (employee) => {
-  // Usar el mismo hash para consistencia
+  // Usar un hash simple del ID para generar un número consistente
   const hash = employee.id.split('-').join('').slice(0, 8);
   const numericId = parseInt(hash, 16) || parseInt(employee.id) || 0;
   const enabled = employee.email && numericId % 10 < 6; // 60% de los que tienen email

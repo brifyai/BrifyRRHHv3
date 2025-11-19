@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ChartBarIcon,
@@ -10,9 +10,6 @@ import {
   Bars3Icon,
   XMarkIcon,
   ArrowUpTrayIcon,
-  SparklesIcon,
-  BellIcon,
-  LightBulbIcon,
   ChevronDownIcon,
   ChevronUpIcon
 } from '@heroicons/react/24/outline';
@@ -21,15 +18,18 @@ import SendMessages from './SendMessages.js';
 import EmployeeFolders from './EmployeeFolders.js';
 import TemplatesDashboard from './TemplatesDashboard.js';
 import ReportsDashboard from './ReportsDashboard.js';
-import EmployeeBulkUpload from './EmployeeBulkUpload.js'; // Importar el nuevo componente
+import EmployeeBulkUpload from './EmployeeBulkUpload.js';
+import DashboardHeader from './DashboardHeader.js';
+import CompanySelector from './CompanySelector.js';
+import MetricsGrid from './MetricsGrid.js';
+import InsightsPanel from './InsightsPanel.js';
+import RecommendationsPanel from './RecommendationsPanel.js';
 import templateService from '../../services/templateService.js';
 import databaseEmployeeService from '../../services/databaseEmployeeService.js';
-import communicationService from '../../services/communicationService.js';
 import organizedDatabaseService from '../../services/organizedDatabaseService.js';
 import trendsAnalysisService from '../../services/trendsAnalysisService.js';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import FlipCard from '../common/FlipCard.js';
 
 const MySwal = withReactContent(Swal);
 
@@ -186,21 +186,19 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
       // Esperar un tick para asegurar que el estado se limpie
       await new Promise(resolve => setTimeout(resolve, 0));
       
-      // Intentar cargar desde la base de datos primero
-      console.log('🔍 DEBUG: Llamando a organizedDatabaseService.getCompanies()...');
-      const companiesData = await organizedDatabaseService.getCompanies();
-      console.log('🔍 DEBUG: organizedDatabaseService.getCompanies() retornó:', {
-        cantidad: companiesData?.length || 0,
-        datos: companiesData,
-        tipos: companiesData?.map(c => ({ id: c.id, name: c.name, tipo: typeof c.id }))
+      // ✅ OPTIMIZACIÓN: Cargar empresas y empleados en paralelo con Promise.all
+      console.log('🔍 DEBUG: Llamando a organizedDatabaseService.getCompanies() y getEmployees() en paralelo...');
+      const [companiesData, employeesData] = await Promise.all([
+        organizedDatabaseService.getCompanies(),
+        organizedDatabaseService.getEmployees()
+      ]);
+      
+      console.log('🔍 DEBUG: Resultados de carga paralela:', {
+        companies: companiesData?.length || 0,
+        employees: employeesData?.length || 0
       });
       
       if (companiesData && companiesData.length > 0) {
-        // Si hay datos en la BD, usarlos
-        console.log('🔍 DEBUG: Hay empresas en BD, cargando empleados...');
-        const employeesData = await organizedDatabaseService.getEmployees();
-        console.log('🔍 DEBUG: organizedDatabaseService.getEmployees() retornó:', employeesData?.length || 0, 'empleados');
-        
         // Verificar si hay duplicados antes de establecer el estado
         const uniqueCompanies = companiesData.filter((company, index, self) =>
           index === self.findIndex((c) => c.id === company.id)
@@ -210,25 +208,16 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
           console.warn('⚠️ Se detectaron duplicados en companiesData:', {
             original: companiesData.length,
             unique: uniqueCompanies.length,
-            duplicados: companiesData.length - uniqueCompanies.length,
-            datosOriginales: companiesData,
-            datosUnicos: uniqueCompanies,
-            idsOriginales: companiesData.map(c => c.id),
-            idsUnicos: uniqueCompanies.map(c => c.id)
+            duplicados: companiesData.length - uniqueCompanies.length
           });
         }
         
         console.log('🔍 DEBUG: Estableciendo companiesFromDB con', uniqueCompanies.length, 'empresas únicas');
         setCompaniesFromDB(uniqueCompanies);
-        setEmployees(employeesData);
-        
-        // Verificar el estado después de establecerlo
-        setTimeout(() => {
-          console.log('🔍 DEBUG: Estado de companiesFromDB después de establecer:', companiesFromDB.length, 'empresas');
-        }, 100);
+        setEmployees(employeesData || []);
         
         console.log('✅ Empresas únicas cargadas desde BD:', uniqueCompanies.length);
-        console.log('✅ Empleados cargados desde BD:', employeesData.length);
+        console.log('✅ Empleados cargados desde BD:', employeesData?.length || 0);
       } else {
         // ✅ CORRECCIÓN: Si no hay datos en la BD, no usar fallback que causa duplicación
         console.log('🔍 DEBUG: No hay empresas en BD, manteniendo lista vacía para evitar duplicaciones');
@@ -308,33 +297,40 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
       try {
         console.log('🔄 Inicializando dashboard de comunicación...');
         
-        // PASO 1: Cargar empresas primero
-        await loadCompaniesFromDB();
+        // ✅ OPTIMIZACIÓN: Cargar todas las fuentes de datos en paralelo
+        // PASO 1: Cargar empresas y datos auxiliares simultáneamente
+        const [companiesResult, templatesResult, dashboardStatsResult] = await Promise.all([
+          // Cargar empresas (internamente ya carga empleados en paralelo)
+          loadCompaniesFromDB(),
+          // Cargar conteo de plantillas
+          templateService.getTemplatesCount(),
+          // Cargar estadísticas del dashboard
+          databaseEmployeeService.getDashboardStats()
+        ]);
+        
+        console.log('✅ Datos iniciales cargados en paralelo');
+        
+        // Establecer datos auxiliares
+        setTemplatesCount(templatesResult);
+        setSentMessages(dashboardStatsResult.sentMessages);
+        setReadRate(dashboardStatsResult.readRate);
         
         // PASO 2: Una vez cargadas las empresas, cargar insights
-        if (companiesFromDB.length > 0) {
-          await loadCompanyInsights();
-        }
-        
-        // PASO 3: Cargar datos auxiliares
-        try {
-          const [templatesCount, dashboardStats] = await Promise.all([
-            templateService.getTemplatesCount(),
-            databaseEmployeeService.getDashboardStats()
-          ]);
-          setTemplatesCount(templatesCount);
-          setSentMessages(dashboardStats.sentMessages);
-          setReadRate(dashboardStats.readRate);
-        } catch (error) {
-          console.warn('Error cargando datos auxiliares:', error);
-          setTemplatesCount(0);
-          setSentMessages(0);
-          setReadRate(0);
-        }
+        // Nota: companiesFromDB se actualizará después de loadCompaniesFromDB
+        // Usamos setTimeout para esperar a que el estado se actualice
+        setTimeout(() => {
+          if (companiesFromDB.length > 0) {
+            loadCompanyInsights();
+          }
+        }, 100);
         
         console.log('✅ Dashboard inicializado completamente');
       } catch (error) {
         console.error('❌ Error inicializando dashboard:', error);
+        // Fallback para datos auxiliares en caso de error
+        setTemplatesCount(0);
+        setSentMessages(0);
+        setReadRate(0);
       }
     };
     
@@ -423,19 +419,7 @@ useEffect(() => {
 
   // Función para renderizar insights dinámicos
   const renderCompanyInsights = (companyName, insights) => {
-    if (!insights) {
-      return (
-        <div className="space-y-4">
-          <div className="bg-white/70 rounded-lg p-4">
-            <div className="flex items-center mb-2">
-              <div className="w-2 h-2 bg-gray-500 rounded-full mr-2"></div>
-              <span className="text-sm font-medium text-gray-700">Cargando insights...</span>
-            </div>
-            <p className="text-sm text-gray-600">Los insights de IA se están generando automáticamente.</p>
-          </div>
-        </div>
-      );
-    }
+    if (!insights) return null;
 
     const sortedFrontInsights = sortInsights([...(insights.frontInsights || [])]);
 
@@ -467,19 +451,7 @@ useEffect(() => {
 
   // Función para renderizar insights del reverso
   const renderBackInsights = (companyName, insights) => {
-    if (!insights) {
-      return (
-        <div className="space-y-4">
-          <div className="bg-white/70 rounded-lg p-4">
-            <div className="flex items-center mb-2">
-              <div className="w-2 h-2 bg-gray-500 rounded-full mr-2"></div>
-              <span className="text-sm font-medium text-gray-700">Más insights próximamente</span>
-            </div>
-            <p className="text-sm text-gray-600">Se están recopilando datos adicionales para insights más detallados.</p>
-          </div>
-        </div>
-      );
-    }
+    if (!insights) return null;
 
     const sortedBackInsights = sortInsights([...(insights.backInsights || [])]);
 
@@ -600,231 +572,42 @@ useEffect(() => {
             </div>
             
             <div className="mt-8">
-              {/* Análisis Inteligente de Tendencias - Diseño Moderno y Compacto */}
+              {/* Análisis Inteligente de Tendencias - Usando componentes modulares */}
               <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl p-8 border border-gray-200 shadow-lg">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center">
-                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded-xl mr-4 shadow-lg">
-                      <SparklesIcon className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Análisis Inteligente de Tendencias
-                      </h3>
-                      <p className="text-gray-600 text-sm">Insights generados por IA sobre comunicación y engagement</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Selector de Empresas */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-purple-200 mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <BuildingOfficeIcon className="w-4 h-4 text-purple-600" />
-                      <label className="text-sm font-medium text-gray-700">
-                        Empresa:
-                      </label>
-                    </div>
-                    <div className="flex-1 max-w-xs">
-                      {loadingCompanies ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-sm text-gray-500">Cargando empresas...</span>
-                        </div>
-                      ) : (
-                        <select
-                          value={selectedCompany}
-                          onChange={(e) => setSelectedCompany(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900"
-                        >
-                          <option value="all">Todas las empresas</option>
-                          {companiesFromDB.map((company) => {
-                            console.log('🔍 DEBUG: Renderizando empresa en selector:', company);
-                            return (
-                              <option key={company.id} value={company.id}>
-                                {company.name}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      )}
-                    </div>
-                    {companyMetrics && (
-                      <div className="flex items-center gap-4 text-xs">
-                        <div className="flex items-center gap-1">
-                          <span className="text-gray-500">Empleados:</span>
-                          <span className="font-semibold text-purple-600">{companyMetrics.employeeCount}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-gray-500">Engagement:</span>
-                          <span className="font-semibold text-green-600">{companyMetrics.engagementRate}%</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Métricas Principales - 100% Datos Reales de Supabase */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-purple-100 hover:shadow-md transition-all duration-300 hover:scale-102">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="bg-purple-100 p-2 rounded-lg">
-                        <ChartBarIcon className="h-5 w-5 text-purple-600" />
-                      </div>
-                      <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                        {companyMetrics?.engagementRate > 0 ? `+${companyMetrics.engagementRate}%` : 'Sin datos'}
-                      </span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {companyMetrics?.engagementRate ?? 0}%
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {selectedCompany !== 'all' ? 'Engagement Real' : 'Engagement Promedio Real'}
-                    </p>
-                  </div>
-
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-blue-100 hover:shadow-md transition-all duration-300 hover:scale-102">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="bg-blue-100 p-2 rounded-lg">
-                        <BellIcon className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                        {companyMetrics?.messageStats?.total > 0 ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {companyMetrics?.messageStats?.total > 0
-                        ? Math.round((companyMetrics.messageStats.read / companyMetrics.messageStats.total) * 100)
-                        : 0}%
-                    </p>
-                    <p className="text-sm text-gray-600">Tasa de Lectura Real</p>
-                  </div>
-
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-cyan-100 hover:shadow-md transition-all duration-300 hover:scale-102">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="bg-cyan-100 p-2 rounded-lg">
-                        <LightBulbIcon className="h-5 w-5 text-cyan-600" />
-                      </div>
-                      <span className="text-xs font-medium text-orange-600 bg-orange-100 px-2 py-1 rounded-full">
-                        {companyMetrics?.messageStats?.total > 0 ? 'Con datos' : 'Sin datos'}
-                      </span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {companyMetrics?.messageStats?.total ?? 0}
-                    </p>
-                    <p className="text-sm text-gray-600">Mensajes Enviados Reales</p>
-                  </div>
-
-                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-rose-100 hover:shadow-md transition-all duration-300 hover:scale-102">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="bg-rose-100 p-2 rounded-lg">
-                        <SparklesIcon className="h-5 w-5 text-rose-600" />
-                      </div>
-                      <span className="text-xs font-medium text-rose-600 bg-rose-100 px-2 py-1 rounded-full">Real</span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {companyMetrics?.employeeCount ?? employees.length}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {selectedCompany !== 'all' ? 'Empleados Reales' : 'Total Empleados Reales'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Secciones Expandibles */}
+                <DashboardHeader />
+                
+                <CompanySelector
+                  companies={companiesFromDB}
+                  selectedCompany={selectedCompany}
+                  onCompanyChange={setSelectedCompany}
+                  loadingCompanies={loadingCompanies}
+                  companyMetrics={companyMetrics}
+                />
+                
+                <MetricsGrid
+                  companyMetrics={companyMetrics}
+                  employees={employees}
+                  selectedCompany={selectedCompany}
+                />
+                
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Insights Clave */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-purple-200">
-                    <button
-                      onClick={() => setExpandedSections(prev => ({ ...prev, insights: !prev.insights }))}
-                      className="flex items-center justify-between w-full mb-4 hover:bg-purple-50 p-2 rounded-lg transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <LightBulbIcon className="h-5 w-5 text-purple-600 mr-2" />
-                        <h4 className="text-lg font-semibold text-gray-900">Insights Clave</h4>
-                      </div>
-                      {expandedSections.insights ? (
-                        <ChevronUpIcon className="h-5 w-5 text-gray-500" />
-                      ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-gray-500" />
-                      )}
-                    </button>
-                    
-                    {expandedSections.insights && (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {selectedCompany !== 'all' && companyInsights[companiesFromDB.find(c => c.id === selectedCompany)?.name] ? (
-                          // Mostrar insights específicos de la empresa seleccionada
-                          renderCompanyInsights(companiesFromDB.find(c => c.id === selectedCompany)?.name, companyInsights[companiesFromDB.find(c => c.id === selectedCompany)?.name])
-                        ) : (
-                          // Mostrar insights generales cuando no hay empresa seleccionada
-                          <>
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                              <div className="flex items-center mb-1">
-                                <div className="w-2 h-2 bg-gray-500 rounded-full mr-2"></div>
-                                <span className="text-sm font-medium text-gray-800">Sin Datos</span>
-                              </div>
-                              <p className="text-sm text-gray-700">No hay mensajes enviados aún. Los insights aparecerán cuando haya actividad de comunicación real.</p>
-                            </div>
-                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                              <div className="flex items-center mb-1">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                                <span className="text-sm font-medium text-blue-800">Estado Actual</span>
-                              </div>
-                              <p className="text-sm text-gray-700">Base de datos conectada. Esperando datos de comunicación reales para generar insights.</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Recomendaciones */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-xl p-6 border border-blue-200">
-                    <button
-                      onClick={() => setExpandedSections(prev => ({ ...prev, recommendations: !prev.recommendations }))}
-                      className="flex items-center justify-between w-full mb-4 hover:bg-blue-50 p-2 rounded-lg transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <ChartBarIcon className="h-5 w-5 text-blue-600 mr-2" />
-                        <h4 className="text-lg font-semibold text-gray-900">Recomendaciones</h4>
-                      </div>
-                      {expandedSections.recommendations ? (
-                        <ChevronUpIcon className="h-5 w-5 text-gray-500" />
-                      ) : (
-                        <ChevronDownIcon className="h-5 w-5 text-gray-500" />
-                      )}
-                    </button>
-                    
-                    {expandedSections.recommendations && (
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {selectedCompany !== 'all' && companyInsights[companiesFromDB.find(c => c.id === selectedCompany)?.name] ? (
-                          // Mostrar recomendaciones específicas de la empresa seleccionada
-                          renderBackInsights(companiesFromDB.find(c => c.id === selectedCompany)?.name, companyInsights[companiesFromDB.find(c => c.id === selectedCompany)?.name])
-                        ) : (
-                          // Mostrar recomendaciones generales cuando no hay empresa seleccionada
-                          <>
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                              <div className="flex items-center mb-1">
-                                <div className="w-2 h-2 bg-gray-500 rounded-full mr-2"></div>
-                                <span className="text-sm font-medium text-gray-800">Sin Actividad</span>
-                              </div>
-                              <p className="text-sm text-gray-700">Las recomendaciones se generarán automáticamente cuando haya mensajes enviados.</p>
-                            </div>
-                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                              <div className="flex items-center mb-1">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                                <span className="text-sm font-medium text-blue-800">Sistema Listo</span>
-                              </div>
-                              <p className="text-sm text-gray-700">El análisis de IA está activo y esperando datos reales para generar recomendaciones.</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <InsightsPanel
+                    companyInsights={
+                      selectedCompany !== 'all' && companiesFromDB.find(c => c.id === selectedCompany)
+                        ? companyInsights[companiesFromDB.find(c => c.id === selectedCompany).name]
+                        : []
+                    }
+                    selectedCompany={selectedCompany}
+                  />
+                  
+                  <RecommendationsPanel
+                    recommendations={
+                      selectedCompany !== 'all' && companiesFromDB.find(c => c.id === selectedCompany)
+                        ? companyInsights[companiesFromDB.find(c => c.id === selectedCompany).name]?.backInsights || []
+                        : []
+                    }
+                  />
                 </div>
-
 
                 {/* Footer */}
                 <div className="mt-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
@@ -881,7 +664,7 @@ useEffect(() => {
                             setMobileMenuOpen(false);
                           }}
                           className={`flex items-center w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors duration-200 text-left ${
-                            window.location.pathname === tab.url
+                            location.pathname === tab.url
                               ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
                               : 'text-gray-700 hover:bg-gray-100'
                           }`}
@@ -906,7 +689,7 @@ useEffect(() => {
           <nav className="flex items-center justify-center gap-3 bg-gradient-to-r from-slate-50 to-gray-50 rounded-2xl p-4 shadow-lg border border-gray-200/50 backdrop-blur-sm overflow-x-auto">
             {tabs.map((tab) => {
               const Icon = tab.icon;
-              const isActive = window.location.pathname === tab.url;
+              const isActive = location.pathname === tab.url;
 
               return (
                 <div key={tab.id} className="relative group">

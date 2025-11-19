@@ -467,10 +467,7 @@ export const useAccessibility = () => {
 /**
  * Hook para manejar focus trap en modales
  */
-export const useFocusTrap = (isOpen, elementRef) => {
-  const { setupFocusTrap, releaseFocusTrap } = useAccessibility();
-
-  useEffect(() => {
+export  useEffect(() => {
     if (isOpen && elementRef.current) {
       const cleanup = setupFocusTrap(elementRef.current);
       return cleanup;
@@ -481,10 +478,7 @@ export const useFocusTrap = (isOpen, elementRef) => {
 /**
  * Hook para anuncios a lectores de pantalla
  */
-export const useScreenReaderAnnouncer = () => {
-  const { announceToScreenReader } = useAccessibility();
-
-  const announce = useCallback((message, priority = 'polite') => {
+export  const announce = useCallback((message, priority = 'polite') => {
     announceToScreenReader(message, priority);
   }, [announceToScreenReader]);
 
@@ -511,9 +505,7 @@ export const useScreenReaderAnnouncer = () => {
 /**
  * Hook para manejar preferencias de accesibilidad
  */
-export const useAccessibilityPreferences = () => {
-  const { getAccessibilityPreferences, applyAccessibilityPreferences } = useAccessibility();
-  const [preferences, setPreferences] = React.useState(null);
+export  const [preferences, setPreferences] = React.useState(null);
 
   useEffect(() => {
     const prefs = getAccessibilityPreferences();

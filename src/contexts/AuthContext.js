@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { auth, db } from '../lib/supabase.js'
 import toast from 'react-hot-toast'
 import unifiedEmployeeFolderService from '../services/unifiedEmployeeFolderService.js'
+import { showFriendlyError, showSimpleError, showAuthError } from '../utils/friendlyErrorHandler.js'
 
 const AuthContext = createContext({})
 
@@ -194,7 +195,8 @@ export const AuthProvider = ({ children }) => {
       const { data: authData, error: authError } = await auth.signUp(email, password, userData)
       
       if (authError) {
-        toast.error(authError.message)
+        console.error('Error técnico en registro:', authError)
+        showAuthError(authError, 'auth')
         return { error: authError }
       }
 
@@ -243,16 +245,16 @@ export const AuthProvider = ({ children }) => {
         const { data: profileData, error: profileError } = await db.users.upsert(userProfileData)
         
         if (profileError) {
-          console.error('Error creating user profile:', profileError)
+          console.error('Error técnico creando perfil:', profileError)
           // Solo mostrar error si es un error real, no si es por duplicado
           if (!profileError.message?.includes('duplicate') && !profileError.message?.includes('already exists')) {
-            toast.error('Error al crear el perfil de usuario')
+            showSimpleError(profileError, 'database')
             return { error: profileError }
           }
           // Si es un error de duplicado, continuar normalmente
-          console.log('User profile already exists, continuing...')
+          console.log('Perfil de usuario ya existe, continuando...')
         } else {
-          console.log('✅ User profile created successfully:', profileData)
+          console.log('✅ Perfil de usuario creado exitosamente:', profileData)
         }
 
         // Crear registro inicial en user_tokens_usage usando upsert
@@ -263,8 +265,9 @@ export const AuthProvider = ({ children }) => {
         })
         
         if (tokenError) {
-          console.error('Error creating initial token usage record:', tokenError)
+          console.error('Error técnico creando registro de tokens:', tokenError)
           // No retornamos error aquí porque no es crítico para el registro
+          // El usuario no necesita saber esto
         }
 
         // Crear carpeta de empleado automáticamente si el usuario tiene email
@@ -296,9 +299,9 @@ export const AuthProvider = ({ children }) => {
               console.log('🔄 Carpeta de empleado actualizada para:', email)
             }
           } catch (folderError) {
-            console.error('❌ Error creando carpeta automática para empleado:', folderError)
+            console.error('❌ Error técnico creando carpeta automática:', folderError)
             // No bloqueamos el registro si falla la creación de la carpeta
-            toast.error('Usuario registrado, pero hubo un error al crear la carpeta personal')
+            showSimpleError('Usuario registrado, pero hubo un error al crear la carpeta personal. Puedes crearla manualmente más tarde.', 'drive')
           }
         }
       }
@@ -306,8 +309,11 @@ export const AuthProvider = ({ children }) => {
       toast.success('Registro exitoso. Revisa tu email para confirmar tu cuenta.')
       return { data: authData }
     } catch (error) {
-      console.error('Error in signUp:', error)
-      toast.error('Error durante el registro')
+      console.error('Error técnico en signUp:', error)
+      showFriendlyError(error, 'auth', {
+        title: 'Error durante el registro',
+        confirmButtonText: 'Intentar nuevamente'
+      })
       return { error }
     } finally {
       setLoading(false)
@@ -322,7 +328,8 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await auth.signIn(email, password)
       
       if (error) {
-        toast.error(error.message)
+        console.error('Error técnico en inicio de sesión:', error)
+        showAuthError(error, 'auth')
         return { error }
       }
 
@@ -333,8 +340,11 @@ export const AuthProvider = ({ children }) => {
 
       return { data }
     } catch (error) {
-      console.error('Error in signIn:', error)
-      toast.error('Error durante el inicio de sesión')
+      console.error('Error técnico en signIn:', error)
+      showFriendlyError(error, 'auth', {
+        title: 'Error durante el inicio de sesión',
+        confirmButtonText: 'Intentar nuevamente'
+      })
       return { error }
     } finally {
       setLoading(false)
@@ -349,7 +359,8 @@ export const AuthProvider = ({ children }) => {
       const { error } = await auth.signOut()
       
       if (error) {
-        toast.error(error.message)
+        console.error('Error técnico en cierre de sesión:', error)
+        showSimpleError(error, 'auth')
         return { error }
       }
 
@@ -363,8 +374,11 @@ export const AuthProvider = ({ children }) => {
       
       return { error: null }
     } catch (error) {
-      console.error('Error in signOut:', error)
-      toast.error('Error al cerrar sesión')
+      console.error('Error técnico en signOut:', error)
+      showFriendlyError(error, 'auth', {
+        title: 'Error al cerrar sesión',
+        confirmButtonText: 'Aceptar'
+      })
       return { error }
     } finally {
       setLoading(false)
@@ -379,7 +393,8 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await db.users.update(user.id, updates)
       
       if (error) {
-        toast.error('Error al actualizar el perfil')
+        console.error('Error técnico actualizando perfil:', error)
+        showSimpleError(error, 'database')
         return { error }
       }
 
@@ -388,8 +403,11 @@ export const AuthProvider = ({ children }) => {
       toast.success('Perfil actualizado exitosamente')
       return { data }
     } catch (error) {
-      console.error('Error updating user profile:', error)
-      toast.error('Error al actualizar el perfil')
+      console.error('Error técnico en updateUserProfile:', error)
+      showFriendlyError(error, 'database', {
+        title: 'Error al actualizar el perfil',
+        confirmButtonText: 'Intentar nuevamente'
+      })
       return { error }
     }
   }
@@ -421,8 +439,11 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, error: null }
     } catch (error) {
-      console.error('Error en updateGoogleDriveCredentials:', error)
-      toast.error('Error conectando Google Drive')
+      console.error('Error técnico en updateGoogleDriveCredentials:', error)
+      showFriendlyError(error, 'drive', {
+        title: 'Error conectando Google Drive',
+        confirmButtonText: 'Revisar configuración'
+      })
       return { success: false, error: { message: error.message } }
     }
   }
@@ -437,7 +458,8 @@ export const AuthProvider = ({ children }) => {
       const googleDrivePersistenceService = (await import('../services/googleDrivePersistenceService.js')).default
       return await googleDrivePersistenceService.getConnectionStatus(user.id)
     } catch (error) {
-      console.error('Error obteniendo estado de Google Drive:', error)
+      console.error('Error técnico obteniendo estado de Google Drive:', error)
+      // No mostramos error al usuario porque es una verificación en background
       return { connected: false, email: null }
     }
   }
@@ -462,8 +484,11 @@ export const AuthProvider = ({ children }) => {
 
       return { success: true, error: null }
     } catch (error) {
-      console.error('Error en disconnectGoogleDrive:', error)
-      toast.error('Error desconectando Google Drive')
+      console.error('Error técnico en disconnectGoogleDrive:', error)
+      showFriendlyError(error, 'drive', {
+        title: 'Error desconectando Google Drive',
+        confirmButtonText: 'Intentar nuevamente'
+      })
       return { success: false, error: { message: error.message } }
     }
   }
@@ -478,7 +503,8 @@ export const AuthProvider = ({ children }) => {
       const googleDrivePersistenceService = (await import('../services/googleDrivePersistenceService.js')).default
       return await googleDrivePersistenceService.getValidAccessToken(user.id)
     } catch (error) {
-      console.error('Error obteniendo token válido:', error)
+      console.error('Error técnico obteniendo token válido:', error)
+      // No mostramos error al usuario porque es una operación en background
       return { token: null, error: { message: error.message } }
     }
   }
@@ -531,51 +557,71 @@ export const AuthProvider = ({ children }) => {
   // Efecto para manejar cambios de autenticación
   useEffect(() => {
     let profileLoadTimeout = null
+    let visibilityTimeout = null
+    let subscription = null
     
-    const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
-      console.log('AuthContext: Auth state change event:', event, 'session exists:', !!session)
-      
-      // Para INITIAL_SESSION, solo procesar si no tenemos userProfile
-      if (event === 'INITIAL_SESSION' && userProfile) {
-        console.log('AuthContext: INITIAL_SESSION with existing userProfile, skipping')
-        return
-      }
-      
-      setLoading(true)
-      
-      if (session?.user) {
-        setUser(session.user)
-        setIsAuthenticated(true)
+    // GUARDAR REF EN VARIABLE LOCAL PARA EVITAR MEMORY LEAK
+    const profileLoadProcessedRef = profileLoadProcessed.current
+    
+    // Inicializar subscription con manejo de errores
+    try {
+      const { data: { subscription: sub } } = auth.onAuthStateChange(async (event, session) => {
+        console.log('AuthContext: Auth state change event:', event, 'session exists:', !!session)
         
-        // Cargar perfil si no tenemos userProfile o si es INITIAL_SESSION
-        if (!userProfile || event === 'INITIAL_SESSION') {
-          console.log('AuthContext: Loading userProfile for event:', event)
-          // Debounce para evitar llamadas excesivas
-          if (profileLoadTimeout) {
-            clearTimeout(profileLoadTimeout)
-          }
-          
-          profileLoadTimeout = setTimeout(async () => {
-            try {
-              await loadUserProfile(session.user.id)
-            } catch (error) {
-              console.error('Error loading profile in auth state change:', error)
-            }
-          }, 300)
+        // Validar estado antes de procesar
+        if (!session && event !== 'SIGNED_OUT') {
+          console.warn('AuthContext: Evento inesperado sin sesión:', event)
+          return
         }
-      } else {
-        setUser(null)
-        setUserProfile(null)
-        setIsAuthenticated(false)
-        // Limpiar el registro cuando el usuario se desloguea
-        profileLoadProcessed.current.clear()
-      }
-      
+        
+        // Para INITIAL_SESSION, solo procesar si no tenemos userProfile
+        if (event === 'INITIAL_SESSION' && userProfile) {
+          console.log('AuthContext: INITIAL_SESSION with existing userProfile, skipping')
+          return
+        }
+        
+        setLoading(true)
+        
+        if (session?.user) {
+          setUser(session.user)
+          setIsAuthenticated(true)
+          
+          // Cargar perfil si no tenemos userProfile o si es INITIAL_SESSION
+          if (!userProfile || event === 'INITIAL_SESSION') {
+            console.log('AuthContext: Loading userProfile for event:', event)
+            // Debounce para evitar llamadas excesivas
+            if (profileLoadTimeout) {
+              clearTimeout(profileLoadTimeout)
+            }
+            
+            profileLoadTimeout = setTimeout(async () => {
+              try {
+                await loadUserProfile(session.user.id)
+              } catch (error) {
+                console.error('Error loading profile in auth state change:', error)
+              } finally {
+                setLoading(false)
+              }
+            }, 300)
+          } else {
+            setLoading(false)
+          }
+        } else {
+          setUser(null)
+          setUserProfile(null)
+          setIsAuthenticated(false)
+          // Limpiar el registro cuando el usuario se desloguea
+          profileLoadProcessedRef.clear()
+          setLoading(false)
+        }
+      })
+      subscription = sub
+    } catch (error) {
+      console.error('AuthContext: Error inicializando auth subscription:', error)
       setLoading(false)
-    })
+    }
 
     // Manejar cambios de visibilidad de la página con throttling
-    let visibilityTimeout = null
     const handleVisibilityChange = () => {
       if (!document.hidden && user && !loading && !userProfile?.offline && userProfile) {
         // Solo recargar si ya tenemos un perfil (no crear uno nuevo)
@@ -596,10 +642,21 @@ export const AuthProvider = ({ children }) => {
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
-      subscription?.unsubscribe()
+      // Cleanup seguro con validación
+      try {
+        if (subscription?.unsubscribe) {
+          subscription.unsubscribe()
+        }
+      } catch (error) {
+        console.warn('AuthContext: Error en unsubscribe:', error)
+      }
+      
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (profileLoadTimeout) clearTimeout(profileLoadTimeout)
       if (visibilityTimeout) clearTimeout(visibilityTimeout)
+      
+      // Limpiar refs usando la variable local (FIX MEMORY LEAK)
+      profileLoadProcessedRef.clear()
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

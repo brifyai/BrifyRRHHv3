@@ -119,29 +119,12 @@ useEffect(() => {
     }
   }, [currentPage, searchTerm, filters, loading, companies.length, employees.length]);
 
-  // Actualizar totalItems cuando cambian los filtros o la búsqueda (sin limpiar carpetas)
+  // Resetear a página 1 cuando cambian filtros o búsqueda
   useEffect(() => {
-    const filteredEmployees = employees.filter(employee => {
-      if (!employee?.email) return false;
-
-      const companyName = (employee.company && employee.company.name) || (employee.companies && employee.companies.name) || '';
-      const term = (searchTerm || '').toLowerCase();
-
-      const matchesSearch =
-        !term ||
-        (employee.name && employee.name.toLowerCase().includes(term)) ||
-        (employee.email && employee.email.toLowerCase().includes(term)) ||
-        (companyName && companyName.toLowerCase().includes(term)) ||
-        (employee.department && employee.department.toLowerCase().includes(term));
-
-      return matchesSearch;
-    });
-
-    // Solo resetear página si los filtros realmente cambiaron
     if (currentPage !== 1) {
       setCurrentPage(1);
     }
-  }, [searchTerm, filters, employees.length, currentPage]);
+  }, [searchTerm, filters, employees, currentPage]);
 
   const loadEmployeesOnly = useCallback(async () => {
     try {
