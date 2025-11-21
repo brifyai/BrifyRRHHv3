@@ -211,7 +211,7 @@ const DatabaseCompanySummary = () => {
       {/* Header con botón de sincronización */}
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-4">
-          <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
+          <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg">
             <BuildingOfficeIcon className="h-8 w-8 text-white" />
           </div>
           <div>

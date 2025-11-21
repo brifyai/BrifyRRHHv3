@@ -380,7 +380,7 @@ const CompanyCard = React.memo(({ company, isFlipped, onToggleFlip }) => {
       <div className="relative bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 h-[420px]">
         
         {/* Header con gradiente */}
-        <div className="bg-gradient-to-r from-violet-500 to-purple-600 p-4 text-white">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
