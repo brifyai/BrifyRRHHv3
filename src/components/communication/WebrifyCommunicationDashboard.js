@@ -170,8 +170,8 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
   const loadCompaniesFromDB = useCallback(async () => {
     try {
       setLoadingCompanies(true);
-      console.log('🔍 DEBUG: loadCompaniesFromDB() - INICIO - Cargando empresas desde base de datos...');
-      console.log('🔍 DEBUG: Estado actual de companiesFromDB antes de cargar:', companiesFromDB.length, 'empresas');
+      console.log('🔍 loadCompaniesFromDB() - INICIO - Cargando empresas desde base de datos...');
+      console.log('🔍 Estado actual de companiesFromDB antes de cargar:', companiesFromDB.length, 'empresas');
       
       // Limpiar estado anterior para evitar acumulación
       setCompaniesFromDB([]);
@@ -221,6 +221,18 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
       }
     } catch (error) {
       console.error('❌ Error cargando datos desde BD:', error);
+      
+      // ✅ MEJORADO: Manejo de errores más específico
+      if (error.message.includes('Timeout')) {
+        console.error('⏰ Timeout al cargar empresas - verificar conectividad');
+      } else if (error.message.includes('Invalid API key')) {
+        console.error('🔑 Error de API key - verificar configuración de Supabase');
+      } else if (error.message.includes('Failed to fetch')) {
+        console.error('🌐 Error de red - verificar conectividad');
+      } else {
+        console.error('❌ Error desconocido:', error.message);
+      }
+      
       // En caso de error, usar lista vacía para evitar duplicaciones
       setCompaniesFromDB([]);
       setEmployees([]);

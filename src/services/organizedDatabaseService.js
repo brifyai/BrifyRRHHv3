@@ -39,29 +39,70 @@ class OrganizedDatabaseService {
     const cached = useCache ? this.getFromCache(cacheKey) : null;
     
     if (cached) {
+      console.log('📦 getCompanies(): Returning cached companies');
       return cached;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .order('name', { ascending: true });
+    console.log('🔍 getCompanies(): Fetching from Supabase...');
+    
+    // Retry logic with exponential backoff
+    const maxRetries = 3;
+    const baseDelay = 500; // 500ms base delay
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 getCompanies(): Attempt ${attempt}/${maxRetries}`);
+        
+        // Create timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Query timeout after 10 seconds')), 10000);
+        });
+        
+        // Create query promise
+        const queryPromise = supabase
+          .from('companies')
+          .select('*')
+          .order('name', { ascending: true });
 
-      if (error) {
-        console.error('❌ Error obteniendo empresas:', error);
-        throw error;
+        // Race between query and timeout
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+
+        if (error) {
+          console.error(`❌ getCompanies() attempt ${attempt} failed:`, error);
+          
+          if (attempt === maxRetries) {
+            throw error;
+          }
+          
+          // Exponential backoff
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          console.log(`⏳ Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        console.log(`✅ getCompanies(): Successfully fetched ${data?.length || 0} companies`);
+        
+        // Don't cache in production
+        if (useCache) {
+          this.setCache(cacheKey, data);
+        }
+        
+        return data || [];
+        
+      } catch (error) {
+        console.error(`❌ getCompanies() attempt ${attempt} error:`, error);
+        
+        if (attempt === maxRetries) {
+          console.error('❌ All retry attempts failed for getCompanies()');
+          throw error;
+        }
+        
+        // Exponential backoff for network errors
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`⏳ Retrying after error in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-      
-      // Don't cache in production
-      if (useCache) {
-        this.setCache(cacheKey, data);
-      }
-      
-      return data || [];
-    } catch (error) {
-      console.error('❌ Error en getCompanies():', error);
-      return [];
     }
   }
 
