@@ -14,6 +14,7 @@ import Navbar from './components/layout/Navbar.js'
 import GoogleAuthCallback from './components/auth/GoogleAuthCallback.js'
 import ReactErrorBoundary from './components/error/ReactErrorBoundary.js'
 import SuspenseWrapper from './components/common/SuspenseWrapper.js'
+import ResourceRecoveryMonitor from './components/monitoring/ResourceRecoveryMonitor.js'
 
 // Componentes grandes - Lazy Loading con manejo de errores
 const ForgotPassword = safeLazy(() => import('./components/auth/ForgotPassword.js'), 'ForgotPassword')
@@ -737,6 +738,9 @@ function App() {
             </Routes>
           </div>
         </Router>
+        
+        {/* 🚨 MONITOR DE RECUPERACIÓN DE RECURSOS - SIEMPRE VISIBLE */}
+        <ResourceRecoveryMonitor />
       </AuthProvider>
     </ReactErrorBoundary>
   )
