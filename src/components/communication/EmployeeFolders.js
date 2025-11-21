@@ -90,13 +90,32 @@ const EmployeeFolders = () => {
       const companyData = await organizedDatabaseService.getCompanies();
       setCompanies(companyData);
       
-      // Obtener empleados de la empresa con filtros - misma fuente que EmployeeSelector
+      // SOLUCIÓN: Usar consulta simple sin JOIN cuando no hay filtros específicos
       let employeesData = [];
       if (companyId) {
         employeesData = await organizedDatabaseService.getEmployees({ companyId });
       } else {
-        // Aplicar filtros directamente en el servicio (ahora soporta todos los filtros)
-        employeesData = await organizedDatabaseService.getEmployees(filters);
+        // SOLUCIÓN: Si no hay filtros activos, usar consulta simple sin JOIN
+        const hasActiveFilters = Object.values(filters).some(value => value && value.trim() !== '');
+        if (!hasActiveFilters) {
+          console.log('🔧 [EmployeeFolders] Sin filtros activos, usando consulta simple...');
+          // Consulta simple sin JOIN para evitar error 400
+          const { data: simpleEmployees, error } = await supabase
+            .from('employees')
+            .select('*')
+            .order('created_at', { ascending: false });
+          
+          if (!error && simpleEmployees) {
+            employeesData = simpleEmployees;
+            console.log(`✅ [EmployeeFolders] Cargados ${employeesData.length} empleados con consulta simple`);
+          } else {
+            console.error('❌ [EmployeeFolders] Error en consulta simple:', error);
+            employeesData = [];
+          }
+        } else {
+          // Solo usar JOIN cuando hay filtros activos
+          employeesData = await organizedDatabaseService.getEmployees(filters);
+        }
       }
 
       console.log(`📊 Cargados ${employeesData.length} empleados (${Object.values(filters).filter(Boolean).length} filtros aplicados)`);
@@ -138,12 +157,85 @@ const EmployeeFolders = () => {
   const loadFoldersForCurrentPage = useCallback(async () => {
     try {
       setLoadingFolders(true);
-      console.log(`📁 Cargando carpetas reales desde la base de datos...`);
+      console.log(`📁 [EmployeeFolders] Iniciando carga de carpetas...`);
+      console.log(`📊 [EmployeeFolders] Estado actual - employees: ${employees.length}, folders: ${folders.length}`);
       
       // SOLUCIÓN: Cargar carpetas sin relaciones de foreign key (que fallan)
       let realFolders = [];
       try {
-        console.log('📁 Cargando carpetas desde la base de datos (sin relaciones)...');
+        console.log('📁 [EmployeeFolders] Cargando carpetas desde employee_folders...');
+        
+        // Consulta simple sin relaciones de foreign key
+        const { data: employeeFolders, error } = await supabase
+          .from('employee_folders')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        console.log(`📊 [EmployeeFolders] Resultado consulta employee_folders:`, {
+          data: employeeFolders?.length || 0,
+          error: error?.message || 'sin error'
+        });
+        
+        if (error) {
+          console.error('❌ [EmployeeFolders] Error en consulta employee_folders:', error);
+        } else if (employeeFolders && employeeFolders.length > 0) {
+          console.log('✅ [EmployeeFolders] Carpetas encontradas:', employeeFolders.length);
+          console.log('📋 [EmployeeFolders] Primeras 3 carpetas:', employeeFolders.slice(0, 3));
+        }
+      } catch (err) {
+        console.error('❌ [EmployeeFolders] Excepción al cargar employee_folders:', err);
+      }
+      
+      try {
+        console.log('📁 [EmployeeFolders] Cargando empleados desde employees...');
+        
+        // Consulta simple de empleados
+        const { data: employeesData, error: employeesError } = await supabase
+          .from('employees')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        console.log(`📊 [EmployeeFolders] Resultado consulta employees:`, {
+          data: employeesData?.length || 0,
+          error: employeesError?.message || 'sin error'
+        });
+        
+        if (employeesError) {
+          console.error('❌ [EmployeeFolders] Error en consulta employees:', employeesError);
+        } else if (employeesData && employeesData.length > 0) {
+          console.log('✅ [EmployeeFolders] Empleados encontrados:', employeesData.length);
+          console.log('📋 [EmployeeFolders] Primeros 3 empleados:', employeesData.slice(0, 3));
+        }
+      } catch (err) {
+        console.error('❌ [EmployeeFolders] Excepción al cargar employees:', err);
+      }
+      
+      try {
+        console.log('📁 [EmployeeFolders] Cargando companies desde companies...');
+        
+        // Consulta simple de companies
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('companies')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        console.log(`📊 [EmployeeFolders] Resultado consulta companies:`, {
+          data: companiesData?.length || 0,
+          error: companiesError?.message || 'sin error'
+        });
+        
+        if (companiesError) {
+          console.error('❌ [EmployeeFolders] Error en consulta companies:', companiesError);
+        } else if (companiesData && companiesData.length > 0) {
+          console.log('✅ [EmployeeFolders] Companies encontradas:', companiesData.length);
+          console.log('📋 [EmployeeFolders] Primeras 3 companies:', companiesData.slice(0, 3));
+        }
+      } catch (err) {
+        console.error('❌ [EmployeeFolders] Excepción al cargar companies:', err);
+      }
+      
+      try {
+        console.log('📁 [EmployeeFolders] Cargando carpetas desde employee_folders (segunda vez)...');
         
         // Consulta simple sin relaciones de foreign key
         const { data: employeeFolders, error } = await supabase
