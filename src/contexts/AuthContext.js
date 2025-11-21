@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
 import { auth, db } from '../lib/supabase.js'
 import toast from 'react-hot-toast'
 import unifiedEmployeeFolderService from '../services/unifiedEmployeeFolderService.js'
@@ -21,6 +21,9 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const registrationProcessed = useRef(new Set())
   const profileLoadProcessed = useRef(new Set())
+  const currentUserIdRef = useRef(null) // 🔥 SOLUCIÓN: Ref para rastrear usuario actual sin causar re-renders
+  const lastUserObjectRef = useRef(null) // 🔥 SOLUCIÓN: Guardar referencia al último objeto user para estabilidad
+  const profileLoadInProgressRef = useRef(false) // 🔥 SOLUCIÓN DEFINITIVA: Prevenir llamadas simultáneas
 
   // Función para extraer nombre del email si no hay nombre disponible
   const extractNameFromEmail = (email) => {
@@ -35,13 +38,45 @@ export const AuthProvider = ({ children }) => {
   }
 
   // Cargar perfil del usuario desde la base de datos
-  const loadUserProfile = React.useCallback(async (userId, forceReload = false) => {
+  const loadUserProfile = useCallback(async (userId, forceReload = false) => {
     try {
-      // Prevenir ejecuciones múltiples solo si no es una recarga forzada y ya tenemos userProfile
-      if (!forceReload && userProfile && profileLoadProcessed.current.has(userId)) {
-        console.log('Carga de perfil ya procesada para este usuario, omitiendo...')
-        return userProfile
+      // 🔥 DEBUGGING: Log cada llamada a loadUserProfile
+      if (window.infiniteLoopDebugger) {
+        window.infiniteLoopDebugger.logRender('ProfileLoad', { userId, forceReload })
       }
+      
+      // 🔥 SOLUCIÓN DEFINITIVA: Usar refs para evitar dependencias problemáticas
+      const currentUserProfile = userProfile
+      const currentUser = user
+      
+      // 🔥 SOLUCIÓN DEFINITIVA: Verificar si ya tenemos este perfil cargado
+      if (!forceReload && currentUserProfile && currentUserProfile.id === userId && profileLoadProcessed.current.has(userId)) {
+        console.log(`✅ Perfil ya cargado para usuario ${userId}, retornando caché`)
+        return currentUserProfile
+      }
+      
+      // 🔥 SOLUCIÓN DEFINITIVA: Prevenir llamadas simultáneas
+      if (profileLoadInProgressRef.current && !forceReload) {
+        console.log(`⏳ Carga de perfil ya en progreso para ${userId}, esperando...`)
+        // Esperar hasta que la carga actual termine
+        let attempts = 0
+        while (profileLoadInProgressRef.current && attempts < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+          attempts++
+        }
+        if (currentUserProfile && currentUserProfile.id === userId) {
+          return currentUserProfile
+        }
+      }
+      
+      // 🔥 SOLUCIÓN: Si es un usuario diferente, limpiar el registro
+      if (currentUserProfile?.id !== userId) {
+        profileLoadProcessed.current.clear()
+      }
+      
+      // 🔥 SOLUCIÓN DEFINITIVA: Marcar que estamos cargando
+      profileLoadInProgressRef.current = true
+      
       profileLoadProcessed.current.add(userId)
       
       const { data, error } = await db.users.getById(userId)
@@ -61,16 +96,16 @@ export const AuthProvider = ({ children }) => {
         
         const userProfileData = {
           id: userId,
-          email: user?.email || '',
-          full_name: user?.user_metadata?.name ||
-                    user?.user_metadata?.full_name ||
-                    extractNameFromEmail(user?.email),
+          email: currentUser?.email || '',
+          full_name: currentUser?.user_metadata?.name ||
+                    currentUser?.user_metadata?.full_name ||
+                    extractNameFromEmail(currentUser?.email),
           telegram_id: null,
           company_id: null,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          name: user?.user_metadata?.name || extractNameFromEmail(user?.email),
+          name: currentUser?.user_metadata?.name || extractNameFromEmail(currentUser?.email),
           current_plan_id: null,
           plan_expiration: null,
           used_storage_bytes: 0,
@@ -90,7 +125,7 @@ export const AuthProvider = ({ children }) => {
           manager_id: null,
           location: 'Chile',
           bio: null,
-          avatar_url: user?.user_metadata?.avatar_url || null
+          avatar_url: currentUser?.user_metadata?.avatar_url || null
         }
         
         const { data: newUserData, error: createError } = await db.users.upsert(userProfileData)
@@ -101,7 +136,7 @@ export const AuthProvider = ({ children }) => {
           const basicProfile = {
             id: userId,
             full_name: 'Usuario',
-            email: user?.email || '',
+            email: currentUser?.email || '',
             current_plan_id: null,
             is_active: true,
             plan_expiration: null,
@@ -135,7 +170,7 @@ export const AuthProvider = ({ children }) => {
           const basicProfile = {
             id: userId,
             full_name: 'Usuario (Sin conexión)',
-            email: user?.email || '',
+            email: currentUser?.email || '',
             current_plan_id: null,
             is_active: false,
             plan_expiration: null,
@@ -150,7 +185,7 @@ export const AuthProvider = ({ children }) => {
         const basicProfile = {
           id: userId,
           full_name: 'Usuario',
-          email: user?.email || '',
+          email: currentUser?.email || '',
           current_plan_id: null,
           is_active: false,
           plan_expiration: null,
@@ -183,8 +218,12 @@ export const AuthProvider = ({ children }) => {
       }
       setUserProfile(basicProfile)
       return basicProfile
+    } finally {
+      // 🔥 SOLUCIÓN DEFINITIVA: Asegurar que siempre limpiemos el flag
+      profileLoadInProgressRef.current = false
     }
-  }, [user, userProfile])
+  }, []) // 🔥 SOLUCIÓN DEFINITIVA: Sin dependencias para evitar bucles infinitos
+  // user y userProfile se acceden via variables locales para evitar re-creación
 
   // Registro de usuario
   const signUp = async (email, password, userData = {}) => {
@@ -552,7 +591,7 @@ export const AuthProvider = ({ children }) => {
     }
     
     initializeAuth()
-  }, [loadUserProfile])
+  }, [loadUserProfile]) // ✅ FIX: Incluir loadUserProfile en dependencias
 
   // Efecto para manejar cambios de autenticación
   useEffect(() => {
@@ -562,6 +601,9 @@ export const AuthProvider = ({ children }) => {
     
     // GUARDAR REF EN VARIABLE LOCAL PARA EVITAR MEMORY LEAK
     const profileLoadProcessedRef = profileLoadProcessed.current
+    
+    // 🔥 SOLUCIÓN DEFINITIVA: Usar ref para rastrear usuario actual sin causar re-renders
+    currentUserIdRef.current = user?.id || null
     
     // Inicializar subscription con manejo de errores
     try {
@@ -574,44 +616,61 @@ export const AuthProvider = ({ children }) => {
           return
         }
         
-        // Para INITIAL_SESSION, solo procesar si no tenemos userProfile
-        if (event === 'INITIAL_SESSION' && userProfile) {
-          console.log('AuthContext: INITIAL_SESSION with existing userProfile, skipping')
-          return
-        }
-        
-        setLoading(true)
-        
-        if (session?.user) {
-          setUser(session.user)
-          setIsAuthenticated(true)
-          
-          // Cargar perfil si no tenemos userProfile o si es INITIAL_SESSION
-          if (!userProfile || event === 'INITIAL_SESSION') {
-            console.log('AuthContext: Loading userProfile for event:', event)
-            // Debounce para evitar llamadas excesivas
-            if (profileLoadTimeout) {
-              clearTimeout(profileLoadTimeout)
-            }
-            
-            profileLoadTimeout = setTimeout(async () => {
-              try {
-                await loadUserProfile(session.user.id)
-              } catch (error) {
-                console.error('Error loading profile in auth state change:', error)
-              } finally {
-                setLoading(false)
-              }
-            }, 300)
-          } else {
-            setLoading(false)
-          }
-        } else {
+        // 🔥 SOLUCIÓN DEFINITIVA: Solo procesar si hay un usuario en la sesión
+        if (!session?.user) {
+          console.log('AuthContext: No hay usuario en la sesión, limpiando estado...')
           setUser(null)
           setUserProfile(null)
           setIsAuthenticated(false)
-          // Limpiar el registro cuando el usuario se desloguea
           profileLoadProcessedRef.clear()
+          currentUserIdRef.current = null
+          lastUserObjectRef.current = null // Limpiar referencia
+          profileLoadInProgressRef.current = false // Resetear flag
+          setLoading(false)
+          return
+        }
+        
+        const newUserId = session.user.id
+        
+        // 🔥 SOLUCIÓN DEFINITIVA: Verificar si el objeto user es realmente diferente
+        // Comparar por ID y también verificar si es el mismo objeto
+        const isSameUserObject = lastUserObjectRef.current &&
+                                 lastUserObjectRef.current.id === newUserId
+        
+        // 🔥 SOLO actualizar si es un usuario completamente nuevo o diferente
+        const shouldUpdateUser = !isSameUserObject || newUserId !== currentUserIdRef.current
+        
+        if (shouldUpdateUser) {
+          console.log(`AuthContext: Usuario ${newUserId} detectado, actualizando estado...`)
+          
+          // 🔥 Guardar referencia al objeto user para futuras comparaciones
+          lastUserObjectRef.current = session.user
+          currentUserIdRef.current = newUserId
+          
+          setUser(session.user)
+          setIsAuthenticated(true)
+          
+          // Limpiar registro si es un usuario diferente
+          if (newUserId !== currentUserIdRef.current) {
+            profileLoadProcessedRef.clear()
+          }
+          
+          // Debounce para evitar llamadas excesivas
+          if (profileLoadTimeout) {
+            clearTimeout(profileLoadTimeout)
+          }
+          
+          profileLoadTimeout = setTimeout(async () => {
+            try {
+              await loadUserProfile(newUserId)
+            } catch (error) {
+              console.error('Error loading profile in auth state change:', error)
+            } finally {
+              setLoading(false)
+            }
+          }, 300)
+        } else {
+          console.log(`AuthContext: Evento ${event} ignorado (mismo usuario objeto: ${newUserId})`)
           setLoading(false)
         }
       })

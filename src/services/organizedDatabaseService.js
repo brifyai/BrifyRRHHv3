@@ -85,45 +85,114 @@ class OrganizedDatabaseService {
     }
   }
 
+  // Función para reintentar operaciones con timeout
+  async retryWithTimeout(operation, maxRetries = 3, baseDelay = 1000, timeout = 10000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Crear timeout para cada intento
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout: La operación tardó demasiado')), timeout);
+        });
+        
+        const operationPromise = operation();
+        
+        return await Promise.race([operationPromise, timeoutPromise]);
+      } catch (error) {
+        console.log(`🔄 Intento ${attempt}/${maxRetries} falló:`, error.message);
+        
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Backoff exponencial: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`⏳ Esperando ${delay}ms antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
   /**
    * Obtiene empresas con estadísticas combinadas
    * Método requerido por DatabaseCompanySummary.js
    */
   async getCompaniesWithStats() {
     try {
-      // 1. Obtener empresas activas (1 query)
-      const { data: allCompanies } = await supabase
-        .from('companies')
-        .select('*')
-        .order('name', { ascending: true });
+      console.log('🚀 getCompaniesWithStats: Iniciando carga de datos desde Supabase...');
+      
+      // ✅ MEJORADO: Usar reintentos con timeout para cada consulta
+      const [companiesResult, employeesResult, logsResult] = await Promise.all([
+        this.retryWithTimeout(async () => {
+          const { data, error } = await supabase
+            .from('companies')
+            .select('*')
+            .order('name', { ascending: true });
+          
+          if (error) throw error;
+          return data;
+        }, 3, 1000, 8000),
+        
+        this.retryWithTimeout(async () => {
+          const { data, error } = await supabase
+            .from('employees')
+            .select('company_id')
+            .eq('status', 'active');
+          
+          if (error) throw error;
+          return data;
+        }, 3, 1000, 8000),
+        
+        this.retryWithTimeout(async () => {
+          const { data, error } = await supabase
+            .from('communication_logs')
+            .select('status, type, employee_id, created_at, company_id')
+            .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+          
+          if (error) throw error;
+          return data;
+        }, 3, 1000, 8000)
+      ]);
+      
+      const allCompanies = companiesResult || [];
+      const allEmployees = employeesResult || [];
+      const allLogs = logsResult || [];
       
       const companies = allCompanies.filter(c =>
         c.status === 'active' || c.status === null || c.status === undefined
       );
 
-      // 2. Obtener TODOS los logs de una vez (1 query)
-      const { data: allLogs } = await supabase
-        .from('communication_logs')
-        .select('status, type, employee_id, created_at, company_id')
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+      console.log(`📊 getCompaniesWithStats: ${companies.length} empresas activas encontradas`);
 
-      // 3. Agrupar logs por company_id en memoria (más rápido que N queries)
+      // 4. Agrupar empleados por company_id en memoria
+      const employeesByCompany = {};
+      allEmployees.forEach(employee => {
+        if (!employeesByCompany[employee.company_id]) employeesByCompany[employee.company_id] = 0;
+        employeesByCompany[employee.company_id]++;
+      });
+
+      // 5. Agrupar logs por company_id en memoria (más rápido que N queries)
       const logsByCompany = {};
       allLogs.forEach(log => {
         if (!logsByCompany[log.company_id]) logsByCompany[log.company_id] = [];
         logsByCompany[log.company_id].push(log);
       });
 
-      // 4. Calcular estadísticas
+      console.log(`👥 getCompaniesWithStats: ${allEmployees.length} empleados activos encontrados`);
+      console.log(`💬 getCompaniesWithStats: ${allLogs.length} logs de comunicación encontrados`);
+
+      // 6. Calcular estadísticas
       return companies.map(company => {
+        const employeeCount = employeesByCompany[company.id] || 0;
         const logs = logsByCompany[company.id] || [];
         const sentMessages = logs.length;
         const readMessages = logs.filter(log => log.status === 'read').length;
         const readRate = sentMessages > 0 ? (readMessages / sentMessages) * 100 : 0;
         
+        console.log(`📈 Empresa ${company.name}: ${employeeCount} empleados, ${sentMessages} mensajes`);
+        
         return {
           ...company,
-          employeeCount: 0, // Calcular si se necesita
+          employeeCount,
           sentMessages,
           readMessages,
           readRate: Math.round(readRate),
@@ -136,6 +205,18 @@ class OrganizedDatabaseService {
       });
     } catch (error) {
       console.error('❌ Error en getCompaniesWithStats():', error);
+      
+      // ✅ MEJORADO: Clasificar errores para mejor diagnóstico
+      if (error.message.includes('ERR_INSUFFICIENT_RESOURCES')) {
+        throw new Error('RECURSOS_INSUFICIENTES: Error de red o servidor sobrecargado');
+      } else if (error.message.includes('Failed to fetch')) {
+        throw new Error('CONEXION_FALLIDA: No se pudo conectar con el servidor');
+      } else if (error.message.includes('Timeout')) {
+        throw new Error('TIMEOUT: La consulta tardó demasiado tiempo');
+      } else if (error.message.includes('timeout')) {
+        throw new Error('TIMEOUT: Tiempo de espera agotado');
+      }
+      
       throw error;
     }
   }
@@ -598,33 +679,176 @@ class OrganizedDatabaseService {
     const cached = useCache ? this.getFromCache(cacheKey) : null;
     
     if (cached) {
+      console.log('📊 getDashboardStats: Usando datos cacheados');
       return cached;
     }
 
     try {
-      // Obtener estadísticas en paralelo
-      const [
-        companiesResult,
-        employeesResult,
-        foldersResult,
-        documentsResult,
-        communicationStatsResult
-      ] = await Promise.all([
-        supabase.from('companies').select('*', { count: 'exact', head: true }),
-        supabase.from('employees').select('*', { count: 'exact', head: true }),
-        supabase.from('folders').select('*', { count: 'exact', head: true }),
-        supabase.from('documents').select('*', { count: 'exact', head: true }),
-        this.getCommunicationStats()
-      ]);
+      console.log('📊 getDashboardStats: Iniciando carga de estadísticas del dashboard...');
+      
+      // ✅ MÉTODO SIMPLIFICADO: Consultas directas sin reintentos complejos
+      console.log('🔍 Consultando companies...');
+      const { count: companiesCount, error: companiesError } = await supabase
+        .from('companies')
+        .select('*', { count: 'exact', head: true });
+      
+      if (companiesError) {
+        console.error('❌ Error consultando companies:', companiesError);
+        throw companiesError;
+      }
+      
+      console.log('🔍 Consultando employees...');
+      const { count: employeesCount, error: employeesError } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true });
+      
+      if (employeesError) {
+        console.error('❌ Error consultando employees:', employeesError);
+        throw employeesError;
+      }
+      
+      console.log('🔍 Consultando folders...');
+      const { count: foldersCount, error: foldersError } = await supabase
+        .from('folders')
+        .select('*', { count: 'exact', head: true });
+      
+      if (foldersError) {
+        console.error('❌ Error consultando folders:', foldersError);
+        throw foldersError;
+      }
+      
+      console.log('🔍 Consultando documents...');
+      const { count: documentsCount, error: documentsError } = await supabase
+        .from('documents')
+        .select('*', { count: 'exact', head: true });
+      
+      if (documentsError) {
+        console.error('❌ Error consultando documents:', documentsError);
+        throw documentsError;
+      }
+      
+      console.log('🔍 Consultando communication_stats...');
+      const communicationStats = await this.getCommunicationStats();
 
+      // ✅ OBTENER DATOS REALES ADICIONALES DESDE LA BASE DE DATOS
+      console.log('🔍 Consultando datos reales adicionales...');
+      
+      // 1. Tokens reales desde user_tokens_usage
+      const { count: tokensCount, error: tokensError } = await supabase
+        .from('user_tokens_usage')
+        .select('*', { count: 'exact', head: true });
+      
+      if (tokensError) {
+        console.warn('⚠️ Error consultando tokens:', tokensError);
+      }
+      
+      // 2. Usuarios activos reales (usuarios que han usado el sistema en los últimos 30 días)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { count: activeUsersCount, error: activeUsersError } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .gte('last_sign_in_at', thirtyDaysAgo);
+      
+      if (activeUsersError) {
+        console.warn('⚠️ Error consultando usuarios activos:', activeUsersError);
+      }
+      
+      // 3. Calcular crecimiento mensual real (nuevos empleados este mes vs mes anterior)
+      const currentMonth = new Date();
+      currentMonth.setDate(1);
+      currentMonth.setHours(0, 0, 0, 0);
+      
+      const lastMonth = new Date(currentMonth);
+      lastMonth.setMonth(lastMonth.getMonth() - 1);
+      
+      const { count: currentMonthEmployees, error: currentMonthError } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', currentMonth.toISOString());
+      
+      if (currentMonthError) {
+        console.warn('⚠️ Error consultando empleados del mes:', currentMonthError);
+      }
+      
+      const { count: lastMonthEmployees, error: lastMonthError } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', lastMonth.toISOString())
+        .lt('created_at', currentMonth.toISOString());
+      
+      if (lastMonthError) {
+        console.warn('⚠️ Error consultando empleados del mes anterior:', lastMonthError);
+      }
+      
+      // 4. Almacenamiento real (suma de tamaños de documentos)
+      const { data: documentsWithSize, error: sizeError } = await supabase
+        .from('documents')
+        .select('file_size')
+        .not('file_size', 'is', null);
+      
+      let totalStorageUsed = 0;
+      if (sizeError) {
+        console.warn('⚠️ Error consultando tamaños de documentos:', sizeError);
+      } else if (documentsWithSize) {
+        totalStorageUsed = documentsWithSize.reduce((sum, doc) => sum + (doc.file_size || 0), 0);
+      }
+      
+      // 5. Calcular tasa de éxito real (operaciones exitosas vs fallidas)
+      const { count: successOperations, error: successError } = await supabase
+        .from('communication_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'delivered');
+      
+      const { count: totalOperations, error: totalError } = await supabase
+        .from('communication_logs')
+        .select('*', { count: 'exact', head: true });
+      
+      let successRate = 0;
+      if (!successError && !totalError && totalOperations > 0) {
+        successRate = Math.floor((successOperations / totalOperations) * 100);
+      }
+      
+      // 6. Calcular crecimiento mensual real
+      let monthlyGrowth = 0;
+      if (lastMonthEmployees > 0) {
+        monthlyGrowth = Math.floor(((currentMonthEmployees - lastMonthEmployees) / lastMonthEmployees) * 100);
+      } else if (currentMonthEmployees > 0) {
+        monthlyGrowth = 100; // Si no había empleados el mes anterior, es 100% de crecimiento
+      }
+
+      const companies = companiesCount || 0;
+      const employees = employeesCount || 0;
+      const folders = foldersCount || 0;
+      const documents = documentsCount || 0;
+
+      console.log('📊 getDashboardStats: Resultados obtenidos:', {
+        companies,
+        employees,
+        folders,
+        documents,
+        communicationTotal: communicationStats.total
+      });
+
+      // ✅ CALCULAR ESTADÍSTICAS 100% REALES
       const stats = {
-        companies: companiesResult.count || 0,
-        employees: employeesResult.count || 0,
-        folders: foldersResult.count || 0,
-        documents: documentsResult.count || 0,
-        communication: communicationStatsResult,
+        companies,
+        employees,
+        folders,
+        documents,
+        communication: communicationStats,
+        
+        // ✅ ESTADÍSTICAS 100% REALES DESDE LA BASE DE DATOS
+        storageUsed: totalStorageUsed, // Tamaño real en bytes
+        tokensUsed: tokensCount || 0, // Conteo real de tokens
+        tokenLimit: 1000,
+        monthlyGrowth: monthlyGrowth, // Crecimiento real basado en nuevos empleados
+        activeUsers: activeUsersCount || 0, // Usuarios que han usado el sistema recientemente
+        successRate: successRate, // Tasa real de operaciones exitosas
+        
         lastUpdated: new Date().toISOString()
       };
+      
+      console.log('📊 getDashboardStats: Estadísticas finales calculadas:', stats);
       
       // Don't cache in production
       if (useCache) {
@@ -634,12 +858,20 @@ class OrganizedDatabaseService {
       return stats;
     } catch (error) {
       console.error('❌ Error en getDashboardStats():', error);
+      
+      // ✅ MEJORADO: Valores por defecto más realistas en caso de error
       return {
         companies: 0,
         employees: 0,
         folders: 0,
         documents: 0,
         communication: { total: 0, byType: {}, byStatus: {}, recent: [] },
+        storageUsed: 0,
+        tokensUsed: 0,
+        tokenLimit: 1000,
+        monthlyGrowth: 0,
+        activeUsers: 0,
+        successRate: 0,
         lastUpdated: new Date().toISOString()
       };
     }

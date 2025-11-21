@@ -28,8 +28,18 @@ const companySyncServiceAvailable = !!companySyncService && typeof companySyncSe
 const ModernDashboardRedesigned = () => {
   const { user, userProfile } = useAuth()
   
+  // 🔥 SOLUCIÓN DEFINITIVA AL BUCLE INFINITO: Ref para rastrear si ya inicializamos para este usuario
+  // Esto persiste entre re-renders y evita que los efectos se re-ejecuten
+  const initializationRef = React.useRef({
+    userId: null,
+    dashboardLoaded: false,
+    pollingStarted: false,
+    componentInstanceId: Math.random().toString(36).substr(2, 9) // ID único para esta instancia
+  })
+  
   // ✅ SOLUCIÓN DEFINITIVA: Verificar companySyncService está cargado al montar el componente
   useEffect(() => {
+    console.log('🔥 Dashboard: Componente montado, instance ID:', initializationRef.current.componentInstanceId);
     console.log('🔍 VERIFICACIÓN DE IMPORTACIÓN SÍNCRONA:');
     console.log('✅ companySyncService importado:', companySyncServiceAvailable);
     console.log('✅ Tipo de companySyncService:', typeof companySyncService);
@@ -152,7 +162,9 @@ const ModernDashboardRedesigned = () => {
     executionLog: [],
     circuitBreakerActive: false,
     totalExecutions: 0,
-    dashboardLoadedForUser: null // NUEVO: Rastrear si ya cargamos para este usuario
+    dashboardLoadedForUser: null,
+    pollingStartedForUser: null,
+    initializedForUser: null
   })
 
   const loadDashboardData = useCallback(async () => {
@@ -304,37 +316,43 @@ const ModernDashboardRedesigned = () => {
       setLoading(false)
       antiLoop.isLoading = false
     }
-  }, [user, userProfile]); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, userProfile]); // Dependencias completas para evitar warnings
 
-  // Timeout de seguridad mejorado para evitar loading infinito
+  // ✅ SOLUCIÓN DEFINITIVA: Timeout de seguridad SIN resetear datos
   useEffect(() => {
     const maxLoadingTimeout = setTimeout(() => {
-      console.log('Dashboard: Timeout de seguridad alcanzado, forzando loading = false')
+      console.log('Dashboard: Timeout de seguridad alcanzado, solo forzando loading = false')
       setLoading(false)
-      // Establecer valores por defecto si el timeout ocurre
-      setStats({
-        totalFolders: 0,
-        totalFiles: 0,
-        storageUsed: 0,
-        tokensUsed: 0,
-        tokenLimit: 1000,
-        monthlyGrowth: 0,
-        activeUsers: 0,
-        successRate: 0
-      })
-      setPercentages({ folders: 0, files: 0 })
-    }, 12000) // 12 segundos máximo (aumentado para conexiones lentas)
+      // ❌ PROBLEMA SOLUCIONADO: NO resetear stats si ya se cargaron datos
+      // Solo mostrar loading=false, mantener los datos cargados
+    }, 12000) // 12 segundos máximo
 
     return () => clearTimeout(maxLoadingTimeout)
   }, [])
 
   useEffect(() => {
-    let loadTimeout = null
+    // 🔥 DEBUGGING: Log cada ejecución del useEffect principal del Dashboard
+    if (window.infiniteLoopDebugger) {
+      window.infiniteLoopDebugger.logRender('Dashboard', { user: !!user, userProfile: !!userProfile })
+    }
+    
+    // 🔥 SOLUCIÓN DEFINITIVA: Verificar si ya inicializamos para este usuario usando ref
+    if (initializationRef.current.userId === user?.id && initializationRef.current.dashboardLoaded) {
+      console.log(`🔄 Dashboard: YA INICIALIZADO para usuario ${user?.id}, evitando bucle`);
+      return;
+    }
     
     console.log('🔄 Dashboard: useEffect optimizado', { user: !!user, userProfile: !!userProfile })
     
+    let loadTimeout = null
+    
     if (user && userProfile) {
       console.log('✅ Dashboard: Usuario y perfil disponibles, cargando datos...')
+      
+      // 🔥 SOLUCIÓN DEFINITIVA: Marcar que hemos inicializado para este usuario
+      initializationRef.current.userId = user?.id;
+      initializationRef.current.dashboardLoaded = true;
+      
       // Debounce optimizado para evitar llamadas excesivas
       loadTimeout = setTimeout(() => {
         loadDashboardData()
@@ -366,7 +384,7 @@ const ModernDashboardRedesigned = () => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, userProfile?.id]) // SOLO IDs para máxima estabilidad
+  }, [user?.id, userProfile?.id]) // Incluir userProfile?.id para detectar cuando el perfil está listo
 
   // Actualizar tiempo cada segundo
   useEffect(() => {
@@ -447,12 +465,27 @@ const ModernDashboardRedesigned = () => {
   
   // ✅ POLLING: Actualizar datos cada 30 segundos para tiempo real
   useEffect(() => {
-    if (!user || !userProfile) {
-      console.log('⏰ Dashboard: No hay usuario/perfil, no se inicia polling');
+    /* eslint-disable react-hooks/exhaustive-deps */
+    // 🔥 SOLUCIÓN DEFINITIVA: Verificar si ya inicializamos polling para este usuario usando ref
+    if (initializationRef.current.pollingStarted) {
+      console.log(`⏰ Dashboard: Polling YA INICIADO para usuario ${user?.id}, evitando bucle`);
       return;
     }
     
-    const antiLoop = antiLoopRef.current
+    // SOLO DEPENDER DE user?.id - el identificador más estable
+    // NO depender de userProfile para evitar re-renderizaciones infinitas
+    if (!user?.id) {
+      console.log('⏰ Dashboard: No hay usuario ID, no se inicia polling');
+      return;
+    }
+    
+    // 🔥 SOLUCIÓN DEFINITIVA: Marcar INMEDIATAMENTE que hemos iniciado polling
+    // Esto previene que el efecto se re-ejecute si el componente re-renderiza
+    initializationRef.current.pollingStarted = true;
+    
+    console.log(`⏰ Dashboard: Iniciando polling para usuario ${user?.id}`);
+    
+    const antiLoop = antiLoopRef.current;
     
     // PREVENCIÓN: Esperar tiempo de inicialización antes de empezar
     console.log(`⏰ Dashboard: Esperando ${antiLoop.initializationDelay}ms antes de iniciar polling...`);
@@ -462,7 +495,7 @@ const ModernDashboardRedesigned = () => {
         return;
       }
       
-      console.log('⏰ Dashboard: Iniciando polling cada 30 segundos');
+      console.log('⏰ Dashboard: Iniciando intervalo de polling cada 30 segundos');
       antiLoop.isPollingActive = true
       
       const interval = setInterval(() => {
@@ -483,9 +516,11 @@ const ModernDashboardRedesigned = () => {
         clearInterval(antiLoop.intervalId);
         antiLoop.intervalId = null;
         antiLoop.isPollingActive = false;
+        // 🔥 CRÍTICO: NO limpiar initializationRef aquí
+        // Debe persistir para toda la vida del componente para evitar re-inicio
       }
     };
-  }, [user?.id, userProfile?.id, loadDashboardData, user, userProfile]); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
 
   const formatBytes = (bytes) => {
