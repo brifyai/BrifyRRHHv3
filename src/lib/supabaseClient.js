@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { APP_CONFIG } from '../config/constants.js'
+import networkResourceManager from './networkResourceManager.js'
 
 // Usar variables de entorno reales - NO valores de fallback
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
@@ -55,6 +56,18 @@ export const supabase = createClient(
       disabled: false,
       encodeChannels: (channel) => channel,
       decodeChannels: (channel) => channel
+    },
+    // 🔥 INTEGRACIÓN NETWORK RESOURCE MANAGER
+    // Interceptar fetch para aplicar gestión de recursos
+    fetch: async (url, options = {}) => {
+      // Solo aplicar gestión a requests de Supabase (evitar requests internos)
+      if (url.includes('/rest/v1/') || url.includes('/auth/v1/')) {
+        console.log('🔄 NetworkResourceManager: Interceptando request Supabase:', url)
+        return networkResourceManager.fetchWithResourceManagement(url, options)
+      }
+      
+      // Para otros requests, usar fetch normal
+      return fetch(url, options)
     }
   }
 )

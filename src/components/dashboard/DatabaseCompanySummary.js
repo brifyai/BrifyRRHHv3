@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { BuildingOfficeIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import CompanyCard from './CompanyCard.js'
-import companySyncService from '../../services/companySyncService.js'
+import organizedDatabaseService from '../../services/organizedDatabaseService.js'
 
 const DatabaseCompanySummary = () => {
   const [companies, setCompanies] = useState([])
@@ -10,21 +10,45 @@ const DatabaseCompanySummary = () => {
   const [error, setError] = useState(null)
   const [flippedCards, setFlippedCards] = useState(new Set())
 
+  // Función para reintentar operaciones con backoff exponencial
+  const retryWithBackoff = async (operation, maxRetries = 3, baseDelay = 1000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        console.log(`🔄 Intento ${attempt}/${maxRetries} falló:`, error.message);
+        
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Backoff exponencial: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.log(`⏳ Esperando ${delay}ms antes del siguiente intento...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  };
+
   // Definir función con useCallback para evitar recreación en cada render
   const loadCompanyData = useCallback(async () => {
     console.log('🚀 DatabaseCompanySummary: Cargando datos desde base de datos organizada')
+    
     try {
       setLoading(true)
       setError(null)
       const startTime = performance.now()
 
-      // ✅ SOLUCIÓN: Invalidar caché del servicio de sincronización
-      companySyncService.invalidateCache('companies_all')
-      companySyncService.invalidateCache('companies_with_stats')
-      console.log('🧹 DatabaseCompanySummary: Caché invalidada en companySyncService')
+      // ✅ SOLUCIÓN MEJORADA: Reintentos con backoff para operaciones de red
+      const companiesWithStats = await retryWithBackoff(async () => {
+        // Invalidar caché del servicio de sincronización
+        organizedDatabaseService.invalidateCache('companies_all')
+        organizedDatabaseService.invalidateCache('companies_with_stats')
+        console.log('🧹 DatabaseCompanySummary: Caché invalidada en organizedDatabaseService')
 
-      // Usar el servicio de sincronización para obtener empresas con estadísticas
-      const companiesWithStats = await companySyncService.getCompaniesWithStats()
+        // Usar el servicio de sincronización para obtener empresas con estadísticas
+        return await organizedDatabaseService.getCompaniesWithStats()
+      }, 3, 1500) // 3 reintentos con delay base de 1.5s
       
       console.log(`📊 DatabaseCompanySummary: ${companiesWithStats.length} empresas cargadas con estadísticas`)
       
@@ -87,10 +111,24 @@ const DatabaseCompanySummary = () => {
       sortedCompanies.forEach((company, index) => {
         console.log(`   ${index + 1}. ${company.name} (ID: ${company.id})`)
       });
-       
+        
     } catch (error) {
       console.error('❌ Error loading company data:', error)
-      setError('Error al cargar los datos de las empresas')
+      
+      // ✅ MENSAJES DE ERROR MÁS ESPECÍFICOS
+      let errorMessage = 'Error al cargar los datos de las empresas';
+      
+      if (error.message.includes('ERR_INSUFFICIENT_RESOURCES')) {
+        errorMessage = 'Error de conectividad. Verifica tu conexión a internet e intenta nuevamente.';
+      } else if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'La consulta está tardando demasiado. Intenta nuevamente en unos momentos.';
+      } else if (error.message.includes('network')) {
+        errorMessage = 'Error de red. Verifica tu conexión a internet.';
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -107,9 +145,9 @@ const DatabaseCompanySummary = () => {
       setSyncing(true)
       setError(null)
       // Invalidar caché del servicio de sincronización y recargar datos
-      companySyncService.invalidateCache('companies_all')
-      companySyncService.invalidateCache('companies_with_stats')
-      console.log('🔄 DatabaseCompanySummary: Caché invalidada en companySyncService, recargando datos reales...')
+      organizedDatabaseService.invalidateCache('companies_all')
+      organizedDatabaseService.invalidateCache('companies_with_stats')
+      console.log('🔄 DatabaseCompanySummary: Caché invalidada en organizedDatabaseService, recargando datos reales...')
       await loadCompanyData()
     } catch (error) {
       console.error('Error syncing with dashboard:', error)
