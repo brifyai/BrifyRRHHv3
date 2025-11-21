@@ -239,7 +239,7 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
     } finally {
       setLoadingCompanies(false);
     }
-  }, []); // ✅ CORRECCIÓN: Sin dependencias para evitar bucle infinito
+  }, [companiesFromDB.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Función para cargar métricas específicas de una empresa usando datos reales de Supabase
   const loadCompanyMetrics = useCallback(async (companyId) => {
