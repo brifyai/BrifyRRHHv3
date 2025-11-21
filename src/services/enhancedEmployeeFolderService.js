@@ -1,55 +1,55 @@
 import { supabase } from '../lib/supabaseClient.js';
 import organizedDatabaseService from './organizedDatabaseService.js';
-import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
+import { googleDriveRealOnly as hybridGoogleDrive } from '../lib/googleDriveRealOnly.js';
  
  // Helper para validar UUID y evitar errores "invalid input syntax for type uuid"
  const isValidUUID = (value) => {
-   if (typeof value !== 'string') value = String(value || '');
-   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-   return uuidRegex.test(value);
- };
+  if (typeof value !== 'string') value = String(value || '');
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(value);
+};
  
  // Normalización de errores de Supabase/PostgREST para diagnóstico
  const normalizeSupabaseError = (err) => {
-   try {
-     if (!err) return 'Error desconocido';
-     if (typeof err === 'string') return err;
-     if (err.message) return err.message;
-     if (err.error_description) return err.error_description;
-     if (err.statusText) return `${err.status} ${err.statusText}`;
-     return JSON.stringify(err);
-   } catch {
-     return 'Error desconocido';
-   }
- };
+  try {
+    if (!err) return 'Error desconocido';
+    if (typeof err === 'string') return err;
+    if (err.message) return err.message;
+    if (err.error_description) return err.error_description;
+    if (err.statusText) return `${err.status} ${err.statusText}`;
+    return JSON.stringify(err);
+  } catch {
+    return 'Error desconocido';
+  }
+};
  
  // Detectar error típico de esquema faltante (relación no existe)
  const isRelationMissingError = (err) => {
-   try {
-     const msg = (err?.message || err?.hint || '').toLowerCase();
-     return err?.code === '42P01' || (msg.includes('relation') && msg.includes('does not exist'));
-   } catch {
-     return false;
-   }
- };
+  try {
+    const msg = (err?.message || err?.hint || '').toLowerCase();
+    return err?.code === '42P01' || (msg.includes('relation') && msg.includes('does not exist'));
+  } catch {
+    return false;
+  }
+};
  
  // Detectar error de RLS (row-level security)
  const isRlsDeniedError = (err) => {
-   try {
-     const msg = (err?.message || '').toLowerCase();
-     return msg.includes('row-level security') || msg.includes('violates row-level security policy');
-   } catch {
-     return false;
-   }
- };
+  try {
+    const msg = (err?.message || '').toLowerCase();
+    return msg.includes('row-level security') || msg.includes('violates row-level security policy');
+  } catch {
+    return false;
+  }
+};
  
- class EnhancedEmployeeFolderService {
-   constructor() {
-     this.initialized = false;
-     this.hybridDriveInitialized = false;
-     // Exponer el cliente para componentes que lo usan directamente (p.ej. EmployeeFolderManager)
-     this.supabase = supabase;
-   }
+class EnhancedEmployeeFolderService {
+  constructor() {
+    this.initialized = false;
+    this.hybridDriveInitialized = false;
+    // Exponer el cliente para componentes que lo usan directamente (p.ej. EmployeeFolderManager)
+    this.supabase = supabase;
+  }
 
   // Inicializar el servicio
   async initialize() {
@@ -61,10 +61,10 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
       if (error) {
         console.warn('⚠️ Verificación rápida de employee_folders falló (continuamos):', error.message || error);
       }
-      
+       
       // Inicializar Hybrid Google Drive
       await this.initializeHybridDrive();
-      
+       
       this.initialized = true;
       console.log('✅ EnhancedEmployeeFolderService inicializado');
       return true;
@@ -97,7 +97,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async createFoldersForAllEmployees() {
     try {
       console.log('🚀 Iniciando creación de carpetas para todos los empleados...');
-      
+       
       // Obtener todos los empleados
       const employees = await organizedDatabaseService.getEmployees();
       let createdCount = 0;
@@ -107,40 +107,89 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
       let schemaSuspect = false;
       let rlsDenied = false;
       let usingLocalStorage = false;
- 
+  
+      // Agrupar empleados por empresa
+      const employeesByCompany = {};
       for (const employee of employees) {
         if (!employee.email) {
           console.warn(`⚠️ Empleado sin email: ${employee.name}`);
           continue;
         }
- 
+        
+        const companyId = employee.company_id || 'no-company';
+        if (!employeesByCompany[companyId]) {
+          employeesByCompany[companyId] = [];
+        }
+        employeesByCompany[companyId].push(employee);
+      }
+  
+      // Procesar cada empresa
+      for (const [companyId, companyEmployees] of Object.entries(employeesByCompany)) {
         try {
-          const result = await this.createEmployeeFolder(employee.email, employee);
-          if (result.created) {
-            createdCount++;
-          } else if (result.updated) {
-            updatedCount++;
+          // Obtener información de la empresa
+          let companyName = 'Sin Empresa';
+          if (companyId !== 'no-company' && isValidUUID(companyId)) {
+            const companies = await organizedDatabaseService.getCompanies();
+            const company = companies.find(comp => comp.id === companyId);
+            if (company) {
+              companyName = company.name;
+            }
           }
-          if (result.usingLocalStorage) {
-            usingLocalStorage = true;
+          
+          console.log(`🏢 Procesando empresa: ${companyName} (${companyEmployees.length} empleados)`);
+          
+          // Crear carpeta de empresa en Google Drive si está disponible
+          let companyFolderId = null;
+          let companyFolderUrl = null;
+          
+          if (this.hybridDriveInitialized && hybridGoogleDrive.isAuthenticated()) {
+            try {
+              const companyFolder = await this.createCompanyFolderInDrive(companyName);
+              if (companyFolder && companyFolder.id) {
+                companyFolderId = companyFolder.id;
+                companyFolderUrl = `https://drive.google.com/drive/folders/${companyFolder.id}`;
+                console.log(`✅ Carpeta de empresa creada: ${companyName}`);
+              }
+            } catch (driveError) {
+              console.warn(`⚠️ No se pudo crear carpeta de empresa en Drive para ${companyName}:`, driveError.message);
+            }
           }
-          // Log abreviado para alto volumen
-          if ((createdCount + updatedCount) % 50 === 0) {
-            console.log(`✅ Procesadas ${createdCount + updatedCount} carpetas...`);
+          
+          // Procesar empleados de esta empresa
+          for (const employee of companyEmployees) {
+            try {
+              const result = await this.createEmployeeFolder(employee.email, employee, companyFolderId);
+              if (result.created) {
+                createdCount++;
+              } else if (result.updated) {
+                updatedCount++;
+              }
+              if (result.usingLocalStorage) {
+                usingLocalStorage = true;
+              }
+              // Log abreviado para alto volumen
+              if ((createdCount + updatedCount) % 50 === 0) {
+                console.log(`✅ Procesadas ${createdCount + updatedCount} carpetas...`);
+              }
+            } catch (error) {
+              errorCount++;
+              const msg = normalizeSupabaseError(error);
+              if (isRelationMissingError(error)) schemaSuspect = true;
+              if (isRlsDeniedError(error)) rlsDenied = true;
+              errors.push(`${employee.email}: ${msg}`);
+              // Registrar cada 25 errores para no saturar
+              if (errorCount <= 10 || errorCount % 25 === 0) {
+                console.error(`❌ Error procesando carpeta para ${employee.email}:`, error);
+              }
+            }
           }
         } catch (error) {
           errorCount++;
-          const msg = normalizeSupabaseError(error);
-          if (isRelationMissingError(error)) schemaSuspect = true;
-          if (isRlsDeniedError(error)) rlsDenied = true;
-          errors.push(`${employee.email}: ${msg}`);
-          // Registrar cada 25 errores para no saturar
-          if (errorCount <= 10 || errorCount % 25 === 0) {
-            console.error(`❌ Error procesando carpeta para ${employee.email}:`, error);
-          }
+          errors.push(`Empresa ${companyId}: ${normalizeSupabaseError(error)}`);
+          console.error(`❌ Error procesando empresa ${companyId}:`, error);
         }
       }
- 
+  
       console.log(`📊 Resumen: ${createdCount} creadas, ${updatedCount} actualizadas, ${errorCount} errores`);
       if (usingLocalStorage) {
         console.log('💾 Usando almacenamiento local como fallback');
@@ -152,15 +201,42 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
     }
   }
 
+  // Crear carpeta de empresa en Google Drive
+  async createCompanyFolderInDrive(companyName) {
+    try {
+      console.log(`🏢 Creando carpeta de empresa en Drive: ${companyName}`);
+      
+      // Buscar si ya existe la carpeta de la empresa
+      const existingFiles = await hybridGoogleDrive.listFiles();
+      const existingCompanyFolder = existingFiles.find(file =>
+        file.name === companyName &&
+        file.mimeType === 'application/vnd.google-apps.folder'
+      );
+
+      if (existingCompanyFolder) {
+        console.log(`✅ Carpeta de empresa ya existe: ${existingCompanyFolder.id}`);
+        return existingCompanyFolder;
+      }
+
+      // Crear nueva carpeta de empresa
+      const companyFolder = await hybridGoogleDrive.createFolder(companyName);
+      console.log(`✅ Carpeta de empresa creada: ${companyFolder.id}`);
+      return companyFolder;
+    } catch (error) {
+      console.error(`❌ Error creando carpeta de empresa ${companyName}:`, error);
+      throw error;
+    }
+  }
+
   // Crear o actualizar carpeta de empleado
-  async createEmployeeFolder(employeeEmail, employeeData) {
+  async createEmployeeFolder(employeeEmail, employeeData, companyFolderId = null) {
     try {
       await this.initialize();
 
       // Obtener información de la empresa
-      let companyName = 'Empresa no especificada';
+      let companyName = 'Sin Empresa';
       let companyId = null;
-      
+       
       if (employeeData.company_id) {
         const companies = await organizedDatabaseService.getCompanies();
         const company = companies.find(comp => comp.id === employeeData.company_id);
@@ -198,34 +274,20 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
       let driveFolderId = null;
       let driveFolderUrl = null;
 
-      // Crear carpeta en Hybrid Drive si está inicializado y autenticado (en caso de Drive real)
-      const serviceInfo = this.hybridDriveInitialized ? hybridGoogleDrive.getServiceInfo() : null;
-      const isAuth = serviceInfo?.isReal
-        ? (hybridGoogleDrive.isAuthenticated ? hybridGoogleDrive.isAuthenticated() : false)
-        : this.hybridDriveInitialized;
-      const canUseDrive = this.hybridDriveInitialized && isAuth;
-
-      if (canUseDrive) {
+      // Crear carpeta en Google Drive si está inicializado y autenticado
+      if (this.hybridDriveInitialized && hybridGoogleDrive.isAuthenticated()) {
         try {
-          const driveFolder = await this.createDriveFolder(employeeEmail, employeeData.name, companyName);
+          const driveFolder = await this.createEmployeeFolderInDrive(employeeEmail, employeeData.name, companyName, companyFolderId);
           if (driveFolder && driveFolder.id) {
             driveFolderId = driveFolder.id;
-            
-            // Crear URL según el servicio
-            if (serviceInfo.isReal) {
-              driveFolderUrl = `https://drive.google.com/drive/folders/${driveFolder.id}`;
-            } else {
-              driveFolderUrl = `#local-folder-${driveFolder.id}`;
-            }
+            driveFolderUrl = `https://drive.google.com/drive/folders/${driveFolder.id}`;
            
             // Compartir carpeta con el empleado
             await this.shareDriveFolder(driveFolder.id, employeeEmail);
           }
         } catch (driveError) {
-          console.warn(`⚠️ No se pudo crear carpeta en Drive para ${employeeEmail}:`, driveError.message || driveError);
+          console.warn(`⚠️ No se pudo crear carpeta en Drive para ${employeeEmail}:`, driveError.message);
         }
-      } else {
-        console.warn(`⚠️ Omitiendo interacción con Drive para ${employeeEmail}: servicio no autenticado o no inicializado`);
       }
 
       folderData.drive_folder_id = driveFolderId;
@@ -312,63 +374,19 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
     }
   }
 
-  // Crear carpeta en Hybrid Drive
-  async createDriveFolder(employeeEmail, employeeName, companyName) {
+  // Crear carpeta de empleado en Google Drive
+  async createEmployeeFolderInDrive(employeeEmail, employeeName, companyName, companyFolderId = null) {
     try {
-      // Crear estructura de carpetas
-      const parentFolderName = `${companyName}/Empleados`;
-      
-      // Buscar o crear carpeta principal de la empresa
-      let parentFolder = await this.findOrCreateParentFolder(parentFolderName);
-      
-      // PRIMERO: Verificar si ya existe la carpeta en Drive
+      // Crear estructura: Empresa/Empleado
       const folderName = `${employeeName} (${employeeEmail})`;
-      console.log(`🔍 Verificando si la carpeta ya existe en Drive: ${folderName}`);
+      console.log(`👤 Creando carpeta de empleado en Drive: ${folderName}`);
       
-      try {
-        const existingFiles = await hybridGoogleDrive.listFiles(parentFolder.id);
-        const existingDriveFolder = existingFiles.find(file =>
-          file.name === folderName &&
-          file.mimeType === 'application/vnd.google-apps.folder'
-        );
-
-        if (existingDriveFolder) {
-          console.log(`✅ Carpeta ya existe en Drive: ${existingDriveFolder.id}`);
-          return existingDriveFolder;
-        }
-      } catch (checkError) {
-        console.warn(`⚠️ Error verificando carpeta existente en Drive: ${checkError.message}`);
-      }
-      
-      // SEGUNDO: Si no existe, crear nueva carpeta
-      console.log(`📁 Creando nueva carpeta en Drive: ${folderName}`);
-      const employeeFolder = await hybridGoogleDrive.createFolder(folderName, parentFolder.id);
+      // Crear carpeta de empleado dentro de la carpeta de empresa (o en la raíz si no hay empresa)
+      const employeeFolder = await hybridGoogleDrive.createFolder(folderName, companyFolderId);
       
       return employeeFolder;
     } catch (error) {
-      console.error(`❌ Error creando carpeta en Drive para ${employeeEmail}:`, error);
-      throw error;
-    }
-  }
-
-  // Buscar o crear carpeta principal de la empresa
-  async findOrCreateParentFolder(folderName) {
-    try {
-      // Listar carpetas para buscar la carpeta principal
-      const folders = await hybridGoogleDrive.listFiles();
-      const parentFolder = folders.find(folder =>
-        folder.name === folderName &&
-        folder.mimeType === 'application/vnd.google-apps.folder'
-      );
-
-      if (parentFolder) {
-        return parentFolder;
-      } else {
-        // Crear nueva carpeta principal
-        return await hybridGoogleDrive.createFolder(folderName);
-      }
-    } catch (error) {
-      console.error(`❌ Error buscando/creando carpeta principal ${folderName}:`, error);
+      console.error(`❌ Error creando carpeta de empleado en Drive para ${employeeEmail}:`, error);
       throw error;
     }
   }
@@ -377,8 +395,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async shareDriveFolder(folderId, employeeEmail) {
     try {
       await hybridGoogleDrive.shareFolder(folderId, employeeEmail, 'writer');
-      const serviceInfo = hybridGoogleDrive.getServiceInfo();
-      console.log(`📤 Carpeta compartida con ${employeeEmail} en ${serviceInfo.service}`);
+      console.log(`📤 Carpeta compartida con ${employeeEmail} en Google Drive`);
     } catch (error) {
       console.warn(`⚠️ No se pudo compartir carpeta con ${employeeEmail}:`, error.message);
     }
@@ -443,7 +460,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
           // No existe la carpeta, intentar crearla
           const employees = await organizedDatabaseService.getEmployees();
           const employee = employees.find(emp => emp.email === employeeEmail);
-          
+           
           if (employee) {
             const result = await this.createEmployeeFolder(employeeEmail, employee);
             return result.folder;
@@ -463,7 +480,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async addEmployeeDocument(employeeEmail, document) {
     try {
       const folder = await this.getEmployeeFolder(employeeEmail);
-      
+       
       const documentData = {
         folder_id: folder.id,
         document_name: document.name || document.document_name,
@@ -497,7 +514,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async addEmployeeFAQ(employeeEmail, question, answer, metadata = {}) {
     try {
       const folder = await this.getEmployeeFolder(employeeEmail);
-      
+       
       const faqData = {
         folder_id: folder.id,
         question,
@@ -528,7 +545,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async addConversationMessage(employeeEmail, messageType, messageContent, channel = 'chat', metadata = {}) {
     try {
       const folder = await this.getEmployeeFolder(employeeEmail);
-      
+       
       const messageData = {
         folder_id: folder.id,
         message_type: messageType,
@@ -556,7 +573,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async getEmployeeFolderStats(employeeEmail) {
     try {
       const folder = await this.getEmployeeFolder(employeeEmail);
-      
+       
       // Obtener conteos de cada tabla
       const [{ count: documentCount }, { count: faqCount }, { count: conversationCount }] = await Promise.all([
         supabase.from('employee_documents').select('*', { count: 'exact', head: true }).eq('folder_id', folder.id),
@@ -583,7 +600,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async searchEmployeeDocuments(employeeEmail, query) {
     try {
       const folder = await this.getEmployeeFolder(employeeEmail);
-      
+       
       const { data, error } = await supabase
         .from('employee_documents')
         .select('*')
@@ -628,7 +645,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
 
       const folder = await this.getEmployeeFolder(employeeEmail);
       const serviceInfo = hybridGoogleDrive.getServiceInfo();
-      
+       
       // Actualizar estado de sincronización
       await supabase
         .from('employee_folders')
@@ -653,10 +670,10 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
         console.log(`🔄 Carpeta sincronizada para ${employeeEmail} (${serviceInfo.service})`);
         return true;
       }
-      
+       
       // Aquí iría la lógica de sincronización real para Google Drive
       // Por ahora, solo actualizamos el estado
-      
+       
       await supabase
         .from('employee_folders')
         .update({
@@ -692,7 +709,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   getServiceStats() {
     const serviceInfo = this.hybridDriveInitialized ? hybridGoogleDrive.getServiceInfo() : null;
     const driveStats = this.hybridDriveInitialized ? hybridGoogleDrive.getStats() : null;
-    
+     
     return {
       hybridDriveInitialized: this.hybridDriveInitialized,
       service: serviceInfo ? serviceInfo.service : 'No Inicializado',
