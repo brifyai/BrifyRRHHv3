@@ -125,7 +125,12 @@ export const errorHandlingConfig = {
 /**
  * Inicializa el sistema de manejo de errores con la configuración
  */
-export    // Configurar el manejador de errores
+/**
+ * Inicializa el sistema de manejo de errores con la configuración
+ */
+export const initializeErrorHandling = () => {
+  try {
+    // Configurar el manejador de errores
     errorHandler.configure(errorHandlingConfig.errorHandler);
 
     // Suscribirse a errores globales
@@ -306,8 +311,7 @@ const sendErrorReport = async () => {
 /**
  * Utilidades para manejo de errores específicos de la aplicación
  */
-export  },
-
+export const errorUtils = {
   // Crear error de base de datos
   createDatabaseError: (message, context = {}) => {
     return errorHandler.createError(message, 'DATABASE', 'HIGH', context);

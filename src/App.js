@@ -1,4 +1,4 @@
-import React, { lazy } from 'react'
+import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext.js'
@@ -6,6 +6,7 @@ import CacheCleanup from './components/CacheCleanup.js'
 import { ensureCorrectSupabaseConfig } from './utils/clearSupabaseCache.js'
 // Importar el interceptor forzado para asegurar el uso del proyecto correcto
 import './lib/forcedSupabaseClient.js'
+import { safeLazy } from './utils/chunkErrorHandler.js'
 
 // Componentes pequeños (cargar directamente)
 import LoadingSpinner from './components/common/LoadingSpinner.js'
@@ -14,39 +15,39 @@ import GoogleAuthCallback from './components/auth/GoogleAuthCallback.js'
 import ReactErrorBoundary from './components/error/ReactErrorBoundary.js'
 import SuspenseWrapper from './components/common/SuspenseWrapper.js'
 
-// Componentes grandes - Lazy Loading para reducir bundle size
-const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword.js'))
-const ResetPassword = lazy(() => import('./components/auth/ResetPassword.js'))
-const Plans = lazy(() => import('./components/plans/Plans.js'))
-const Folders = lazy(() => import('./components/folders/Folders.js'))
-const Files = lazy(() => import('./components/files/Files.js'))
-const Profile = lazy(() => import('./components/profile/Profile.js'))
-const SemanticSearch = lazy(() => import('./components/embeddings/SemanticSearch.js'))
-const Abogado = lazy(() => import('./components/legal/Abogado.js'))
-const HomeStaffHubSEO = lazy(() => import('./components/home/HomeStaffHubSEO.js'))
-const LoginUltraModern = lazy(() => import('./components/auth/LoginRedesigned.js'))
-const RegisterInnovador = lazy(() => import('./components/auth/RegisterInnovador.js'))
-const ModernDashboard = lazy(() => import('./components/dashboard/ModernDashboardRedesigned.js'))
-const CompanyEmployeeTest = lazy(() => import('./components/dashboard/CompanyEmployeeTest.js'))
-const CompanySyncTest = lazy(() => import('./components/test/CompanySyncTest.js'))
-const WhatsAppAPITest = lazy(() => import('./components/test/WhatsAppAPITest.js'))
-const WebrifyCommunicationDashboard = lazy(() => import('./components/communication/WebrifyCommunicationDashboard.js'))
-const Settings = lazy(() => import('./components/settings/Settings.js'))
-const BrevoStatisticsDashboard = lazy(() => import('./components/communication/BrevoStatisticsDashboard.js'))
-const BrevoTemplatesManager = lazy(() => import('./components/communication/BrevoTemplatesManager.js'))
-const WhatsAppOnboarding = lazy(() => import('./components/whatsapp/WhatsAppOnboarding.js'))
-const MultiWhatsAppManager = lazy(() => import('./components/whatsapp/MultiWhatsAppManager.js'))
-const GoogleDriveIntegrationSelector = lazy(() => import('./components/integrations/GoogleDriveIntegrationSelector.js'))
-const GoogleDriveAutoSetup = lazy(() => import('./components/integrations/GoogleDriveAutoSetup.js'))
-const GoogleDriveSetupWizard = lazy(() => import('./components/integrations/GoogleDriveSetupWizard.js'))
-const GoogleDriveSimplePage = lazy(() => import('./components/integrations/GoogleDriveSimplePage.js'))
-const GoogleDriveTestPage = lazy(() => import('./components/integrations/GoogleDriveTestPage.js'))
-const GoogleDriveLocalTest = lazy(() => import('./components/test/GoogleDriveLocalTest.js'))
-const GoogleDriveProductionDiagnosis = lazy(() => import('./components/test/GoogleDriveProductionDiagnosis.js'))
-const UserGoogleDriveConnector = lazy(() => import('./components/integrations/UserGoogleDriveConnector.js'))
-const GoogleDriveURIChecker = lazy(() => import('./components/test/GoogleDriveURIChecker.js'))
-const GoogleDriveURIDebugger = lazy(() => import('./components/test/GoogleDriveURIDebugger.js'))
-const GoogleDriveConnectionVerifier = lazy(() => import('./components/test/GoogleDriveConnectionVerifier.js'))
+// Componentes grandes - Lazy Loading con manejo de errores
+const ForgotPassword = safeLazy(() => import('./components/auth/ForgotPassword.js'), 'ForgotPassword')
+const ResetPassword = safeLazy(() => import('./components/auth/ResetPassword.js'), 'ResetPassword')
+const Plans = safeLazy(() => import('./components/plans/Plans.js'), 'Plans')
+const Folders = safeLazy(() => import('./components/folders/Folders.js'), 'Folders')
+const Files = safeLazy(() => import('./components/files/Files.js'), 'Files')
+const Profile = safeLazy(() => import('./components/profile/Profile.js'), 'Profile')
+const SemanticSearch = safeLazy(() => import('./components/embeddings/SemanticSearch.js'), 'SemanticSearch')
+const Abogado = safeLazy(() => import('./components/legal/Abogado.js'), 'Abogado')
+const HomeStaffHubSEO = safeLazy(() => import('./components/home/HomeStaffHubSEO.js'), 'HomeStaffHubSEO')
+const LoginUltraModern = safeLazy(() => import('./components/auth/LoginRedesigned.js'), 'LoginUltraModern')
+const RegisterInnovador = safeLazy(() => import('./components/auth/RegisterInnovador.js'), 'RegisterInnovador')
+const ModernDashboard = safeLazy(() => import('./components/dashboard/ModernDashboardRedesigned.js'), 'ModernDashboard')
+const CompanyEmployeeTest = safeLazy(() => import('./components/dashboard/CompanyEmployeeTest.js'), 'CompanyEmployeeTest')
+const CompanySyncTest = safeLazy(() => import('./components/test/CompanySyncTest.js'), 'CompanySyncTest')
+const WhatsAppAPITest = safeLazy(() => import('./components/test/WhatsAppAPITest.js'), 'WhatsAppAPITest')
+const WebrifyCommunicationDashboard = safeLazy(() => import('./components/communication/WebrifyCommunicationDashboard.js'), 'WebrifyCommunicationDashboard')
+const Settings = safeLazy(() => import('./components/settings/Settings.js'), 'Settings')
+const BrevoStatisticsDashboard = safeLazy(() => import('./components/communication/BrevoStatisticsDashboard.js'), 'BrevoStatisticsDashboard')
+const BrevoTemplatesManager = safeLazy(() => import('./components/communication/BrevoTemplatesManager.js'), 'BrevoTemplatesManager')
+const WhatsAppOnboarding = safeLazy(() => import('./components/whatsapp/WhatsAppOnboarding.js'), 'WhatsAppOnboarding')
+const MultiWhatsAppManager = safeLazy(() => import('./components/whatsapp/MultiWhatsAppManager.js'), 'MultiWhatsAppManager')
+const GoogleDriveIntegrationSelector = safeLazy(() => import('./components/integrations/GoogleDriveIntegrationSelector.js'), 'GoogleDriveIntegrationSelector')
+const GoogleDriveAutoSetup = safeLazy(() => import('./components/integrations/GoogleDriveAutoSetup.js'), 'GoogleDriveAutoSetup')
+const GoogleDriveSetupWizard = safeLazy(() => import('./components/integrations/GoogleDriveSetupWizard.js'), 'GoogleDriveSetupWizard')
+const GoogleDriveSimplePage = safeLazy(() => import('./components/integrations/GoogleDriveSimplePage.js'), 'GoogleDriveSimplePage')
+const GoogleDriveTestPage = safeLazy(() => import('./components/integrations/GoogleDriveTestPage.js'), 'GoogleDriveTestPage')
+const GoogleDriveLocalTest = safeLazy(() => import('./components/test/GoogleDriveLocalTest.js'), 'GoogleDriveLocalTest')
+const GoogleDriveProductionDiagnosis = safeLazy(() => import('./components/test/GoogleDriveProductionDiagnosis.js'), 'GoogleDriveProductionDiagnosis')
+const UserGoogleDriveConnector = safeLazy(() => import('./components/integrations/UserGoogleDriveConnector.js'), 'UserGoogleDriveConnector')
+const GoogleDriveURIChecker = safeLazy(() => import('./components/test/GoogleDriveURIChecker.js'), 'GoogleDriveURIChecker')
+const GoogleDriveURIDebugger = safeLazy(() => import('./components/test/GoogleDriveURIDebugger.js'), 'GoogleDriveURIDebugger')
+const GoogleDriveConnectionVerifier = safeLazy(() => import('./components/test/GoogleDriveConnectionVerifier.js'), 'GoogleDriveConnectionVerifier')
 
 
 // Limpiar configuración incorrecta de Supabase al iniciar la aplicación
@@ -96,7 +97,7 @@ function App() {
   return (
     <ReactErrorBoundary>
       <AuthProvider>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <div className="App">
             <CacheCleanup />
             <Toaster
@@ -122,7 +123,7 @@ function App() {
             }}
           />
           
-          <Routes>
+          <Routes future={{ v7_startTransition: true }}>
             {/* Nuevo Home Moderno - página principal */}
             <Route
               path="/"

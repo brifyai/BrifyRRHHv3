@@ -4,7 +4,6 @@
  */
 
 import logger from './logger.js'
-import { createClient } from '@supabase/supabase-js'
 
 class GoogleDriveAuthService {
   constructor() {
@@ -311,7 +310,7 @@ class GoogleDriveAuthService {
         is_active: true
       }
 
-      const { data, error } = await this.supabase
+      const { error } = await this.supabase
         .from('user_google_drive_credentials')
         .upsert(credentialsData, {
           onConflict: 'user_id'

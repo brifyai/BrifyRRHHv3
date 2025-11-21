@@ -229,7 +229,6 @@ const BrevoStatisticsDashboard = () => {
   }
 
   // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
 useEffect(() => {
     loadStatistics()
   }, [loadStatistics])

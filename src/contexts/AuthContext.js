@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   // Cargar perfil del usuario desde la base de datos
-  const loadUserProfile = async (userId, forceReload = false) => {
+  const loadUserProfile = React.useCallback(async (userId, forceReload = false) => {
     try {
       // Prevenir ejecuciones múltiples solo si no es una recarga forzada y ya tenemos userProfile
       if (!forceReload && userProfile && profileLoadProcessed.current.has(userId)) {
@@ -184,7 +184,7 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(basicProfile)
       return basicProfile
     }
-  }
+  }, [user, userProfile])
 
   // Registro de usuario
   const signUp = async (email, password, userData = {}) => {
@@ -552,7 +552,7 @@ export const AuthProvider = ({ children }) => {
     }
     
     initializeAuth()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadUserProfile])
 
   // Efecto para manejar cambios de autenticación
   useEffect(() => {

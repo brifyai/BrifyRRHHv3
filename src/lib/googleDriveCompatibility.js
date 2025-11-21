@@ -7,5 +7,5 @@
 import unifiedGoogleDriveService from './unifiedGoogleDriveService.js';
 
 // Re-exportar como los nombres originales para compatibilidad
-exportexportexportexport// Exportar también como default para imports tradicionales
+// Exportar también como default para imports tradicionales
 export default unifiedGoogleDriveService;

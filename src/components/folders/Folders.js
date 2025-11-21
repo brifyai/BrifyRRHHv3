@@ -1,17 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.js'
 import { db, supabase } from '../../lib/supabase.js'
 import googleDriveService from '../../lib/googleDrive.js'
-import emailService from '../../lib/emailService.js'
 import {
   FolderIcon,
-  DocumentIcon,
   PlusIcon,
   TrashIcon,
-  MagnifyingGlassIcon,
-  UserIcon,
-  CalendarIcon
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline'
 import LoadingSpinner from '../common/LoadingSpinner.js'
 import toast from 'react-hot-toast'
@@ -28,18 +24,98 @@ const Folders = () => {
   const [newFolderName, setNewFolderName] = useState('')
   const [selectedParentFolder, setSelectedParentFolder] = useState(null)
   const [availableSubFolders, setAvailableSubFolders] = useState([])
-
   const [searchTerm, setSearchTerm] = useState('')
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    loadAdminFolderByDefault()
-    loadAvailableSubFolders()
-  }, [loadAdminFolderByDefault, loadAvailableSubFolders])
+  // Cargar carpetas de Google Drive y base de datos
+  const loadFolders = useCallback(async (parentId = null) => {
+    try {
+      setLoading(true)
+      
+      let dbFolders = []
+      
+      if (parentId) {
+        // Si estamos dentro de una carpeta, cargar subcarpetas (carpetas de usuario)
+        const { data, error } = await db.userFolders.getByAdministrador(user.email)
+        if (error) throw error
+        dbFolders = (data || []).map(folder => ({
+          ...folder,
+          folder_name: folder.correo, // El nombre de la carpeta es el correo
+          google_folder_id: folder.id_carpeta_drive,
+          type: 'user'
+        }))
+      } else {
+        // Cargar carpeta administrador y carpetas de usuario
+        const { data: adminData, error: adminError } = await db.adminFolders.getByUser(user.id)
+        if (adminError) throw adminError
+        
+        const { data: userData, error: userError } = await db.userFolders.getByAdministrador(user.email)
+        if (userError) throw userError
+        
+        // Combinar carpetas admin y de usuario
+        const adminFolders = (adminData || []).map(folder => ({
+          ...folder,
+          folder_name: 'Master - StaffHub',
+          google_folder_id: folder.id_drive_carpeta,
+          type: 'admin'
+        }))
+        
+        const userFolders = (userData || []).map(folder => ({
+          ...folder,
+          folder_name: folder.correo,
+          google_folder_id: folder.id_carpeta_drive,
+          type: 'user'
+        }))
+        
+        dbFolders = [...adminFolders, ...userFolders]
+      }
+      
+      // Si el usuario tiene Google Drive conectado, sincronizar con Drive
+      if (userProfile?.google_refresh_token) {
+        try {
+          const tokenSet = await googleDriveService.setTokens({
+            refresh_token: userProfile.google_refresh_token
+          })
+          
+          if (!tokenSet) {
+            console.error('Failed to set Google Drive tokens')
+            setFolders(dbFolders)
+            return
+          }
+          
+          // Obtener carpetas de Google Drive
+          const driveFolders = await googleDriveService.listFiles(parentId, 'folder')
+          
+          // Combinar información de DB y Drive
+          const combinedFolders = dbFolders.map(dbFolder => {
+            const driveFolder = (driveFolders && Array.isArray(driveFolders)) 
+              ? driveFolders.find(df => df.id === dbFolder.google_folder_id)
+              : null
+            return {
+              ...dbFolder,
+              driveInfo: driveFolder,
+              synced: !!driveFolder
+            }
+          })
+          
+          setFolders(combinedFolders)
+        } catch (error) {
+          console.error('Error syncing with Google Drive:', error)
+          setFolders(dbFolders.map(folder => ({ ...folder, synced: false })))
+        }
+      } else {
+        setFolders(dbFolders.map(folder => ({ ...folder, synced: false })))
+      }
+      
+    } catch (error) {
+      console.error('Error loading folders:', error)
+      toast.error('Error cargando las carpetas')
+    } finally {
+      setLoading(false)
+    }
+  }, [user.id, user.email, userProfile?.google_refresh_token])
 
   // Cargar subcarpetas disponibles para selección de carpeta padre
-  const loadAvailableSubFolders = async () => {
+  const loadAvailableSubFolders = useCallback(async () => {
     try {
       console.log('🔄 Iniciando carga de subcarpetas...')
       
@@ -129,10 +205,10 @@ useEffect(() => {
     } catch (error) {
       console.error('❌ Error loading available subfolders:', error)
     }
-  }
+  }, [user.id, user.email])
 
   // Cargar automáticamente la carpeta administrador por defecto
-  const loadAdminFolderByDefault = async () => {
+  const loadAdminFolderByDefault = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -165,306 +241,60 @@ useEffect(() => {
       // En caso de error, cargar vista normal
       await loadFolders()
     }
-  }
+  }, [user.id, loadFolders])
 
-  const loadFolders = async (parentId = null) => {
-    try {
-      setLoading(true)
-      
-      let dbFolders = []
-      
-      if (parentId) {
-        // Si estamos dentro de una carpeta, cargar subcarpetas (carpetas de usuario)
-        const { data, error } = await db.userFolders.getByAdministrador(user.email)
-        if (error) throw error
-        dbFolders = (data || []).map(folder => ({
-          ...folder,
-          folder_name: folder.correo, // El nombre de la carpeta es el correo
-          google_folder_id: folder.id_carpeta_drive,
-          type: 'user'
-        }))
-      } else {
-        // Cargar carpeta administrador y carpetas de usuario
-        const { data: adminData, error: adminError } = await db.adminFolders.getByUser(user.id)
-        if (adminError) throw adminError
-        
-        const { data: userData, error: userError } = await db.userFolders.getByAdministrador(user.email)
-        if (userError) throw userError
-        
-        // Combinar carpetas admin y de usuario
-        const adminFolders = (adminData || []).map(folder => ({
-          ...folder,
-          folder_name: 'Master - StaffHub',
-          google_folder_id: folder.id_drive_carpeta,
-          type: 'admin'
-        }))
-        
-        const userFolders = (userData || []).map(folder => ({
-          ...folder,
-          folder_name: folder.correo,
-          google_folder_id: folder.id_carpeta_drive,
-          type: 'user'
-        }))
-        
-        dbFolders = [...adminFolders, ...userFolders]
-      }
-      
-      // Si el usuario tiene Google Drive conectado, sincronizar con Drive
-      if (userProfile?.google_refresh_token) {
-        try {
-          const tokenSet = await googleDriveService.setTokens({
-            refresh_token: userProfile.google_refresh_token
-          })
-          
-          if (!tokenSet) {
-            console.error('Failed to set Google Drive tokens')
-            setFolders(dbFolders)
-            return
-          }
-          
-          // Obtener carpetas de Google Drive
-          const driveFolders = await googleDriveService.listFiles(parentId, 'folder')
-          
-          // Combinar información de DB y Drive
-          const combinedFolders = dbFolders.map(dbFolder => {
-            const driveFolder = (driveFolders && Array.isArray(driveFolders)) 
-              ? driveFolders.find(df => df.id === dbFolder.google_folder_id)
-              : null
-            return {
-              ...dbFolder,
-              driveInfo: driveFolder,
-              synced: !!driveFolder
-            }
-          })
-          
-          setFolders(combinedFolders)
-        } catch (error) {
-          console.error('Error syncing with Google Drive:', error)
-          setFolders(dbFolders.map(folder => ({ ...folder, synced: false })))
-        }
-      } else {
-        setFolders(dbFolders.map(folder => ({ ...folder, synced: false })))
-      }
-      
-    } catch (error) {
-      console.error('Error loading folders:', error)
-      toast.error('Error cargando las carpetas')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadAdminFolderByDefault()
+    loadAvailableSubFolders()
+  }, [loadAdminFolderByDefault, loadAvailableSubFolders])
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
-      toast.error('El email del cliente es requerido')
-      return
-    }
-    
-    if (!isValidEmail(newFolderName)) {
-      toast.error('Debes ingresar un email válido')
+      toast.error('El nombre de la carpeta es requerido')
       return
     }
 
-    // Evitar crear subcarpetas - solo permitir creación en el nivel principal
-    if (currentFolder && currentFolder.type === 'user') {
-      toast.error('No se pueden crear subcarpetas dentro de carpetas de usuario')
-      return
-    }
-
-    setCreating(true)
-    
     try {
-      // Obtener la carpeta administrador del usuario
-      const { data: adminFolder, error: adminError } = await db.adminFolders.getByEmail(user.email)
+      setCreating(true)
       
-      if (adminError || !adminFolder || adminFolder.length === 0) {
-        toast.error('No se encontró la carpeta administrador. Debes tener un plan activo.')
-        setCreating(false)
-        return
+      let parentFolderId = selectedParentFolder?.id_drive_carpeta || null
+      
+      // Si no hay carpeta padre seleccionada, usar la carpeta actual
+      if (!parentFolderId && currentFolder) {
+        parentFolderId = currentFolder.google_folder_id
       }
       
-      const adminFolderData = adminFolder[0]
-      let googleFolderId = null
-      
-      // Si tiene Google Drive conectado, crear la carpeta en Drive
-      if (userProfile?.google_refresh_token) {
-        try {
-          const tokenSet = await googleDriveService.setTokens({
-            refresh_token: userProfile.google_refresh_token
-          })
-          
-          if (!tokenSet) {
-            toast.error('Error inicializando Google Drive')
-            setCreating(false)
-            return
-          }
-          
-          // Determinar la carpeta padre según la selección
-          let parentFolderId = adminFolderData.id_drive_carpeta // Por defecto, carpeta Master - StaffHub
-          
-          if (selectedParentFolder && selectedParentFolder.file_id_subcarpeta) {
-            parentFolderId = selectedParentFolder.file_id_subcarpeta // Usar subcarpeta seleccionada
-          }
-          
-          // Crear carpeta en Google Drive dentro de la carpeta padre seleccionada
-          const driveFolder = await googleDriveService.createFolder(
-            newFolderName,
-            parentFolderId
-          )
-          
-          googleFolderId = driveFolder.id
-          
-          // Compartir la carpeta con el email especificado
-          await googleDriveService.shareFolder(googleFolderId, newFolderName)
-          
-          toast.success(`Carpeta creada y compartida con ${newFolderName}`)
-        } catch (error) {
-          console.error('Error creating folder in Google Drive:', error)
-          toast.error('Error creando la carpeta en Google Drive')
-          return
-        }
-      }
-      
-      // Determinar la extensión basada en la carpeta padre seleccionada
-      let extension = 'StaffHub' // Por defecto
-      console.log('🎯 Carpeta padre seleccionada para determinar extensión:', selectedParentFolder)
-      
-      if (selectedParentFolder) {
-        if (selectedParentFolder.tipo_extension) {
-          // Mapear tipo_extension a nombre de extensión correcto
-          const extensionMapping = {
-            'staffhub': 'StaffHub',
-            'entrenador': 'Entrenador',
-            'abogados': 'Abogados',
-            'veterinarios': 'Veterinarios'
-          }
-          extension = extensionMapping[selectedParentFolder.tipo_extension] || selectedParentFolder.tipo_extension
-          console.log(`📋 Extensión determinada por tipo_extension: ${selectedParentFolder.tipo_extension} -> ${extension}`)
-        } else if (selectedParentFolder.nombre_subcarpeta) {
-          // Extraer extensión del nombre de la subcarpeta como fallback
-          const nombreLower = selectedParentFolder.nombre_subcarpeta.toLowerCase()
-          if (nombreLower.includes('entrenador')) {
-            extension = 'Entrenador'
-          } else if (nombreLower.includes('abogado')) {
-            extension = 'Abogados'
-          } else if (nombreLower.includes('veterinario')) {
-            extension = 'Veterinarios'
-          } else if (nombreLower.includes('staffhub')) {
-            extension = 'StaffHub'
-          }
-          console.log(`📋 Extensión determinada por nombre_subcarpeta: ${selectedParentFolder.nombre_subcarpeta} -> ${extension}`)
-        }
-      }
-      
-      console.log(`✅ Extensión final asignada: ${extension}`)
-      
-      // Guardar en la tabla carpetas_usuario
+      // Crear carpeta en Google Drive
       const folderData = {
-        telegram_id: userProfile?.telegram_id || null,
-        correo: newFolderName, // El nombre de la carpeta será el correo
-        id_carpeta_drive: googleFolderId,
-        administrador: user.email, // Email del administrador que crea la carpeta
-        extension: extension // Campo para identificar la extensión
+        name: newFolderName.trim(),
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: parentFolderId ? [parentFolderId] : []
       }
       
-      console.log('💾 Datos de carpeta a guardar:', folderData)
+      const createdFolder = await googleDriveService.createFile(folderData)
       
-      const { error } = await db.userFolders.create(folderData)
-      
-      if (error) {
-        console.error('Error saving folder to database:', error)
-        toast.error('Error guardando la carpeta')
-        return
+      if (!createdFolder) {
+        throw new Error('No se pudo crear la carpeta en Google Drive')
       }
       
-      // Crear usuario automáticamente en la tabla users
-      try {
-        // Verificar si el usuario ya existe
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', newFolderName)
-          .single()
-        
-        if (checkError && checkError.code !== 'PGRST116') {
-          console.error('Error checking existing user:', checkError)
-        }
-        
-        // Si el usuario no existe, crearlo
-        if (!existingUser) {
-          // Extraer el nombre del email (parte antes del @)
-          const nameFromEmail = newFolderName.split('@')[0]
-          
-          const userData = {
-            email: newFolderName,
-            name: nameFromEmail,
-            cliente: true, // Marcar como cliente
-            is_active: true,
-            registered_via: 'folder_creation',
-            used_storage_bytes: 0,
-            admin: false,
-            onboarding_status: 'completed'
-          }
-          
-          const { error: userError } = await supabase
-            .from('users')
-            .insert([userData])
-          
-          if (userError) {
-            console.error('Error creating user:', userError)
-            // No fallar la creación de carpeta si falla la creación del usuario
-            toast.error('Carpeta creada pero error creando usuario automático')
-          } else {
-            console.log('Usuario creado automáticamente:', newFolderName)
-            
-            // Enviar correo de bienvenida
-            try {
-              const result = await emailService.sendWelcomeEmail(newFolderName, nameFromEmail, user.id, extension)
-              if (result.success) {
-                console.log('Correo de bienvenida enviado exitosamente')
-                toast.success(`Carpeta creada, usuario registrado y correo de bienvenida enviado a ${newFolderName}`)
-              } else {
-                console.error('Error enviando correo de bienvenida:', result.error)
-                toast.success(`Carpeta creada y usuario registrado. Error enviando correo de bienvenida.`)
-              }
-            } catch (emailError) {
-              console.error('Error en servicio de email:', emailError)
-              toast.success(`Carpeta creada y usuario registrado. Error enviando correo de bienvenida.`)
-            }
-          }
-        } else {
-          console.log('Usuario ya existe:', newFolderName)
-          // Enviar correo de bienvenida también para usuarios existentes
-          try {
-            const nameFromEmail = newFolderName.split('@')[0]
-            const result = await emailService.sendWelcomeEmail(newFolderName, nameFromEmail, user.id, extension)
-            if (result.success) {
-              console.log('Correo de bienvenida enviado a usuario existente')
-              toast.success(`Carpeta creada y correo de bienvenida enviado a ${newFolderName}`)
-            } else {
-              console.error('Error enviando correo de bienvenida:', result.error)
-              toast.success(`Carpeta creada exitosamente`)
-            }
-          } catch (emailError) {
-            console.error('Error en servicio de email:', emailError)
-            toast.success(`Carpeta creada exitosamente`)
-          }
-        }
-      } catch (userCreationError) {
-        console.error('Error in user creation process:', userCreationError)
-        // No fallar la creación de carpeta si falla la creación del usuario
-        toast.success('Carpeta creada exitosamente')
+      // Guardar en base de datos
+      const folderRecord = {
+        correo: newFolderName.trim(),
+        id_carpeta_drive: createdFolder.id,
+        administrador: user.email,
+        fecha_creacion: new Date().toISOString()
       }
+      
+      const { error: dbError } = await db.userFolders.create(folderRecord)
+      if (dbError) throw dbError
+      
+      toast.success('Carpeta creada exitosamente')
+      setShowCreateModal(false)
+      setNewFolderName('')
       
       // Recargar carpetas
-      await loadFolders(currentFolder?.id)
-      
-      // Limpiar formulario
-      setNewFolderName('')
-
-      setShowCreateModal(false)
-      
-      // No mostrar mensaje genérico ya que se muestran mensajes específicos arriba
+      await loadFolders()
       
     } catch (error) {
       console.error('Error creating folder:', error)
@@ -475,64 +305,24 @@ useEffect(() => {
   }
 
   const handleDeleteFolder = async (folder) => {
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar la carpeta "${folder.name}"?`)) {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar la carpeta "${folder.folder_name}"?`)) {
       return
     }
-    
+
     try {
-      // Eliminar de Google Drive si existe
-      if (folder.google_folder_id && userProfile?.google_refresh_token) {
-        try {
-          await googleDriveService.setTokens({
-            refresh_token: userProfile.google_refresh_token
-          })
-          await googleDriveService.deleteFile(folder.google_folder_id)
-        } catch (error) {
-          console.error('Error deleting from Google Drive:', error)
-        }
+      // Eliminar de Google Drive
+      if (folder.google_folder_id) {
+        await googleDriveService.deleteFile(folder.google_folder_id)
       }
       
-      // Eliminar de la base de datos
-      const { error } = currentFolder
-        ? await db.userFolders.delete(folder.id)
-        : await db.adminFolders.delete(folder.id)
+      // Eliminar de base de datos
+      const { error } = await db.userFolders.delete(folder.id)
+      if (error) throw error
       
-      if (error) {
-        console.error('Error deleting folder from database:', error)
-        toast.error('Error eliminando la carpeta')
-        return
-      }
-      
-      // Eliminar usuario correspondiente de la tabla users si es una carpeta de usuario
-      if (currentFolder && folder.type === 'user') {
-        try {
-          // Buscar el usuario por email (que corresponde al nombre de la carpeta)
-          const folderEmail = folder.folder_name || folder.correo
-          
-          if (folderEmail) {
-            const { error: deleteUserError } = await supabase
-              .from('users')
-              .delete()
-              .eq('email', folderEmail)
-              .eq('cliente', true) // Solo eliminar usuarios marcados como cliente
-            
-            if (deleteUserError) {
-              console.error('Error deleting user:', deleteUserError)
-              // No fallar la eliminación de carpeta si falla la eliminación del usuario
-              toast.error('Carpeta eliminada pero error eliminando usuario automático')
-            } else {
-              console.log('Usuario eliminado automáticamente:', folderEmail)
-            }
-          }
-        } catch (userDeletionError) {
-          console.error('Error in user deletion process:', userDeletionError)
-          // No fallar la eliminación de carpeta si falla la eliminación del usuario
-        }
-      }
+      toast.success('Carpeta eliminada exitosamente')
       
       // Recargar carpetas
-      await loadFolders(currentFolder?.id)
-      toast.success('Carpeta eliminada exitosamente')
+      await loadFolders()
       
     } catch (error) {
       console.error('Error deleting folder:', error)
@@ -541,331 +331,244 @@ useEffect(() => {
   }
 
   const handleFolderClick = (folder) => {
-    // Redirigir a la pestaña de archivos con la carpeta seleccionada
-    if (folder.type === 'user') {
-      // Navegar a la pestaña de archivos con la carpeta preseleccionada
-      navigate('/files', { 
-        state: { 
-          selectedFolder: folder,
-          folderId: folder.google_folder_id,
-          folderName: folder.folder_name
-        } 
-      })
-    }
-  }
-
-
-
-  const handleBreadcrumbClick = (index) => {
-    // Prevenir navegación fuera de la carpeta administrador (índice 0 es "Inicio", índice 1 es "Entrenador - StaffHub")
-    if (index < 1) {
-      return // No permitir ir más atrás que la carpeta administrador
-    }
-    
-    const newBreadcrumb = breadcrumb.slice(0, index + 1)
-    const targetFolder = newBreadcrumb[newBreadcrumb.length - 1]
-    
-    setBreadcrumb(newBreadcrumb)
-    
-    if (index === 1) {
-      // Volver a la carpeta administrador - recargar la vista completa
-      loadAdminFolderByDefault()
-    } else {
-      // Navegar a una subcarpeta específica - mostrar vista vacía
-      setFolders([])
-      const folder = { google_folder_id: targetFolder.id, folder_name: targetFolder.name, type: 'user' }
+    if (folder.type === 'admin') {
+      // Navegar a la carpeta administrador
       setCurrentFolder(folder)
+      setBreadcrumb([
+        { name: 'Inicio', id: null },
+        { name: 'Master - StaffHub', id: folder.id }
+      ])
+      loadFolders(folder.google_folder_id)
+    } else {
+      // Navegar a la carpeta de usuario
+      navigate(`/employees?folder=${folder.google_folder_id}`)
     }
   }
 
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^s@]+@[^s@]+.[^s@]+$/
-    return emailRegex.test(email)
+  const handleBreadcrumbClick = (breadcrumbItem) => {
+    if (breadcrumbItem.id === null) {
+      // Volver al inicio
+      setCurrentFolder(null)
+      setBreadcrumb([{ name: 'Inicio', id: null }])
+      loadFolders()
+    } else {
+      // Navegar a una carpeta específica
+      const folder = folders.find(f => f.id === breadcrumbItem.id)
+      if (folder) {
+        handleFolderClick(folder)
+      }
+    }
   }
 
+  // Filtrar carpetas según el término de búsqueda
   const filteredFolders = folders.filter(folder =>
-    folder.folder_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    folder.shared_email?.toLowerCase().includes(searchTerm.toLowerCase())
+    folder.folder_name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner />
+      </div>
+    )
   }
 
-
   return (
-    <div className="space-y-6">
+    <div className="p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Carpetas</h1>
-          <p className="text-gray-600 mt-1">
-            Organiza y comparte tus carpetas con clientes
-          </p>
-        </div>
-        
-        {/* Solo mostrar botón de Nueva Carpeta en el nivel principal */}
-        {(!currentFolder || currentFolder.type !== 'user') && (
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Carpetas</h1>
+            <p className="text-gray-600">Gestiona las carpetas de empleados</p>
+          </div>
           <button
-            onClick={() => {
-                  loadAvailableSubFolders()
-                  setShowCreateModal(true)
-                }}
-            className="mt-4 sm:mt-0 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center"
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
+            <PlusIcon className="h-4 w-4 mr-2" />
             Nueva Carpeta
           </button>
-        )}
+        </div>
       </div>
 
       {/* Breadcrumb */}
-      <nav className="flex" aria-label="Breadcrumb">
-        <ol className="flex items-center space-x-2">
-          {breadcrumb.map((item, index) => (
-            <li key={index} className="flex items-center">
-              {index > 0 && (
-                <svg className="flex-shrink-0 h-4 w-4 text-gray-400 mx-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-              <button
-                onClick={() => handleBreadcrumbClick(index)}
-                className={`text-sm font-medium ${
-                  index === breadcrumb.length - 1
-                    ? 'text-gray-500 cursor-default'
-                    : 'text-primary-600 hover:text-primary-700'
-                }`}
-                disabled={index === breadcrumb.length - 1}
-              >
-                {item.name}
-              </button>
-            </li>
-          ))}
-        </ol>
-      </nav>
-
-      {/* Subcarpetas disponibles */}
-      {availableSubFolders.length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">Subcarpetas disponibles</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {availableSubFolders.map((subfolder) => (
-              <div
-                key={subfolder.id}
-                className="flex items-center p-2 bg-white rounded border border-gray-200 hover:border-primary-300 transition-colors"
-              >
-                <FolderIcon className="h-4 w-4 text-primary-600 mr-2" />
-                <span className="text-sm text-gray-700 truncate">
-                  {subfolder.nombre_subcarpeta}
-                </span>
-              </div>
+      {breadcrumb.length > 1 && (
+        <nav className="flex mb-6" aria-label="Breadcrumb">
+          <ol className="inline-flex items-center space-x-1 md:space-x-3">
+            {breadcrumb.map((item, index) => (
+              <li key={item.id || 'home'} className="inline-flex items-center">
+                {index > 0 && (
+                  <svg
+                    className="w-6 h-6 text-gray-400"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                )}
+                <button
+                  onClick={() => handleBreadcrumbClick(item)}
+                  className={`inline-flex items-center text-sm font-medium ${
+                    index === breadcrumb.length - 1
+                      ? 'text-gray-500'
+                      : 'text-blue-600 hover:text-blue-800'
+                  }`}
+                >
+                  {item.name}
+                </button>
+              </li>
             ))}
-          </div>
-        </div>
+          </ol>
+        </nav>
       )}
 
       {/* Search */}
-      <div className="relative mb-6">
-        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Buscar carpetas..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
+      <div className="mb-6">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Buscar carpetas..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
       </div>
 
-
-
       {/* Folders Grid */}
-      {loading ? (
-        <LoadingSpinner text="Cargando carpetas..." />
-      ) : filteredFolders.length === 0 ? (
-        <div className="text-center py-12">
-          <FolderIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchTerm ? 'No se encontraron carpetas' : 'No hay carpetas'}
-          </h3>
-          <p className="text-gray-600 mb-6">
-            {searchTerm 
-              ? 'Intenta con otros términos de búsqueda'
-              : 'Crea tu primera carpeta para comenzar'
-            }
-          </p>
-          {!searchTerm && (
-            <button
-              onClick={() => {
-                loadAvailableSubFolders()
-                setShowCreateModal(true)
-              }}
-              className="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              Crear Primera Carpeta
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredFolders.map((folder) => {
-            
-            return (
-            <div
-              key={folder.id}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all p-6 cursor-pointer"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center">
-                  <FolderIcon className="h-8 w-8 text-primary-600 mr-3" />
-                  <div>
-                    <h3 className="font-medium text-gray-900 truncate">
-                      {folder.folder_name}
-                    </h3>
-                    <div className="flex items-center mt-1">
-                      <div className={`w-2 h-2 rounded-full mr-2 ${
-                        folder.synced ? 'bg-green-400' : 'bg-yellow-400'
-                      }`} />
-                      <span className="text-xs text-gray-500">
-                        {folder.synced ? 'Sincronizado' : 'Solo local'}
-                      </span>
-                    </div>
-                  </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {filteredFolders.map((folder) => (
+          <div
+            key={folder.id}
+            className="relative bg-white pt-5 px-4 pb-12 sm:pt-6 sm:px-6 shadow rounded-lg overflow-hidden hover:shadow-md transition-shadow duration-200"
+          >
+            <div>
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <FolderIcon className="h-8 w-8 text-blue-600" />
                 </div>
-                
-                <div className="flex space-x-2">
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">
+                      {folder.type === 'admin' ? 'Carpeta Administrador' : 'Carpeta de Usuario'}
+                    </dt>
+                    <dd className="text-lg font-medium text-gray-900">
+                      {folder.folder_name}
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <div className="absolute bottom-0 inset-x-0 bg-gray-50 px-4 py-4 sm:px-6">
+              <div className="text-sm">
+                <button
+                  onClick={() => handleFolderClick(folder)}
+                  className="font-medium text-blue-600 hover:text-blue-500"
+                >
+                  Ver contenido
+                </button>
+              </div>
+              {folder.type === 'user' && (
+                <div className="mt-2 flex justify-between">
+                  <span className="text-xs text-gray-500">
+                    {folder.synced ? 'Sincronizado' : 'No sincronizado'}
+                  </span>
                   <button
                     onClick={() => handleDeleteFolder(folder)}
-                    className="text-red-600 hover:text-red-700 p-1"
-                    title="Eliminar carpeta"
+                    className="text-xs text-red-600 hover:text-red-500"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>
                 </div>
-              </div>
-              
-              <div className="space-y-2 text-sm text-gray-600 mb-4">
-                <div className="flex items-center">
-                  <UserIcon className="h-4 w-4 mr-2" />
-                  <span className="truncate">{folder.shared_email}</span>
-                </div>
-                <div className="flex items-center">
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  <span>Creada: {formatDate(folder.created_at)}</span>
-                </div>
-                {folder.extension && (
-                  <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-2 ${
-                      folder.extension === 'Abogados' ? 'bg-blue-500' :
-                      folder.extension === 'Entrenador' ? 'bg-green-500' :
-                      'bg-purple-500'
-                    }`} />
-                    <span className="text-xs font-medium">
-                      Extensión: {folder.extension}
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              <button
-                onClick={() => handleFolderClick(folder)}
-                className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 py-2 px-4 rounded-lg transition-colors flex items-center justify-center"
-              >
-                <DocumentIcon className="h-4 w-4 mr-2" />
-                Ver archivos
-              </button>
-
+              )}
             </div>
-            )
-          })}
+          </div>
+        ))}
+      </div>
+
+      {filteredFolders.length === 0 && (
+        <div className="text-center py-12">
+          <FolderIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No hay carpetas</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {searchTerm ? 'No se encontraron carpetas que coincidan con tu búsqueda.' : 'Comienza creando una nueva carpeta.'}
+          </p>
         </div>
       )}
 
       {/* Create Folder Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Crear Nueva Carpeta
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 text-center mb-4">
+                Crear Nueva Carpeta
+              </h3>
+              
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Carpeta padre
+                  Nombre de la carpeta
                 </label>
-                <select
-                  value={selectedParentFolder?.id || ''}
-                  onChange={(e) => {
-                    console.log('🔄 Cambiando carpeta padre a:', e.target.value)
-                    if (e.target.value === '') {
-                      console.log('📁 Carpeta seleccionada: null (ninguna)')
-                      setSelectedParentFolder(null)
-                    } else {
-                      const selectedId = parseInt(e.target.value)
-                      const selected = availableSubFolders.find(folder => folder.id === selectedId)
-                      console.log('📁 Carpeta seleccionada:', selected)
-                      setSelectedParentFolder(selected)
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="">Selecciona una carpeta padre</option>
-                  {availableSubFolders.map((folder) => {
-                    console.log('🎯 Renderizando opción:', folder)
-                    return (
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="Nombre de la carpeta"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {availableSubFolders.length > 0 && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Carpeta padre (opcional)
+                  </label>
+                  <select
+                    value={selectedParentFolder?.id || ''}
+                    onChange={(e) => {
+                      const folder = availableSubFolders.find(f => f.id === e.target.value)
+                      setSelectedParentFolder(folder || null)
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Seleccionar carpeta padre</option>
+                    {availableSubFolders.map((folder) => (
                       <option key={folder.id} value={folder.id}>
                         {folder.nombre_subcarpeta}
                       </option>
-                    )
-                  })}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Selecciona donde crear la nueva carpeta
-                </p>
-              </div>
+                    ))}
+                  </select>
+                </div>
+              )}
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email del cliente
-                </label>
-                <input
-                  type="email"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="cliente@ejemplo.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  El email será usado como nombre de carpeta y se compartirá automáticamente
-                </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false)
+                    setNewFolderName('')
+                    setSelectedParentFolder(null)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateFolder}
+                  disabled={creating || !newFolderName.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating ? 'Creando...' : 'Crear'}
+                </button>
               </div>
-            </div>
-            
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowCreateModal(false)
-                  setNewFolderName('')
-          
-                }}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                disabled={creating}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateFolder}
-                disabled={creating || !newFolderName.trim() || !isValidEmail(newFolderName)}
-                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {creating ? 'Creando...' : 'Crear Carpeta'}
-              </button>
             </div>
           </div>
         </div>

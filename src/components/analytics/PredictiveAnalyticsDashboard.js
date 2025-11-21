@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase.js';
 import enhancedCommunicationService from '../../services/enhancedCommunicationService.js';
@@ -14,34 +14,7 @@ const PredictiveAnalyticsDashboard = ({ companyId }) => {
   const [activeMetric, setActiveMetric] = useState(null);
   const [expandedInsight, setExpandedInsight] = useState(null);
 
-  useEffect(() => {
-    loadAnalyticsData();
-    
-    // Suscribirse a eventos de cambios en empresas
-    let unsubscribeId = null
-    try {
-      if (companySyncService && typeof companySyncService.subscribe === 'function') {
-        unsubscribeId = companySyncService.subscribe('companies-updated', (data) => {
-          console.log('PredictiveAnalyticsDashboard: Empresas actualizadas, recargando analíticas...', data)
-          loadAnalyticsData()
-        })
-      }
-    } catch (error) {
-      console.error('Error al suscribirse a eventos de empresas:', error)
-    }
-
-    return () => {
-      if (unsubscribeId && companySyncService && typeof companySyncService.unsubscribe === 'function') {
-        try {
-          companySyncService.unsubscribe('companies-updated', unsubscribeId)
-        } catch (error) {
-          console.error('Error al cancelar suscripción:', error)
-        }
-      }
-    }
-  }, [companyId, timeRange]);
-
-  const loadAnalyticsData = async () => {
+  const loadAnalyticsData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -59,7 +32,7 @@ const PredictiveAnalyticsDashboard = ({ companyId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
 
   const getEngagementColor = (score) => {
     if (score >= 0.7) return 'from-emerald-400 to-emerald-600';

@@ -48,11 +48,6 @@ const BusquedaLeyes = () => {
     searchLaws()
   }
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'No disponible'
-    return new Date(dateString).toLocaleDateString('es-CL')
-  }
-
   const truncateContent = (content, maxLength = 300) => {
     if (!content) return 'Contenido no disponible'
     return content.length > maxLength ? content.substring(0, maxLength) + '...' : content

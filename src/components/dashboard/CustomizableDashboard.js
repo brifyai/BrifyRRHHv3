@@ -328,7 +328,8 @@ const CustomizableDashboard = ({ userId = 'default' }) => {
   }, [savedLayouts])
 
   const deleteLayout = useCallback((layoutName) => {
-    if (!confirm(`¿Eliminar el layout "${layoutName}"?`)) return
+    // Usar window.confirm para evitar el warning de ESLint
+    if (!window.confirm(`¿Eliminar el layout "${layoutName}"?`)) return
 
     const newLayouts = savedLayouts.filter(l => l.name !== layoutName)
     setSavedLayouts(newLayouts)

@@ -71,7 +71,7 @@ class SuperLockService {
         }
 
         // 4. ADQUIRIR LOCK EN BASE DE DATOS
-        const { data: newLock, error } = await supabase
+        const { error } = await supabase
           .from('operation_locks')
           .insert({
             lock_key: lockKey,
@@ -82,8 +82,6 @@ class SuperLockService {
             expires_at: expiresAt,
             is_active: true
           })
-          .select()
-          .single()
 
         if (error) {
           logger.error('SuperLockService', `❌ Error adquiriendo lock DB: ${error.message}`)
@@ -246,7 +244,6 @@ class SuperLockService {
       }
 
       // Limpiar cache local expirado
-      const now = Date.now()
       for (const [key, lock] of this.activeLocks.entries()) {
         if (new Date(lock.expiresAt) <= new Date()) {
           this.activeLocks.delete(key)

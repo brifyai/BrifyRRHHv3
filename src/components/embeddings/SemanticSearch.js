@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext.js';
 import embeddingsService from '../../lib/embeddings.js';
 import organizedDatabaseService from '../../services/organizedDatabaseService.js';
-import LoadingSpinner from '../common/LoadingSpinner.js';
 import SubtleSpinner from '../common/SubtleSpinner.js';
 import AIChat from './AIChat.js';
 import {
@@ -12,8 +11,7 @@ import {
   ExclamationTriangleIcon,
   ChatBubbleLeftRightIcon,
   ArrowDownTrayIcon,
-  BuildingOfficeIcon,
-  FunnelIcon
+  BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 
@@ -28,23 +26,23 @@ const SemanticSearch = () => {
   const [selectedCompany, setSelectedCompany] = useState('');
   const [expandedResults, setExpandedResults] = useState(new Set());
 
+  const loadCompanies = useCallback(async () => {
+    try {
+      const companyData = await organizedDatabaseService.getCompanies();
+      setCompanies(companyData);
+      // Seleccionar la primera empresa por defecto
+      if (companyData.length > 0 && !selectedCompany) {
+        setSelectedCompany(companyData[0].name);
+      }
+    } catch (error) {
+      console.error('Error loading companies:', error);
+    }
+  }, [selectedCompany]);
+
   // Cargar empresas al montar el componente
   useEffect(() => {
-    const loadCompanies = async () => {
-      try {
-        const companyData = await organizedDatabaseService.getCompanies();
-        setCompanies(companyData);
-        // Seleccionar la primera empresa por defecto
-        if (companyData.length > 0 && !selectedCompany) {
-          setSelectedCompany(companyData[0].name);
-        }
-      } catch (error) {
-        console.error('Error loading companies:', error);
-      }
-    };
-
     loadCompanies();
-  }, []);
+  }, [loadCompanies]);
 
   const toggleExpansion = (resultId) => {
     setExpandedResults(prev => {

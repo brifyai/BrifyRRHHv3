@@ -50,7 +50,6 @@ const AnalyticsDashboard = ({ companyId = null, isComparative = false }) => {
   const [realTimeData, setRealTimeData] = useState(null)
   const [companyReport, setCompanyReport] = useState(null)
   const [insights, setInsights] = useState(null)
-  const [refreshInterval, setRefreshInterval] = useState(null)
 
   // Opciones de rango de fechas
   const dateRangeOptions = [
@@ -60,14 +59,14 @@ const AnalyticsDashboard = ({ companyId = null, isComparative = false }) => {
     { value: '90d', label: 'Últimos 90 días' }
   ]
 
-  // Opciones de canales
-  const channelOptions = [
+  // Opciones de canales - envuelto en useMemo para evitar re-creación
+  const channelOptions = useMemo(() => [
     { value: 'email', label: 'Email', color: '#3B82F6' },
     { value: 'sms', label: 'SMS', color: '#10B981' },
     { value: 'telegram', label: 'Telegram', color: '#8B5CF6' },
     { value: 'whatsapp', label: 'WhatsApp', color: '#25D366' },
     { value: 'groq', label: 'Groq AI', color: '#F59E0B' }
-  ]
+  ], [])
 
   // Función para cargar todos los datos de analytics
   const loadAnalyticsData = useCallback(async () => {
@@ -139,7 +138,6 @@ const AnalyticsDashboard = ({ companyId = null, isComparative = false }) => {
 
   // Cargar datos iniciales
   // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
 useEffect(() => {
     loadAnalyticsData()
   }, [loadAnalyticsData])
@@ -202,7 +200,7 @@ useEffect(() => {
         }
       ]
     }
-  }, [realTimeData])
+  }, [realTimeData, channelOptions])
 
   // Datos para gráfico circular - Distribución de canales
   const channelDistributionData = useMemo(() => {
@@ -223,7 +221,7 @@ useEffect(() => {
         }
       ]
     }
-  }, [realTimeData])
+  }, [realTimeData, channelOptions])
 
   // Datos para gráfico de radar - KPIs
   const kpiRadarData = useMemo(() => {

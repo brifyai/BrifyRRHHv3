@@ -580,7 +580,6 @@ class CompanyReportsService {
 
     Object.keys(comparisons).forEach(metric => {
       const comparison = comparisons[metric]
-      const ranking = rankings[metric]
 
       // Identificar gaps significativos
       if (comparison.max > comparison.average * 2) {
@@ -973,7 +972,7 @@ class CompanyReportsService {
    */
   generateReportSpecificInsights(metrics) {
     const insights = []
-    const { delivery, engagement, channels } = metrics.communication
+    const { engagement, channels } = metrics.communication
 
     // Insight sobre rendimiento de canales
     const bestChannel = Object.keys(channels).reduce((best, channel) => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BuildingOfficeIcon, UsersIcon, PaperAirplaneIcon, EyeIcon, FaceSmileIcon, FaceFrownIcon, ExclamationTriangleIcon, ClockIcon, DocumentTextIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { BuildingOfficeIcon, UsersIcon, PaperAirplaneIcon, EyeIcon, FaceSmileIcon, FaceFrownIcon, ExclamationTriangleIcon, ClockIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
 // Memoizar el componente para evitar re-renders innecesarios
 const CompanyCard = React.memo(({ company, isFlipped, onToggleFlip }) => {
@@ -154,20 +154,6 @@ const CompanyCard = React.memo(({ company, isFlipped, onToggleFlip }) => {
             </div>
           </div>
 
-          {/* Botón de tendencias */}
-          <div className="absolute bottom-4 right-4">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Aquí iría la lógica para mostrar tendencias
-                console.log(`📈 Mostrando tendencias para ${company.name}`);
-              }}
-              className="p-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg transition-all duration-300 hover:scale-105"
-              title="Ver tendencias"
-            >
-              <ArrowPathIcon className="h-4 w-4" />
-            </button>
-          </div>
         </div>
 
         {/* Lado trasero de la tarjeta */}
@@ -177,9 +163,6 @@ const CompanyCard = React.memo(({ company, isFlipped, onToggleFlip }) => {
               <h4 className="text-lg font-bold text-gray-900">
                 {company.name}
               </h4>
-              <div className="text-sm text-gray-500">
-                Vista Detallada
-              </div>
             </div>
 
             <div className="flex-1 space-y-4">

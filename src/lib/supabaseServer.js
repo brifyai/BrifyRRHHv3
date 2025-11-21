@@ -6,43 +6,43 @@ import { createClient } from '@supabase/supabase-js'
 // Create server-side Supabase client with lazy validation
 let _supabaseServer = null;
 
-export      console.log('- SUPABASE_URL:', SUPABASE_URL ? 'Present' : 'Missing');
-      console.log('- SUPABASE_KEY:', SUPABASE_KEY ? 'Present' : 'Missing');
+export const getSupabaseServer = () => {
+  if (!_supabaseServer) {
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-      if (!SUPABASE_URL || !SUPABASE_KEY) {
-        throw new Error('Missing Supabase configuration. Please check your environment variables.')
-      }
+    console.log('- SUPABASE_URL:', SUPABASE_URL ? 'Present' : 'Missing');
+    console.log('- SUPABASE_KEY:', SUPABASE_KEY ? 'Present' : 'Missing');
 
-      _supabaseServer = createClient(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        {
-          auth: {
-            persistSession: false, // No session persistence on server
-            autoRefreshToken: false, // No auto refresh on server
-            detectSessionInUrl: false, // No URL detection on server
-            flow: 'pkce'
-          },
-          global: {
-            headers: {
-              'X-Client-Info': 'StaffHub/1.0.0 (server)',
-              'X-Forced-Project': 'tmqglnycivlcjijoymwe'
-            }
-          },
-          db: {
-            schema: 'public'
-          },
-          realtime: {
-            disabled: true // Disable realtime on server
-          }
-        }
-      );
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+      throw new Error('Missing Supabase configuration. Please check your environment variables.');
     }
 
-    return _supabaseServer[prop];
+    _supabaseServer = createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY,
+      {
+        auth: {
+          persistSession: false, // No session persistence on server
+          autoRefreshToken: false, // No auto refresh on server
+          detectSessionInUrl: false, // No URL detection on server
+          flow: 'pkce'
+        },
+        global: {
+          headers: {
+            'X-Client-Info': 'StaffHub/1.0.0 (server)',
+            'X-Forced-Project': 'tmqglnycivlcjijoymwe'
+          }
+        },
+        db: {
+          schema: 'public'
+        },
+        realtime: {
+          disabled: true // Disable realtime on server
+        }
+      }
+    );
   }
-});
 
-// Export configuration for reference (lazy loaded)
-export  }
-});
+  return _supabaseServer;
+};

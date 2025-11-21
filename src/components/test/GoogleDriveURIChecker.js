@@ -1,40 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import './GoogleDriveURIChecker.css'
 
 const GoogleDriveURIChecker = () => {
   const [diagnosis, setDiagnosis] = useState({})
   const [loading, setLoading] = useState(false)
   const [currentConfig, setCurrentConfig] = useState({})
-
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    performDiagnosis()
-  }, [])
-
-  const performDiagnosis = async () => {
-    setLoading(true)
-    const results = {}
-
-    // 1. Verificar variables de entorno
-    results.environment = checkEnvironmentVariables()
-    
-    // 2. Verificar configuración actual
-    results.currentConfig = getCurrentConfiguration()
-    
-    // 3. Generar URIs correctos
-    results.correctURIs = generateCorrectURIs()
-    
-    // 4. Verificar consistencia
-    results.consistency = checkConsistency(results.environment, results.correctURIs)
-    
-    // 5. Generar solución
-    results.solution = generateSolution(results)
-
-    setDiagnosis(results)
-    setCurrentConfig(results.currentConfig)
-    setLoading(false)
-  }
 
   const checkEnvironmentVariables = () => {
     const vars = {
@@ -70,7 +40,7 @@ useEffect(() => {
     return {
       environment: process.env.REACT_APP_ENVIRONMENT || 'undefined',
       netlifyUrl: netlifyUrl,
-      currentRedirectUri: isProduction 
+      currentRedirectUri: isProduction
         ? `${netlifyUrl}/auth/google/callback`
         : 'http://localhost:3000/auth/google/callback',
       isProduction
@@ -109,25 +79,53 @@ useEffect(() => {
     }
   }
 
-  const checkConsistency = (env, uris) => {
-    const isProduction = env.vars.environment === 'production'
-    const expectedUri = isProduction 
-      ? uris.production.redirectURIs[0]
-      : uris.development.redirectURIs[0]
+  const performDiagnosis = useCallback(async () => {
+    setLoading(true)
+    const results = {}
+
+    // 1. Verificar variables de entorno
+    results.environment = checkEnvironmentVariables()
     
-    const currentUri = getCurrentConfiguration().currentRedirectUri
+    // 2. Verificar configuración actual
+    results.currentConfig = getCurrentConfiguration()
     
-    return {
-      isProduction,
-      expectedUri,
-      currentUri,
-      isConsistent: expectedUri === currentUri,
-      netlifyUrl: env.vars.netlifyUrl
+    // 3. Generar URIs correctos
+    results.correctURIs = generateCorrectURIs()
+    
+    // 4. Verificar consistencia (función inline para evitar dependencias)
+    const checkConsistency = (env, uris) => {
+      const isProduction = env.vars.environment === 'production'
+      const expectedUri = isProduction
+        ? uris.production.redirectURIs[0]
+        : uris.development.redirectURIs[0]
+      
+      const currentUri = getCurrentConfiguration().currentRedirectUri
+      
+      return {
+        isProduction,
+        expectedUri,
+        currentUri,
+        isConsistent: expectedUri === currentUri,
+        netlifyUrl: env.vars.netlifyUrl
+      }
     }
-  }
+    
+    results.consistency = checkConsistency(results.environment, results.correctURIs)
+    
+    // 5. Generar solución
+    results.solution = generateSolution(results)
+
+    setDiagnosis(results)
+    setCurrentConfig(results.currentConfig)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    performDiagnosis()
+  }, [performDiagnosis])
 
   const generateSolution = (results) => {
-    const { environment, consistency, correctURIs } = results
+    const { environment, consistency } = results
     
     if (!environment.allPresent) {
       return {

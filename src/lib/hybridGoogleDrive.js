@@ -246,4 +246,4 @@ class HybridGoogleDrive {
   }
 }
 
-export
+export default HybridGoogleDrive;

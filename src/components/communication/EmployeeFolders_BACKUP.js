@@ -887,19 +887,6 @@ useEffect(() => {
     }
   };
 
-  // Calcular filteredEmployees para el conteo total    const companyName = (employee.company && employee.company.name) || (employee.companies && employee.companies.name) || '';
-    const term = (searchTerm || '').toLowerCase();
-
-    const matchesSearch =
-      !term ||
-      (employee.name && employee.name.toLowerCase().includes(term)) ||
-      (employee.email && employee.email.toLowerCase().includes(term)) ||
-      (companyName && companyName.toLowerCase().includes(term)) ||
-      (employee.department && employee.department.toLowerCase().includes(term));
-
-    return matchesSearch;
-  });
-
   // Calcular páginas totales
   const totalPages = getTotalPages();
   const hasMorePages = currentPage < totalPages;

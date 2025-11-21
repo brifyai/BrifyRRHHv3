@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { BuildingOfficeIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
-import { supabase } from '../../lib/supabase.js'
 import CompanyCard from './CompanyCard.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
 
@@ -190,9 +189,6 @@ const DatabaseCompanySummary = () => {
             <h3 className="text-2xl font-bold text-gray-900">
               Empresas Activas
             </h3>
-            <p className="text-gray-600">
-              Resumen detallado por organización
-            </p>
           </div>
         </div>
         <button

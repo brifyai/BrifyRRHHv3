@@ -14,6 +14,7 @@ import {
   CloudArrowUpIcon
 } from '@heroicons/react/24/outline';
 import unifiedEmployeeFolderService from '../../services/unifiedEmployeeFolderService.js';
+import enhancedEmployeeFolderService from '../../services/enhancedEmployeeFolderService.js';
 import toast from 'react-hot-toast';
 
 const EmployeeFolderManager = () => {

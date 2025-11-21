@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '../../contexts/AuthContext.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
 import {
   UserGroupIcon,
@@ -16,7 +15,6 @@ import toast from 'react-hot-toast'
 import UserForm from './UserForm.js'
 
 const UserManagement = () => {
-  const { user } = useAuth()
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [loading, setLoading] = useState(true)

@@ -7,7 +7,6 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  PhoneIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ArrowRightIcon,
@@ -21,10 +20,8 @@ import {
   QuestionMarkCircleIcon,
   LightBulbIcon,
   PlayIcon,
-  DocumentTextIcon,
   GlobeAltIcon,
-  KeyIcon,
-  WrenchScrewdriverIcon
+  KeyIcon
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid';
 import communicationService from '../../services/communicationService.js';
@@ -100,45 +97,43 @@ const WhatsAppOnboarding = () => {
     }
   ];
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
+  useEffect(() => {
+    const initializeOnboarding = async () => {
+      setIsLoading(true);
+      try {
+        // Cargar perfil del usuario
+        const profile = await communicationService.getCurrentUser();
+        setUserProfile(profile);
+
+        // Cargar empresas
+        const companiesResult = await communicationService.getCompanies();
+        if (companiesResult) {
+          setCompanies(companiesResult);
+        }
+
+        // Cargar configuraciones existentes
+        const configsResult = await communicationService.getAllWhatsAppConfigurations();
+        if (configsResult.success) {
+          setConfigurations(configsResult.configurations);
+        }
+
+        // Determinar paso inicial
+        if (configsResult.configurations && configsResult.configurations.length > 0) {
+          // Usuario ya tiene configuraciones, ir directo al dashboard
+          setCurrentStep(6); // Último paso (success) - steps.length - 1
+        } else {
+          setCurrentStep(0); // Comenzar desde el inicio
+        }
+
+      } catch (error) {
+        console.error('Error inicializando onboarding:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     initializeOnboarding();
   }, []);
-
-  const initializeOnboarding = async () => {
-    setIsLoading(true);
-    try {
-      // Cargar perfil del usuario
-      const profile = await communicationService.getCurrentUser();
-      setUserProfile(profile);
-
-      // Cargar empresas
-      const companiesResult = await communicationService.getCompanies();
-      if (companiesResult) {
-        setCompanies(companiesResult);
-      }
-
-      // Cargar configuraciones existentes
-      const configsResult = await communicationService.getAllWhatsAppConfigurations();
-      if (configsResult.success) {
-        setConfigurations(configsResult.configurations);
-      }
-
-      // Determinar paso inicial
-      if (configsResult.configurations && configsResult.configurations.length > 0) {
-        // Usuario ya tiene configuraciones, ir directo al dashboard
-        setCurrentStep(steps.length - 1); // Último paso (success)
-      } else {
-        setCurrentStep(0); // Comenzar desde el inicio
-      }
-
-    } catch (error) {
-      console.error('Error inicializando onboarding:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const nextStep = () => {
     if (currentStep < steps.length - 1) {

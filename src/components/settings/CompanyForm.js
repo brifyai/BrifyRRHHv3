@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import { supabase } from '../../lib/supabaseClient.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
-import companyKnowledgeService from '../../services/companyKnowledgeService.js'
 import {
   BuildingOfficeIcon,
   UserGroupIcon,
@@ -16,11 +15,8 @@ import {
   ArrowDownIcon,
   ArrowsUpDownIcon,
   EnvelopeIcon,
-  DocumentTextIcon,
   Cog6ToothIcon,
-  KeyIcon,
   GlobeAltIcon,
-  ServerIcon,
   ChatBubbleLeftIcon,
   DevicePhoneMobileIcon,
   ComputerDesktopIcon,
@@ -115,6 +111,21 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
   // Estado para manejar debounce de guardado automático
   const [debounceTimers, setDebounceTimers] = useState({})
 
+  const loadEmployees = useCallback(async () => {
+    if (!company) return
+
+    try {
+      // Usar el servicio de base de datos organizada para cargar empleados reales
+      const allEmployees = await organizedDatabaseService.getEmployees()
+      const companyEmployees = allEmployees.filter(emp => emp.company_id === company.id)
+      setEmployees(companyEmployees)
+
+    } catch (error) {
+      console.error('Error loading employees:', error)
+      toast.error('Error al cargar empleados')
+    }
+  }, [company])
+
   useEffect(() => {
     if (company) {
       const fallbackConfig = company.fallback_config || { order: ['WhatsApp', 'Telegram', 'SMS', 'Email'] }
@@ -196,22 +207,7 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
         isNew: true
       }])
     }
-  }, [company])
-
-  const loadEmployees = async () => {
-    if (!company) return
-
-    try {
-      // Usar el servicio de base de datos organizada para cargar empleados reales
-      const allEmployees = await organizedDatabaseService.getEmployees()
-      const companyEmployees = allEmployees.filter(emp => emp.company_id === company.id)
-      setEmployees(companyEmployees)
-
-    } catch (error) {
-      console.error('Error loading employees:', error)
-      toast.error('Error al cargar empleados')
-    }
-  }
+  }, [company, loadEmployees])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({

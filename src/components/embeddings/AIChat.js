@@ -3,7 +3,6 @@ import { useAuth } from '../../contexts/AuthContext.js'
 import embeddingsService from '../../lib/embeddings.js'
 import groqService from '../../services/groqService.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
-import LoadingSpinner from '../common/LoadingSpinner.js'
 import SubtleSpinner from '../common/SubtleSpinner.js'
 import {
   ChatBubbleLeftRightIcon,
@@ -12,10 +11,7 @@ import {
   DocumentIcon,
   UserIcon,
   CpuChipIcon,
-  ExclamationTriangleIcon,
-  FunnelIcon,
-  BuildingOfficeIcon,
-  XMarkIcon
+  FunnelIcon
 } from '@heroicons/react/24/outline'
 import toast from 'react-hot-toast'
 
@@ -49,7 +45,6 @@ const AIChat = () => {
   }
 
   // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
 useEffect(() => {
     scrollToBottom()
   }, [messages, isTyping])

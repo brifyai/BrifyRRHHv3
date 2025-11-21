@@ -1,6 +1,5 @@
 // Servicio de embeddings y tracking de tokens
 import { supabase } from './supabase.js';
-import groqService from '../services/groqService.js';
 
 class EmbeddingsService {
   constructor() {

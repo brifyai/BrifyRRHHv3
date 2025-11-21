@@ -58,7 +58,7 @@ const EnhancedLoadingSpinner = ({
       </div>
 
       {/* Estilos para animaciones personalizadas */}
-      <style jsx>{`
+      <style>{`
         .animation-delay-0 {
           animation-delay: 0ms;
         }

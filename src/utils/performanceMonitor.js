@@ -229,7 +229,11 @@ if (DEV_CONFIG.ENABLE_LOGGING && typeof window !== 'undefined') {
 }
 
 // Hook personalizado para React
-export  };
+export const usePerformanceMonitor = (componentName) => {
+
+  const startTiming = (operation) => {
+    return performanceMonitor.startTiming(`${componentName}-${operation}`);
+  };
 
   const endTiming = (operation) => {
     return performanceMonitor.endTiming(`${componentName}-${operation}`);
@@ -257,13 +261,11 @@ export  };
 };
 
 // Funciones de utilidad exportadas
-export  const result = fn();
+export const measurePerformance = (label, fn) => {
+  performanceMonitor.startTiming(label);
+  const result = fn();
   performanceMonitor.endTiming(label);
   return result;
 };
-
-export};
-
-export};
 
 export default performanceMonitor;

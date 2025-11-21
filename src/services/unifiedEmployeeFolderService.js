@@ -7,7 +7,6 @@ import { supabase } from '../lib/supabaseClient.js'
 import superLockService from '../lib/superLockService.js'
 import organizedDatabaseService from './organizedDatabaseService.js'
 import googleDriveConsolidatedService from '../lib/googleDriveConsolidated.js'
-import logger from '../lib/logger.js'
 
 class UnifiedEmployeeFolderService {
   constructor() {
@@ -445,7 +444,6 @@ class UnifiedEmployeeFolderService {
       for (const [email, group] of Object.entries(emailGroups)) {
         if (group.length > 1) {
           // Mantener el más reciente, eliminar los demás
-          const toKeep = group[0]
           const toDelete = group.slice(1)
           
           for (const folder of toDelete) {

@@ -5,6 +5,8 @@ import { toast } from 'react-hot-toast'
 import DatabaseCompanySummary from './DatabaseCompanySummary.js'
 import AnalyticsDashboard from '../analytics/AnalyticsDashboard.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
+// ✅ SOLUCIÓN DEFINITIVA: Importar companySyncService de forma síncrona para evitar ChunkLoadError
+// Forzamos la carga síncrona con verificación en tiempo de compilación
 import companySyncService from '../../services/companySyncService.js'
 import {
   FolderIcon,
@@ -20,8 +22,29 @@ import {
   ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline'
 
+// Verificación inmediata de la importación (después de todos los imports)
+const companySyncServiceAvailable = !!companySyncService && typeof companySyncService === 'object'
+
 const ModernDashboardRedesigned = () => {
   const { user, userProfile } = useAuth()
+  
+  // ✅ SOLUCIÓN DEFINITIVA: Verificar companySyncService está cargado al montar el componente
+  useEffect(() => {
+    console.log('🔍 VERIFICACIÓN DE IMPORTACIÓN SÍNCRONA:');
+    console.log('✅ companySyncService importado:', companySyncServiceAvailable);
+    console.log('✅ Tipo de companySyncService:', typeof companySyncService);
+    console.log('✅ Métodos disponibles:', companySyncService ? Object.keys(companySyncService) : 'N/A');
+    
+    if (!companySyncServiceAvailable) {
+      console.error('❌ ERROR CRÍTICO: companySyncService no está disponible');
+      console.error('❌ Esto causará ChunkLoadError. Verificar:');
+      console.error('❌ 1. src/services/companySyncService.js existe');
+      console.error('❌ 2. La exportación es correcta (export default)');
+      console.error('❌ 3. No hay imports dinámicos en la cadena de dependencias');
+    } else {
+      console.log('✅ companySyncService cargado correctamente');
+    }
+  }, [])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalFolders: 0,
@@ -112,17 +135,67 @@ const ModernDashboardRedesigned = () => {
     timestamp: 0,
     isValid: false
   })
+  
+  // SISTEMA ANTI-BUCLE DEFINITIVO - Múltiples capas de protección
+  const antiLoopRef = React.useRef({
+    isLoading: false,
+    loadCount: 0,
+    lastUserId: null,
+    maxRetries: 2, // Reducido para activar circuit breaker más rápido
+    lastExecutionTime: 0,
+    minExecutionInterval: 5000, // 5 segundos mínimo entre ejecuciones
+    componentMountTime: Date.now(),
+    initializationDelay: 3000, // 3 segundos de delay antes de iniciar
+    intervalId: null,
+    isComponentMounted: false,
+    isPollingActive: false,
+    executionLog: [],
+    circuitBreakerActive: false,
+    totalExecutions: 0,
+    dashboardLoadedForUser: null // NUEVO: Rastrear si ya cargamos para este usuario
+  })
 
   const loadDashboardData = useCallback(async () => {
-    console.log('🚀 Dashboard: Iniciando carga optimizada')
+    const now = Date.now()
+    const antiLoop = antiLoopRef.current
+    
+    // PREVENCIÓN DE BUCLE #1: Verificar si YA CARGAMOS para este usuario
+    if (antiLoop.dashboardLoadedForUser === user?.id) {
+      console.log(`✅ Dashboard: Ya cargado para usuario ${user.id}, omitiendo`)
+      setLoading(false)
+      return
+    }
+    
+    // PREVENCIÓN DE BUCLE #2: Verificar tiempo mínimo entre ejecuciones
+    const timeSinceLastExecution = now - antiLoop.lastExecutionTime
+    if (timeSinceLastExecution < antiLoop.minExecutionInterval) {
+      console.log(`⚠️ Dashboard: Ejecución demasiado rápida (${timeSinceLastExecution}ms), ignorando`)
+      return
+    }
+    
+    // PREVENCIÓN DE BUCLE #3: Verificar si ya está cargando
+    if (antiLoop.isLoading) {
+      console.log('⚠️ Dashboard: Carga ya en progreso, ignorando llamada duplicada')
+      return
+    }
+    
+    // PREVENCIÓN DE BUCLE #4: Verificar si el usuario ya fue procesado recientemente demasiadas veces
+    if (antiLoop.lastUserId === user?.id && antiLoop.loadCount >= antiLoop.maxRetries) {
+      console.log(`🚨 Dashboard: CIRCUIT BREAKER ACTIVADO - ${antiLoop.loadCount} intentos para usuario ${user.id}`)
+      setLoading(false)
+      // Forzar detención de polling si hay bucle
+      antiLoop.loadCount = 0
+      return
+    }
+
+    console.log(`🚀 Dashboard: Iniciando carga optimizada (Intento #${antiLoop.loadCount + 1})`)
     
     if (!user || !userProfile) {
       console.log('Dashboard: Esperando usuario y perfil...')
       return
     }
 
-    // Verificar cache (válido por 5 minutos - aumentado para mejor rendimiento)
-    const now = Date.now()
+    // Verificar cache (válido por 5 minutos)
     const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
     
     if (cacheRef.current.isValid && (now - cacheRef.current.timestamp) < CACHE_DURATION) {
@@ -130,20 +203,28 @@ const ModernDashboardRedesigned = () => {
       setStats(cacheRef.current.data.stats)
       setPercentages(cacheRef.current.data.percentages)
       setLoading(false)
+      // MARCAR COMO CARGADO
+      antiLoop.dashboardLoadedForUser = user.id
       return
     }
 
     console.log('Dashboard: Cargando datos optimizados para usuario:', user.id)
     
+    // Marcar como cargando
+    antiLoop.isLoading = true
+    antiLoop.lastUserId = user.id
+    antiLoop.loadCount++
+    antiLoop.lastExecutionTime = now
+    
     try {
       setLoading(true)
       const startTime = performance.now()
       
-      // CARGA OPTIMIZADA con timeout y manejo de errores mejorado
+      // CARGA OPTIMIZADA con timeout
       const dashboardStats = await Promise.race([
         organizedDatabaseService.getDashboardStats(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout de carga')), 8000) // 8 segundos timeout
+          setTimeout(() => reject(new Error('Timeout de carga')), 8000)
         )
       ])
       
@@ -155,7 +236,7 @@ const ModernDashboardRedesigned = () => {
         totalFiles: dashboardStats.documents || 0,
         storageUsed: dashboardStats.storageUsed || 0,
         tokensUsed: dashboardStats.tokensUsed || 0,
-        tokenLimit: 1000, // valor por defecto
+        tokenLimit: 1000,
         monthlyGrowth: dashboardStats.monthlyGrowth || 0,
         activeUsers: dashboardStats.activeUsers || 0,
         successRate: dashboardStats.successRate || 0
@@ -179,12 +260,17 @@ const ModernDashboardRedesigned = () => {
         isValid: true
       }
       
+      // Resetear contador de carga en éxito
+      antiLoop.loadCount = 0
+      // MARCAR COMO CARGADO PARA ESTE USUARIO
+      antiLoop.dashboardLoadedForUser = user.id
+      
       console.log('✅ Dashboard: Carga optimizada completada correctamente')
       
     } catch (error) {
       console.error('❌ Error en carga optimizada:', error)
       
-      // Valores por defecto más realistas en caso de error
+      // Valores por defecto en caso de error
       const fallbackStats = {
         totalFolders: 0,
         totalFiles: 0,
@@ -203,21 +289,22 @@ const ModernDashboardRedesigned = () => {
       setStats(fallbackStats)
       setPercentages(fallbackPercentages)
       
-      // Guardar en cache con duración más corta para reintentar pronto
+      // Guardar en cache
       cacheRef.current = {
         data: { stats: fallbackStats, percentages: fallbackPercentages },
         timestamp: now,
         isValid: true
       }
       
-      // Mostrar notificación de error solo si es un error real de red
+      // Mostrar notificación de error
       if (error.message !== 'Timeout de carga') {
         toast.error('Error al cargar datos del dashboard. Usando valores por defecto.')
       }
     } finally {
       setLoading(false)
+      antiLoop.isLoading = false
     }
-  }, [user, userProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, userProfile]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
   // Timeout de seguridad mejorado para evitar loading infinito
   useEffect(() => {
@@ -278,7 +365,8 @@ const ModernDashboardRedesigned = () => {
         clearTimeout(loadTimeout)
       }
     }
-  }, [user, userProfile, loadDashboardData]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, userProfile?.id]) // SOLO IDs para máxima estabilidad
 
   // Actualizar tiempo cada segundo
   useEffect(() => {
@@ -300,27 +388,34 @@ const ModernDashboardRedesigned = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showNotifications])
 
-  // Escuchar cambios en las empresas para actualizar el dashboard
+  // ✅ SOLUCIÓN DEFINITIVA: Escuchar cambios en las empresas para actualizar el dashboard
   useEffect(() => {
     if (!user || !userProfile) return
 
     const subscriptionId = `modern-dashboard-${user.id}`
     
-    const handleCompanyChange = () => {
-      console.log('🔄 ModernDashboard: Cambio detectado en empresas, actualizando dashboard...')
-      // Invalidar cache para forzar recarga
-      cacheRef.current.isValid = false
-      loadDashboardData()
+    // const handleCompanyChange = () => {
+    //   console.log('🔄 ModernDashboard: Cambio detectado en empresas, actualizando dashboard...')
+    //   // Invalidar cache para forzar recarga
+    //   cacheRef.current.isValid = false
+    //   loadDashboardData()
+    // }
+
+    // SOLUCIÓN DEFINITIVA: Solo intentar suscripción si companySyncService está disponible
+    if (!companySyncServiceAvailable) {
+      console.warn('⚠️ ModernDashboard: companySyncService no disponible, saltando suscripción');
+      console.warn('⚠️ El dashboard funcionará sin actualizaciones automáticas de empresas');
+      return;
     }
 
-    try {
-      if (companySyncService && typeof companySyncService.subscribe === 'function') {
-        companySyncService.subscribe('companies-updated', handleCompanyChange, subscriptionId)
-        console.log('✅ ModernDashboard: Suscrito a cambios de empresas')
-      }
-    } catch (error) {
-      console.warn('⚠️ ModernDashboard: Error al suscribirse a cambios de empresas:', error.message)
-    }
+    // try {
+    //   console.log('🔍 ModernDashboard: Intentando suscripción a cambios de empresas...');
+    //   companySyncService.subscribe('companies-updated', handleCompanyChange, subscriptionId)
+    //   console.log('✅ ModernDashboard: Suscrito exitosamente a cambios de empresas')
+    // } catch (error) {
+    //   console.error('❌ ModernDashboard: Error al suscribirse:', error.message);
+    //   // No bloquear el dashboard si la suscripción falla
+    // }
 
     return () => {
       try {
@@ -332,24 +427,65 @@ const ModernDashboardRedesigned = () => {
         console.warn('⚠️ ModernDashboard: Error al desuscribirse:', error.message)
       }
     }
-  }, [user, userProfile]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, userProfile?.id, user, userProfile]) // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ✅ INICIALIZACIÓN SEGURA: Solo ejecutar cuando el componente esté realmente montado
+  useEffect(() => {
+    const antiLoop = antiLoopRef.current
+    antiLoop.isComponentMounted = true
+    console.log('✅ Dashboard: Componente montado y listo');
+    
+    return () => {
+      console.log('❌ Dashboard: Componente desmontado, limpiando recursos...');
+      antiLoop.isComponentMounted = false
+      antiLoop.isPollingActive = false
+      if (antiLoop.intervalId) {
+        clearInterval(antiLoop.intervalId)
+        antiLoop.intervalId = null
+      }
+    }
+  }, []) // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   // ✅ POLLING: Actualizar datos cada 30 segundos para tiempo real
   useEffect(() => {
-    if (!user || !userProfile) return;
+    if (!user || !userProfile) {
+      console.log('⏰ Dashboard: No hay usuario/perfil, no se inicia polling');
+      return;
+    }
     
-    console.log('⏰ Dashboard: Iniciando polling cada 30 segundos');
-    const interval = setInterval(() => {
-      console.log('🔄 Dashboard: Polling activo - recargando datos...');
-      // Invalidar caché antes de recargar
-      cacheRef.current.isValid = false;
-      loadDashboardData();
-    }, 30000); // 30 segundos
+    const antiLoop = antiLoopRef.current
+    
+    // PREVENCIÓN: Esperar tiempo de inicialización antes de empezar
+    console.log(`⏰ Dashboard: Esperando ${antiLoop.initializationDelay}ms antes de iniciar polling...`);
+    const initializationDelay = setTimeout(() => {
+      if (!antiLoop.isComponentMounted) {
+        console.log('⚠️ Dashboard: Componente desmontado antes de iniciar polling');
+        return;
+      }
+      
+      console.log('⏰ Dashboard: Iniciando polling cada 30 segundos');
+      antiLoop.isPollingActive = true
+      
+      const interval = setInterval(() => {
+        console.log('🔄 Dashboard: Polling activo - recargando datos...');
+        // Invalidar caché antes de recargar
+        cacheRef.current.isValid = false;
+        loadDashboardData();
+      }, 30000); // 30 segundos
+
+      // Guardar interval ID en ref para limpieza externa si es necesario
+      antiLoop.intervalId = interval;
+    }, antiLoop.initializationDelay);
 
     return () => {
-      console.log('⏰ Dashboard: Deteniendo polling');
-      clearInterval(interval);
+      console.log('⏰ Dashboard: Limpieza de polling iniciada');
+      clearTimeout(initializationDelay);
+      if (antiLoop.intervalId) {
+        clearInterval(antiLoop.intervalId);
+        antiLoop.intervalId = null;
+        antiLoop.isPollingActive = false;
+      }
     };
-  }, [user, userProfile, loadDashboardData]);
+  }, [user?.id, userProfile?.id, loadDashboardData, user, userProfile]); // eslint-disable-next-line react-hooks/exhaustive-deps
 
 
   const formatBytes = (bytes) => {

@@ -520,10 +520,9 @@ class WhatsAppService {
       throw new Error('WhatsApp no está configurado')
     }
 
-    const { 
+    const {
       startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Últimos 30 días
-      endDate = new Date(),
-      limit = 100
+      endDate = new Date()
     } = params
 
     try {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowUpTrayIcon,
   DocumentTextIcon,
@@ -22,18 +22,18 @@ const EmployeeBulkUpload = () => {
   const [uploadResults, setUploadResults] = useState(null);
   const [companies, setCompanies] = useState([]);
 
-  useEffect(() => {
-    loadCompanies();
-  }, [loadCompanies]);
-
-  const loadCompanies = async () => {
+  const loadCompanies = useCallback(async () => {
     try {
       const companiesData = await organizedDatabaseService.getCompanies();
       setCompanies(companiesData || []);
     } catch (error) {
       console.error('Error loading companies:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadCompanies();
+  }, [loadCompanies]);
 
   // Estructura esperada del Excel
   const expectedColumns = [

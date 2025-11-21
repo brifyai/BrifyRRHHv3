@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   BuildingOfficeIcon,
   UserGroupIcon,
@@ -11,7 +11,6 @@ import {
 } from '@heroicons/react/24/outline'
 
 const SettingsHeader = ({ activeTab }) => {
-  const location = useLocation()
 
   const tabs = [
     { id: 'companies', label: 'Empresas', icon: BuildingOfficeIcon, path: '/configuracion/empresas' },

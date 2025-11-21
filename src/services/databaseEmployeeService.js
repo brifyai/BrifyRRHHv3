@@ -147,17 +147,6 @@ class DatabaseEmployeeService {
     try {
       console.log(`🔍 DEBUG: Obteniendo conteo de empleados para companyId: ${companyId}`);
       
-      // Verificar si la tabla employees existe
-      const { data: tableCheck, error: tableError } = await supabase
-        .from('employees')
-        .select('id')
-        .limit(1);
-
-      if (tableError) {
-        console.log('🔍 DEBUG: Tabla employees no existe:', tableError.message);
-        return 0;
-      }
-
       // Obtener conteo real de empleados
       const { count, error } = await supabase
         .from('employees')
@@ -183,7 +172,7 @@ class DatabaseEmployeeService {
       console.log(`🔍 DEBUG: Obteniendo estadísticas de mensajes para companyId: ${companyId}`);
       
       // Verificar si la tabla communication_logs existe
-      const { data: tableCheck, error: tableError } = await supabase
+      const { error: tableError } = await supabase
         .from('communication_logs')
         .select('id')
         .limit(1);
@@ -241,7 +230,7 @@ class DatabaseEmployeeService {
       console.log('🔍 DEBUG: Verificando existencia de tablas...');
       
       // Verificar si las tablas existen primero
-      const { data: tablesCheck, error: tablesError } = await supabase
+      const { error: tablesError } = await supabase
         .from('companies')
         .select('id')
         .limit(1);
@@ -252,7 +241,7 @@ class DatabaseEmployeeService {
       }
 
       // Verificar tabla communication_logs
-      const { data: commCheck, error: commError } = await supabase
+      const { error: commError } = await supabase
         .from('communication_logs')
         .select('id')
         .limit(1);

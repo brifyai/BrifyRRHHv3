@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase.js';
 import groqService from './groqService.js';
+import { withRateLimit } from '../lib/supabaseRateLimiter.js';
 
 class TrendsAnalysisService {
   constructor() {
@@ -20,11 +21,14 @@ class TrendsAnalysisService {
       let companyData;
       if (isId) {
         // Si es ID, buscar directamente por ID
-        const { data, error } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('id', companyIdentifier)
-          .maybeSingle();
+        const { data, error } = await withRateLimit(
+          `company-${companyIdentifier}`,
+          () => supabase
+            .from('companies')
+            .select('*')
+            .eq('id', companyIdentifier)
+            .maybeSingle()
+        );
         
         if (error) throw error;
         companyData = data;
@@ -92,12 +96,15 @@ class TrendsAnalysisService {
   // Obtener insights existentes de la base de datos
   async getExistingInsights(companyName) {
     try {
-      const { data: insights, error } = await supabase
-        .from('company_insights')
-        .select('*')
-        .eq('company_name', companyName)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+      const { data: insights, error } = await withRateLimit(
+        `insights-${companyName}`,
+        () => supabase
+          .from('company_insights')
+          .select('*')
+          .eq('company_name', companyName)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+      );
 
       if (error) throw error;
       
@@ -119,11 +126,14 @@ class TrendsAnalysisService {
   // Obtener datos reales de la empresa
   async getCompanyRealData(companyName) {
     try {
-      const { data: company, error } = await supabase
-        .from('companies')
-        .select('*')
-        .ilike('name', `%${companyName}%`)
-        .maybeSingle();
+      const { data: company, error } = await withRateLimit(
+        `company-search-${companyName}`,
+        () => supabase
+          .from('companies')
+          .select('*')
+          .ilike('name', `%${companyName}%`)
+          .maybeSingle()
+      );
 
       if (error) throw error;
       return company;
@@ -139,10 +149,13 @@ class TrendsAnalysisService {
       console.log(`🔍 DEBUG: Obteniendo métricas de comunicación para companyId: ${companyId}`);
       
       // Verificar si la tabla communication_logs existe
-      const { data: tableCheck, error: tableError } = await supabase
-        .from('communication_logs')
-        .select('id')
-        .limit(1);
+      const { error: tableError } = await withRateLimit(
+        'check-communication_logs',
+        () => supabase
+          .from('communication_logs')
+          .select('id')
+          .limit(1)
+      );
 
       console.log('🔍 DEBUG: Tabla communication_logs existe:', !tableError ? 'SÍ' : 'NO');
       if (tableError) {
@@ -150,12 +163,15 @@ class TrendsAnalysisService {
         return this.getEmptyMetrics();
       }
 
-      const { data: logs, error } = await supabase
-        .from('communication_logs')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false })
-        .limit(1000);
+      const { data: logs, error } = await withRateLimit(
+        `communication_logs-${companyId}`,
+        () => supabase
+          .from('communication_logs')
+          .select('*')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(1000)
+      );
 
       console.log('🔍 DEBUG: Logs encontrados para empresa:', logs?.length || 0);
       if (error) {
@@ -219,10 +235,13 @@ class TrendsAnalysisService {
   // Obtener datos de empleados
   async getEmployeeData(companyId) {
     try {
-      const { data: employees, error } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('company_id', companyId);
+      const { data: employees, error } = await withRateLimit(
+        `employees-${companyId}`,
+        () => supabase
+          .from('employees')
+          .select('*')
+          .eq('company_id', companyId)
+      );
 
       if (error) throw error;
 
@@ -377,10 +396,13 @@ Genera insights específicos basados en estos datos. Identifica patrones, tenden
   async saveInsights(companyName, insights) {
     try {
       // Primero, desactivar insights anteriores
-      await supabase
-        .from('company_insights')
-        .update({ is_active: false })
-        .eq('company_name', companyName);
+      await withRateLimit(
+        `deactivate-insights-${companyName}`,
+        () => supabase
+          .from('company_insights')
+          .update({ is_active: false })
+          .eq('company_name', companyName)
+      );
 
       // Guardar nuevos insights
       const insightsToSave = [];
@@ -412,10 +434,13 @@ Genera insights específicos basados en estos datos. Identifica patrones, tenden
       });
 
       if (insightsToSave.length > 0) {
-        const { data, error } = await supabase
-          .from('company_insights')
-          .insert(insightsToSave)
-          .select();
+        const { error } = await withRateLimit(
+          `insert-insights-${companyName}`,
+          () => supabase
+            .from('company_insights')
+            .insert(insightsToSave)
+            .select()
+        );
 
         if (error) throw error;
         console.log(`✅ ${insightsToSave.length} insights guardados para ${companyName}`);
@@ -456,12 +481,15 @@ Genera insights específicos basados en estos datos. Identifica patrones, tenden
       };
 
       // Upsert métricas
-      const { data, error } = await supabase
-        .from('company_metrics')
-        .upsert(metrics, {
-          onConflict: 'company_name'
-        })
-        .select();
+      const { error } = await withRateLimit(
+        `metrics-${companyName}`,
+        () => supabase
+          .from('company_metrics')
+          .upsert(metrics, {
+            onConflict: 'company_name'
+          })
+          .select()
+      );
 
       if (error) throw error;
       console.log(`✅ Métricas guardadas para ${companyName}`);
@@ -579,11 +607,14 @@ Genera insights específicos basados en estos datos. Identifica patrones, tenden
   // Limpiar insights expirados
   async cleanupExpiredInsights() {
     try {
-      const { error } = await supabase
-        .from('company_insights')
-        .update({ is_active: false })
-        .lt('expires_at', new Date().toISOString())
-        .eq('is_active', true);
+      const { error } = await withRateLimit(
+        'cleanup-expired-insights',
+        () => supabase
+          .from('company_insights')
+          .update({ is_active: false })
+          .lt('expires_at', new Date().toISOString())
+          .eq('is_active', true)
+      );
 
       if (error) throw error;
       console.log('✅ Insights expirados limpiados');
@@ -597,10 +628,13 @@ Genera insights específicos basados en estos datos. Identifica patrones, tenden
     try {
       console.log('🔄 Generando insights para todas las empresas...');
       
-      const { data: companies, error } = await supabase
-        .from('companies')
-        .select('name')
-        .order('name', { ascending: true });
+      const { data: companies, error } = await withRateLimit(
+        'all-companies',
+        () => supabase
+          .from('companies')
+          .select('name')
+          .order('name', { ascending: true })
+      );
 
       if (error) throw error;
 

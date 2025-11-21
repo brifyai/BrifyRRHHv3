@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserIcon, FunnelIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import Swal from 'sweetalert2';
@@ -40,54 +40,7 @@ const EmployeeSelector = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  useEffect(() => {
-    loadEmployees();
-    loadCompanies();
-    
-    // Si hay datos temporales de empleados seleccionados, cargarlos
-    if (window.tempSelectedEmployees) {
-      const tempSelected = new Set(window.tempSelectedEmployees);
-      setSelectedEmployees(tempSelected);
-      delete window.tempSelectedEmployees;
-    }
-  }, []);
-
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    applyFilters();
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [employees, filters]);
-
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    extractUniqueFilters();
-  }, [employees]);
-
-  const loadEmployees = async () => {
-    try {
-      setLoading(true);
-      const employeeData = await organizedDatabaseService.getEmployees();
-      setEmployees(employeeData);
-      setFilteredEmployees(employeeData);
-    } catch (error) {
-      console.error('Error loading employees:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCompanies = async () => {
-    try {
-      const companyData = await organizedDatabaseService.getCompanies();
-      setCompanies(companyData);
-    } catch (error) {
-      console.error('Error loading companies:', error);
-    }
-  };
-
-  const extractUniqueFilters = () => {
+  const extractUniqueFilters = useCallback(() => {
     const regions = [...new Set(employees.map(emp => emp.region))];
     const departments = [...new Set(employees.map(emp => emp.department))];
     const levels = [...new Set(employees.map(emp => emp.level))];
@@ -99,9 +52,9 @@ useEffect(() => {
     setUniqueLevels(levels.sort());
     setUniqueWorkModes(workModes.sort());
     setUniqueContractTypes(contractTypes.sort());
-  };
+  }, [employees]);
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let result = [...employees];
     
     if (filters.companyId) {
@@ -129,7 +82,51 @@ useEffect(() => {
     }
     
     setFilteredEmployees(result);
-  };
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [employees, filters]);
+
+  const loadEmployees = useCallback(async () => {
+    try {
+      setLoading(true);
+      const employeeData = await organizedDatabaseService.getEmployees();
+      setEmployees(employeeData);
+      setFilteredEmployees(employeeData);
+    } catch (error) {
+      console.error('Error loading employees:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadCompanies = useCallback(async () => {
+    try {
+      const companyData = await organizedDatabaseService.getCompanies();
+      setCompanies(companyData);
+    } catch (error) {
+      console.error('Error loading companies:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadEmployees();
+    loadCompanies();
+    
+    // Si hay datos temporales de empleados seleccionados, cargarlos
+    if (window.tempSelectedEmployees) {
+      const tempSelected = new Set(window.tempSelectedEmployees);
+      setSelectedEmployees(tempSelected);
+      delete window.tempSelectedEmployees;
+    }
+  }, [loadEmployees, loadCompanies]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [employees, filters, applyFilters]);
+
+  useEffect(() => {
+    extractUniqueFilters();
+  }, [employees, extractUniqueFilters]);
+
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({
@@ -594,13 +591,21 @@ useEffect(() => {
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
-                        <div className={`w-2 h-2 rounded-full ${getSimulatedSMS(employee).enabled ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                        <div className="text-sm text-gray-900">{getSimulatedSMS(employee).phone}</div>
-                        {getSimulatedSMS(employee).enabled && (
-                          <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
-                        )}
+                        {(() => {
+                          const whatsappData = getSimulatedWhatsApp(employee);
+                          const smsData = getSimulatedSMS(employee, whatsappData);
+                          return (
+                            <>
+                              <div className={`w-2 h-2 rounded-full ${smsData.enabled ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                              <div className="text-sm text-gray-900">{smsData.phone}</div>
+                              {smsData.enabled && (
+                                <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap">

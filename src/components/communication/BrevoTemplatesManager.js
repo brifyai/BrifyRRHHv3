@@ -7,16 +7,13 @@ import {
   TrashIcon,
   EnvelopeIcon,
   ChatBubbleLeftRightIcon,
-  CheckCircleIcon,
   XCircleIcon,
   MagnifyingGlassIcon,
-  FunnelIcon,
   TagIcon,
   ClockIcon,
   UserGroupIcon,
   ArrowPathIcon,
   EyeIcon,
-  EyeSlashIcon,
   DocumentDuplicateIcon,
   SparklesIcon
 } from '@heroicons/react/24/outline'
@@ -302,7 +299,6 @@ const BrevoTemplatesManager = () => {
   }
 
   // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
 useEffect(() => {
     loadTemplates()
   }, [loadTemplates])

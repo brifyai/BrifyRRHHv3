@@ -51,7 +51,7 @@ class DistributedLockService {
         }
 
         // Adquirir nuevo lock
-        const { data: newLock, error } = await supabase
+        const { error } = await supabase
           .from('operation_locks')
           .insert({
             lock_key: lockKey,
@@ -62,8 +62,6 @@ class DistributedLockService {
             expires_at: expiresAt,
             is_active: true
           })
-          .select()
-          .single()
 
         if (error) {
           logger.error('DistributedLockService', `❌ Error adquiriendo lock: ${error.message}`)

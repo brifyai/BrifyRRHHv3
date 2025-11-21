@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import companySyncService from '../../services/companySyncService.js';
 
 const CompanySyncTest = () => {
@@ -12,7 +12,7 @@ const CompanySyncTest = () => {
     setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
   };
 
-  const testRefreshCompanies = async () => {
+  const testRefreshCompanies = useCallback(async () => {
     setLoading(true);
     setError(null);
     addLog('Iniciando refreshCompanies...');
@@ -27,9 +27,9 @@ const CompanySyncTest = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const testGetCompanies = async () => {
+  const testGetCompanies = useCallback(async () => {
     setLoading(true);
     setError(null);
     addLog('Iniciando getCompanies...');
@@ -44,9 +44,9 @@ const CompanySyncTest = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const testGetStats = async () => {
+  const testGetStats = useCallback(async () => {
     setLoading(true);
     setError(null);
     addLog('Iniciando getCompanyStats...');
@@ -61,9 +61,9 @@ const CompanySyncTest = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const testSubscription = () => {
+  const testSubscription = useCallback(() => {
     addLog('Configurando suscripción a eventos...');
     
     const unsubscribe = companySyncService.subscribe('companies:refreshed', (data) => {
@@ -77,21 +77,17 @@ const CompanySyncTest = () => {
       unsubscribe();
       addLog('🔌 Suscripción cancelada');
     };
-  };
+  }, []);
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
+  useEffect(() => {
     const unsubscribe = testSubscription();
     return unsubscribe;
-  }, []);
+  }, [testSubscription]);
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
+  useEffect(() => {
     testGetCompanies();
     testGetStats();
-  }, []);
+  }, [testGetCompanies, testGetStats]);
 
   return (
     <div className="max-w-4xl mx-auto p-6">

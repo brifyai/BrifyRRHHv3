@@ -46,26 +46,6 @@ const Files = () => {
   // Usar la instancia por defecto de googleDriveService
   const fileInputRef = useRef(null)
 
-  useEffect(() => {
-    if (selectedFolder) {
-      loadFiles(selectedFolder)
-    }
-  }, [selectedFolder, loadFiles])
-
-  useEffect(() => {
-    loadFolders()
-    loadFiles()
-  }, [loadFolders, loadFiles])
-
-  // Manejar carpeta preseleccionada desde navegación
-  useEffect(() => {
-    if (location.state?.selectedFolder) {
-      const folder = location.state.selectedFolder
-      setSelectedFolder(folder.id.toString())
-      toast.success(`Carpeta "${folder.folder_name}" seleccionada`)
-    }
-  }, [location.state])
-
   const loadFolders = useCallback(async () => {
     try {
       // Cargar carpetas del usuario
@@ -177,7 +157,26 @@ const Files = () => {
     } finally {
       setLoading(false)
     }
-  }, [user, userProfile])
+  }, [userProfile])
+// Manejar carpeta preseleccionada desde navegación
+  useEffect(() => {
+    if (location.state?.selectedFolder) {
+      const folder = location.state.selectedFolder
+      setSelectedFolder(folder.id.toString())
+      toast.success(`Carpeta "${folder.folder_name}" seleccionada`)
+    }
+  }, [location.state])
+
+  useEffect(() => {
+    if (selectedFolder) {
+      loadFiles(selectedFolder)
+    }
+  }, [selectedFolder, loadFiles])
+
+  useEffect(() => {
+    loadFolders()
+    loadFiles()
+  }, [loadFolders, loadFiles])
 
   // Tipos de archivo permitidos
   const allowedFileTypes = {

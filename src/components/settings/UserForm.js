@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '../../contexts/AuthContext.js'
+import React, { useState, useEffect, useCallback } from 'react'
 import inMemoryUserService from '../../services/inMemoryUserService.js'
 import {
   UserIcon,
@@ -15,7 +14,6 @@ import {
 import toast from 'react-hot-toast'
 
 const UserForm = ({ user, roles, onSuccess, onCancel }) => {
-  const { user: currentUser } = useAuth()
   const [formData, setFormData] = useState({
     email: '',
     full_name: '',
@@ -41,13 +39,7 @@ const UserForm = ({ user, roles, onSuccess, onCancel }) => {
     }
   }, [user])
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    loadPermissionsByCategory()
-  }, [loadPermissionsByCategory])
-
-  const loadRolePermissions = async (roleId) => {
+const loadRolePermissions = async (roleId) => {
     if (!roleId) {
       setRolePermissions([])
       return
@@ -61,14 +53,18 @@ useEffect(() => {
     }
   }
 
-  const loadPermissionsByCategory = async () => {
+  const loadPermissionsByCategory = useCallback(async () => {
     try {
       const categories = await inMemoryUserService.getPermissionsByCategory()
       setPermissionsByCategory(categories)
     } catch (error) {
       console.error('Error loading permissions by category:', error)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadPermissionsByCategory()
+  }, [loadPermissionsByCategory])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -143,16 +139,6 @@ useEffect(() => {
       case 'executive': return <UserIcon className="h-5 w-5 text-blue-600" />
       case 'redactor': return <UserGroupIcon className="h-5 w-5 text-green-600" />
       default: return <UserIcon className="h-5 w-5 text-gray-600" />
-    }
-  }
-
-  const getRoleBadgeColor = (roleName) => {
-    switch (roleName) {
-      case 'super_admin': return 'bg-red-100 text-red-800 border-red-200'
-      case 'director': return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'executive': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'redactor': return 'bg-green-100 text-green-800 border-green-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 

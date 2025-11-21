@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase.js'
 import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
 import LoadingSpinner from '../common/LoadingSpinner.js'
@@ -18,7 +18,6 @@ const ResetPassword = () => {
   const [passwordReset, setPasswordReset] = useState(false)
   
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     // Función para obtener parámetros del fragmento de la URL (hash)

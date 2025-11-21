@@ -5,7 +5,7 @@
 
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import { getFriendlyErrorMessage, ErrorCategory } from '../config/errorMessages.js';
+import { getFriendlyErrorMessage } from '../config/errorMessages.js';
 
 const MySwal = withReactContent(Swal);
 
@@ -160,7 +160,6 @@ export const safeExecute = async (fn, context = '') => {
  * @param {string} field - Campo que falló la validación
  */
 export const showValidationError = (message, field = '') => {
-  const fieldText = field ? ` (${field})` : '';
   showSimpleError(message, 'validation');
 };
 
@@ -186,7 +185,7 @@ export const showAuthError = (error) => {
   });
 };
 
-export default {
+const friendlyErrorHandler = {
   showFriendlyError,
   showSimpleError,
   showErrorToast,
@@ -195,3 +194,5 @@ export default {
   showNetworkError,
   showAuthError
 };
+
+export default friendlyErrorHandler;

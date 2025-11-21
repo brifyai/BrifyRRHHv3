@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import { db, supabase } from '../../lib/supabase.js'
 import { toast } from 'react-hot-toast'
 import {
-  CheckIcon,
   CreditCardIcon,
-  PlusIcon,
   XMarkIcon,
   StarIcon,
   ArrowUpIcon
@@ -13,19 +11,13 @@ import {
 import LoadingSpinner from '../common/LoadingSpinner.js'
 
 const UpgradePlan = ({ isOpen, onClose, currentPlan, userExtensions, onUpgradeComplete }) => {
-  const { user, userProfile } = useAuth()
+  const { user } = useAuth()
   const [extensions, setExtensions] = useState([])
   const [selectedExtensions, setSelectedExtensions] = useState([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
 
-  useEffect(() => {
-    if (isOpen) {
-      loadAvailableExtensions()
-    }
-  }, [isOpen, userExtensions])
-
-  const loadAvailableExtensions = async () => {
+  const loadAvailableExtensions = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -44,7 +36,7 @@ const UpgradePlan = ({ isOpen, onClose, currentPlan, userExtensions, onUpgradeCo
 
       // Filtrar extensiones que el usuario NO tiene
       const userExtensionIds = userExtensions.map(ue => ue.extension_id)
-      const availableForUpgrade = allExtensions.filter(ext => 
+      const availableForUpgrade = allExtensions.filter(ext =>
         !userExtensionIds.includes(ext.id)
       )
 
@@ -55,7 +47,13 @@ const UpgradePlan = ({ isOpen, onClose, currentPlan, userExtensions, onUpgradeCo
     } finally {
       setLoading(false)
     }
-  }
+  }, [userExtensions])
+
+  useEffect(() => {
+    if (isOpen) {
+      loadAvailableExtensions()
+    }
+  }, [isOpen, loadAvailableExtensions])
 
   const handleExtensionToggle = (extensionId) => {
     setSelectedExtensions(prev => {

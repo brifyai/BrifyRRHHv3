@@ -15,7 +15,6 @@
  */
 
 import { supabase } from '../lib/supabase.js';
-import whatsappComplianceService from './whatsappComplianceService.js';
 
 class MultiWhatsAppService {
   constructor() {
@@ -341,7 +340,6 @@ class MultiWhatsAppService {
       delayBetweenMessages = 1000
     } = params;
 
-    const results = [];
     const totalResults = {
       totalCompanies: companies.length,
       successfulCompanies: 0,

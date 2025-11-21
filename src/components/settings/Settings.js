@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.js'
 import googleDriveService from '../../lib/unifiedGoogleDriveService.js'
 import googleDrivePersistenceService from '../../services/googleDrivePersistenceService.js'
@@ -7,7 +7,6 @@ import googleDriveCallbackHandler from '../../lib/googleDriveCallbackHandler.js'
 import brevoService from '../../services/brevoService.js'
 import companySyncService from '../../services/companySyncService.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
-import communicationService from '../../services/communicationService.js'
 import whatsappOfficialService from '../../services/whatsappOfficialService.js'
 import whatsappWahaService from '../../services/whatsappWahaService.js'
 import configurationService from '../../services/configurationService.js'
@@ -25,12 +24,11 @@ import SecuritySection from './SecuritySection.js'
 const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
   const [companies, setCompanies] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCompanyForm, setShowCompanyForm] = useState(false)
   const [editingCompany, setEditingCompany] = useState(null)
-  const [companyId, setCompanyId] = useState(null)
+  const [companyId] = useState(null)
   
   // Estado para controlar el sistema de configuración jerárquico
   const [hierarchyMode, setHierarchyMode] = useState('company_first')
@@ -105,6 +103,263 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
   // Estados para Google Drive
   const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false)
   const [connectingGoogleDrive, setConnectingGoogleDrive] = useState(false)
+
+  // Funciones de carga - movidas antes del useEffect para evitar use-before-define
+  const loadCompanies = useCallback(async () => {
+    try {
+      setLoading(true)
+      const companiesData = await organizedDatabaseService.getCompanies()
+      setCompanies(companiesData || [])
+    } catch (error) {
+      console.error('Error loading companies:', error)
+      setCompanies([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const loadNotificationSettings = useCallback(async () => {
+    try {
+      const saved = await configurationService.getNotificationSettings()
+      if (saved) {
+        const settingsWithArrayRecipients = {
+          ...saved,
+          reports: {
+            ...saved.reports,
+            recipients: Array.isArray(saved.reports?.recipients)
+              ? saved.reports.recipients
+              : saved.reports?.recipients
+                ? [saved.reports.recipients]
+                : [user?.email || '']
+          }
+        }
+        setNotificationSettings(prev => ({ ...prev, ...settingsWithArrayRecipients }))
+      }
+    } catch (error) {
+      console.error('Error loading notification settings:', error)
+    }
+  }, [user?.email])
+
+  const loadSecuritySettings = useCallback(async () => {
+    try {
+      const saved = await configurationService.getSecuritySettings()
+      if (saved) setSecuritySettings(prev => ({ ...prev, ...saved }))
+    } catch (error) {
+      console.error('Error loading security settings:', error)
+    }
+  }, [])
+
+  const loadActiveSessions = useCallback(() => {
+    try {
+      const sessions = [
+        {
+          id: 'current',
+          device: 'Chrome en macOS',
+          location: 'Santiago, Chile',
+          ip: '192.168.1.100',
+          lastActivity: new Date(),
+          current: true
+        },
+        {
+          id: 'session_2',
+          device: 'Safari en iPhone',
+          location: 'Santiago, Chile',
+          ip: '192.168.1.101',
+          lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          current: false
+        }
+      ]
+      setActiveSessions(sessions)
+    } catch (error) {
+      console.error('Error loading active sessions:', error)
+    }
+  }, [])
+
+  const loadSecurityLogs = useCallback(() => {
+    try {
+      const logs = [
+        {
+          id: 1,
+          action: 'Inicio de sesión exitoso',
+          details: 'Chrome • Santiago, Chile',
+          timestamp: new Date(),
+          ip: '192.168.1.100',
+          status: 'success'
+        },
+        {
+          id: 2,
+          action: 'Cambio de contraseña',
+          details: 'Aplicación web',
+          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+          ip: '192.168.1.100',
+          status: 'success'
+        },
+        {
+          id: 3,
+          action: 'Configuración de 2FA',
+          details: 'Aplicación web',
+          timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+          ip: '192.168.1.100',
+          status: 'success'
+        },
+        {
+          id: 4,
+          action: 'Intento de inicio de sesión fallido',
+          details: 'IP sospechosa • Nueva York, USA',
+          timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          ip: '104.28.1.100',
+          status: 'warning'
+        }
+      ]
+      setSecurityLogs(logs)
+    } catch (error) {
+      console.error('Error loading security logs:', error)
+    }
+  }, [])
+
+  const loadBackupSettings = useCallback(async () => {
+    try {
+      const saved = await configurationService.getConfig('system', 'backup_settings', 'global', null, {
+        autoBackup: true,
+        backupFrequency: 'weekly',
+        retentionDays: 30,
+        lastBackup: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        backupSize: '2.3 GB'
+      })
+      setBackupSettings(prev => ({ ...prev, ...saved }))
+    } catch (error) {
+      console.error('Error loading backup settings:', error)
+    }
+  }, [])
+
+  const loadHierarchyMode = useCallback(async () => {
+    try {
+      const saved = await configurationService.getConfig('system', 'hierarchy_mode', 'global', null, 'company_first')
+      if (saved && ['global_only', 'company_first', 'both'].includes(saved)) {
+        setHierarchyMode(saved)
+      }
+    } catch (error) {
+      console.error('Error loading hierarchy mode:', error)
+    }
+  }, [])
+
+  const checkGoogleDriveConnection = useCallback(async () => {
+    try {
+      const isConnected = await googleDrivePersistenceService.isConnected(user?.id)
+      setIsGoogleDriveConnected(isConnected)
+      
+      if (isConnected) {
+        const status = await googleDrivePersistenceService.getConnectionStatus(user?.id)
+        setIntegrations(prev => ({
+          ...prev,
+          google: {
+            connected: status.connected,
+            status: status.connected ? 'connected' : 'disconnected',
+            lastSync: status.lastSync || new Date().toISOString(),
+            email: status.email
+          }
+        }))
+      }
+    } catch (error) {
+      console.error('Error verificando conexión de Google Drive:', error)
+      setIsGoogleDriveConnected(false)
+    }
+  }, [user?.id])
+
+  const checkBrevoConfiguration = useCallback(() => {
+    const config = brevoService.loadConfiguration()
+    setIntegrations(prev => ({
+      ...prev,
+      brevo: {
+        connected: !!config.apiKey,
+        status: config.apiKey ? 'connected' : 'disconnected',
+        lastSync: config.apiKey ? new Date().toISOString() : null,
+        testMode: config.testMode
+      }
+    }))
+  }, [])
+
+  const checkGroqConfiguration = useCallback(async () => {
+    try {
+      const apiKey = process.env.REACT_APP_GROQ_API_KEY
+      const groqConfig = await configurationService.getConfig('integrations', 'groq', 'global', null, {})
+      
+      setIntegrations(prev => ({
+        ...prev,
+        groq: {
+          connected: !!(apiKey && apiKey !== 'tu_groq_api_key_aqui'),
+          status: !!(apiKey && apiKey !== 'tu_groq_api_key_aqui') ? 'connected' : 'disconnected',
+          lastSync: !!(apiKey && apiKey !== 'tu_groq_api_key_aqui') ? new Date().toISOString() : null,
+          model: groqConfig.model || 'gemma2-9b-it'
+        }
+      }))
+    } catch (error) {
+      console.error('Error checking Groq configuration:', error)
+    }
+  }, [])
+
+  const checkWhatsAppConfiguration = useCallback(async () => {
+    try {
+      const whatsappConfig = await configurationService.getConfig('integrations', 'whatsapp', 'global', null, {})
+      
+      setIntegrations(prev => ({
+        ...prev,
+        whatsapp: {
+          connected: !!(whatsappConfig.accessToken && whatsappConfig.phoneNumberId),
+          status: !!(whatsappConfig.accessToken && whatsappConfig.phoneNumberId) ? 'connected' : 'disconnected',
+          lastSync: !!(whatsappConfig.accessToken && whatsappConfig.phoneNumberId) ? new Date().toISOString() : null,
+          testMode: whatsappConfig.testMode || false
+        }
+      }))
+    } catch (error) {
+      console.error('Error checking WhatsApp configuration:', error)
+    }
+  }, [])
+
+  const checkWhatsAppOfficialConfiguration = useCallback(() => {
+    const config = whatsappOfficialService.loadConfiguration()
+    setIntegrations(prev => ({
+      ...prev,
+      whatsappOfficial: {
+        connected: !!(config.accessToken && config.phoneNumberId),
+        status: !!(config.accessToken && config.phoneNumberId) ? 'connected' : 'disconnected',
+        lastSync: !!(config.accessToken && config.phoneNumberId) ? new Date().toISOString() : null,
+        testMode: config.testMode
+      }
+    }))
+  }, [])
+
+  const checkWhatsAppWahaConfiguration = useCallback(() => {
+    const config = whatsappWahaService.loadConfiguration()
+    setIntegrations(prev => ({
+      ...prev,
+      whatsappWaha: {
+        connected: !!(config.apiKey && config.sessionId),
+        status: !!(config.apiKey && config.sessionId) ? 'connected' : 'disconnected',
+        lastSync: !!(config.apiKey && config.sessionId) ? new Date().toISOString() : null,
+        testMode: config.testMode
+      }
+    }))
+  }, [])
+
+  const checkTelegramConfiguration = useCallback(async () => {
+    try {
+      const telegramConfig = await configurationService.getConfig('integrations', 'telegram', 'global', null, {})
+      
+      setIntegrations(prev => ({
+        ...prev,
+        telegram: {
+          connected: !!(telegramConfig.botToken && telegramConfig.botUsername),
+          status: !!(telegramConfig.botToken && telegramConfig.botUsername) ? 'connected' : 'disconnected',
+          lastSync: !!(telegramConfig.botToken && telegramConfig.botUsername) ? new Date().toISOString() : null,
+          botToken: telegramConfig.botToken,
+          botUsername: telegramConfig.botUsername
+        }
+      }))
+    } catch (error) {
+      console.error('Error checking Telegram configuration:', error)
+    }
+  }, [])
 
   useEffect(() => {
     if (propActiveTab && propActiveTab !== activeTab) {
@@ -500,263 +755,6 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
 
     return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full">Desconectado</span>
   }
-
-  // Funciones de carga
-  const loadCompanies = useCallback(async () => {
-    try {
-      setLoading(true)
-      const companiesData = await organizedDatabaseService.getCompanies()
-      setCompanies(companiesData || [])
-    } catch (error) {
-      console.error('Error loading companies:', error)
-      setCompanies([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const loadNotificationSettings = useCallback(async () => {
-    try {
-      const saved = await configurationService.getNotificationSettings()
-      if (saved) {
-        const settingsWithArrayRecipients = {
-          ...saved,
-          reports: {
-            ...saved.reports,
-            recipients: Array.isArray(saved.reports?.recipients)
-              ? saved.reports.recipients
-              : saved.reports?.recipients
-                ? [saved.reports.recipients]
-                : [user?.email || '']
-          }
-        }
-        setNotificationSettings(prev => ({ ...prev, ...settingsWithArrayRecipients }))
-      }
-    } catch (error) {
-      console.error('Error loading notification settings:', error)
-    }
-  }, [user?.email])
-
-  const loadSecuritySettings = useCallback(async () => {
-    try {
-      const saved = await configurationService.getSecuritySettings()
-      if (saved) setSecuritySettings(prev => ({ ...prev, ...saved }))
-    } catch (error) {
-      console.error('Error loading security settings:', error)
-    }
-  }, [])
-
-  const loadActiveSessions = useCallback(() => {
-    try {
-      const sessions = [
-        {
-          id: 'current',
-          device: 'Chrome en macOS',
-          location: 'Santiago, Chile',
-          ip: '192.168.1.100',
-          lastActivity: new Date(),
-          current: true
-        },
-        {
-          id: 'session_2',
-          device: 'Safari en iPhone',
-          location: 'Santiago, Chile',
-          ip: '192.168.1.101',
-          lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          current: false
-        }
-      ]
-      setActiveSessions(sessions)
-    } catch (error) {
-      console.error('Error loading active sessions:', error)
-    }
-  }, [])
-
-  const loadSecurityLogs = useCallback(() => {
-    try {
-      const logs = [
-        {
-          id: 1,
-          action: 'Inicio de sesión exitoso',
-          details: 'Chrome • Santiago, Chile',
-          timestamp: new Date(),
-          ip: '192.168.1.100',
-          status: 'success'
-        },
-        {
-          id: 2,
-          action: 'Cambio de contraseña',
-          details: 'Aplicación web',
-          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-          ip: '192.168.1.100',
-          status: 'success'
-        },
-        {
-          id: 3,
-          action: 'Configuración de 2FA',
-          details: 'Aplicación web',
-          timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          ip: '192.168.1.100',
-          status: 'success'
-        },
-        {
-          id: 4,
-          action: 'Intento de inicio de sesión fallido',
-          details: 'IP sospechosa • Nueva York, USA',
-          timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          ip: '104.28.1.100',
-          status: 'warning'
-        }
-      ]
-      setSecurityLogs(logs)
-    } catch (error) {
-      console.error('Error loading security logs:', error)
-    }
-  }, [])
-
-  const loadBackupSettings = useCallback(async () => {
-    try {
-      const saved = await configurationService.getConfig('system', 'backup_settings', 'global', null, {
-        autoBackup: true,
-        backupFrequency: 'weekly',
-        retentionDays: 30,
-        lastBackup: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        backupSize: '2.3 GB'
-      })
-      setBackupSettings(prev => ({ ...prev, ...saved }))
-    } catch (error) {
-      console.error('Error loading backup settings:', error)
-    }
-  }, [])
-
-  const loadHierarchyMode = useCallback(async () => {
-    try {
-      const saved = await configurationService.getConfig('system', 'hierarchy_mode', 'global', null, 'company_first')
-      if (saved && ['global_only', 'company_first', 'both'].includes(saved)) {
-        setHierarchyMode(saved)
-      }
-    } catch (error) {
-      console.error('Error loading hierarchy mode:', error)
-    }
-  }, [])
-
-  const checkGoogleDriveConnection = useCallback(async () => {
-    try {
-      const isConnected = await googleDrivePersistenceService.isConnected(user?.id)
-      setIsGoogleDriveConnected(isConnected)
-      
-      if (isConnected) {
-        const status = await googleDrivePersistenceService.getConnectionStatus(user?.id)
-        setIntegrations(prev => ({
-          ...prev,
-          google: {
-            connected: status.connected,
-            status: status.connected ? 'connected' : 'disconnected',
-            lastSync: status.lastSync || new Date().toISOString(),
-            email: status.email
-          }
-        }))
-      }
-    } catch (error) {
-      console.error('Error verificando conexión de Google Drive:', error)
-      setIsGoogleDriveConnected(false)
-    }
-  }, [user?.id])
-
-  const checkBrevoConfiguration = useCallback(() => {
-    const config = brevoService.loadConfiguration()
-    setIntegrations(prev => ({
-      ...prev,
-      brevo: {
-        connected: !!config.apiKey,
-        status: config.apiKey ? 'connected' : 'disconnected',
-        lastSync: config.apiKey ? new Date().toISOString() : null,
-        testMode: config.testMode
-      }
-    }))
-  }, [])
-
-  const checkGroqConfiguration = useCallback(async () => {
-    try {
-      const apiKey = process.env.REACT_APP_GROQ_API_KEY
-      const groqConfig = await configurationService.getConfig('integrations', 'groq', 'global', null, {})
-      
-      setIntegrations(prev => ({
-        ...prev,
-        groq: {
-          connected: !!(apiKey && apiKey !== 'tu_groq_api_key_aqui'),
-          status: !!(apiKey && apiKey !== 'tu_groq_api_key_aqui') ? 'connected' : 'disconnected',
-          lastSync: !!(apiKey && apiKey !== 'tu_groq_api_key_aqui') ? new Date().toISOString() : null,
-          model: groqConfig.model || 'gemma2-9b-it'
-        }
-      }))
-    } catch (error) {
-      console.error('Error checking Groq configuration:', error)
-    }
-  }, [])
-
-  const checkWhatsAppConfiguration = useCallback(async () => {
-    try {
-      const whatsappConfig = await configurationService.getConfig('integrations', 'whatsapp', 'global', null, {})
-      
-      setIntegrations(prev => ({
-        ...prev,
-        whatsapp: {
-          connected: !!(whatsappConfig.accessToken && whatsappConfig.phoneNumberId),
-          status: !!(whatsappConfig.accessToken && whatsappConfig.phoneNumberId) ? 'connected' : 'disconnected',
-          lastSync: !!(whatsappConfig.accessToken && whatsappConfig.phoneNumberId) ? new Date().toISOString() : null,
-          testMode: whatsappConfig.testMode || false
-        }
-      }))
-    } catch (error) {
-      console.error('Error checking WhatsApp configuration:', error)
-    }
-  }, [])
-
-  const checkWhatsAppOfficialConfiguration = useCallback(() => {
-    const config = whatsappOfficialService.loadConfiguration()
-    setIntegrations(prev => ({
-      ...prev,
-      whatsappOfficial: {
-        connected: !!(config.accessToken && config.phoneNumberId),
-        status: !!(config.accessToken && config.phoneNumberId) ? 'connected' : 'disconnected',
-        lastSync: !!(config.accessToken && config.phoneNumberId) ? new Date().toISOString() : null,
-        testMode: config.testMode
-      }
-    }))
-  }, [])
-
-  const checkWhatsAppWahaConfiguration = useCallback(() => {
-    const config = whatsappWahaService.loadConfiguration()
-    setIntegrations(prev => ({
-      ...prev,
-      whatsappWaha: {
-        connected: !!(config.apiKey && config.sessionId),
-        status: !!(config.apiKey && config.sessionId) ? 'connected' : 'disconnected',
-        lastSync: !!(config.apiKey && config.sessionId) ? new Date().toISOString() : null,
-        testMode: config.testMode
-      }
-    }))
-  }, [])
-
-  const checkTelegramConfiguration = useCallback(async () => {
-    try {
-      const telegramConfig = await configurationService.getConfig('integrations', 'telegram', 'global', null, {})
-      
-      setIntegrations(prev => ({
-        ...prev,
-        telegram: {
-          connected: !!(telegramConfig.botToken && telegramConfig.botUsername),
-          status: !!(telegramConfig.botToken && telegramConfig.botUsername) ? 'connected' : 'disconnected',
-          lastSync: !!(telegramConfig.botToken && telegramConfig.botUsername) ? new Date().toISOString() : null,
-          botToken: telegramConfig.botToken,
-          botUsername: telegramConfig.botUsername
-        }
-      }))
-    } catch (error) {
-      console.error('Error checking Telegram configuration:', error)
-    }
-  }, [])
 
   if (showCompanyForm) {
     return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import { supabase } from '../../lib/supabase.js'
 import googleDriveService from '../../lib/googleDrive.js'
@@ -6,14 +6,13 @@ import * as XLSX from 'xlsx'
 import {
   CloudArrowUpIcon,
   DocumentTextIcon,
-  CheckCircleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import LoadingSpinner from '../common/LoadingSpinner.js'
 import toast from 'react-hot-toast'
 
 const RoutineUpload = ({ onUploadComplete, onClose }) => {
-  const { user, userProfile } = useAuth()
+  const { userProfile } = useAuth()
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -21,13 +20,7 @@ const RoutineUpload = ({ onUploadComplete, onClose }) => {
   const [loadingFolders, setLoadingFolders] = useState(true)
   const [selectedFolder, setSelectedFolder] = useState('')
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    loadFolders()
-  }, [loadFolders])
-
-  const loadFolders = async () => {
+  const loadFolders = useCallback(async () => {
     try {
       setLoadingFolders(true)
       const { data, error } = await supabase
@@ -43,7 +36,11 @@ useEffect(() => {
     } finally {
       setLoadingFolders(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadFolders()
+  }, [loadFolders])
 
   // Función para procesar el Excel y convertirlo al formato requerido
   const processExcelFile = async (file) => {

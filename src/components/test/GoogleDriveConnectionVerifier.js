@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import userGoogleDriveService from '../../services/userGoogleDriveService.js'
 import userSpecificGoogleDriveService from '../../services/userSpecificGoogleDriveService.js'
@@ -10,64 +10,15 @@ const GoogleDriveConnectionVerifier = () => {
   const [loading, setLoading] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
 
-  const verificationSteps = [
+  const verificationSteps = useMemo(() => [
     { id: 'env', name: 'Variables de Entorno', icon: '🔧' },
     { id: 'service', name: 'Servicio de Autenticación', icon: '🔐' },
     { id: 'connection', name: 'Conexión con Google Drive', icon: '🔗' },
     { id: 'operations', name: 'Operaciones de API', icon: '⚡' },
     { id: 'database', name: 'Base de Datos', icon: '💾' }
-  ]
+  ], [])
 
-  useEffect(() => {
-    if (user) {
-      runCompleteVerification()
-    }
-  }, [user])
-
-  const runCompleteVerification = async () => {
-    setLoading(true)
-    const results = {}
-
-    for (let i = 0; i < verificationSteps.length; i++) {
-      setCurrentStep(i)
-      const step = verificationSteps[i]
-      
-      try {
-        switch (step.id) {
-          case 'env':
-            results.env = await verifyEnvironment()
-            break
-          case 'service':
-            results.service = await verifyService()
-            break
-          case 'connection':
-            results.connection = await verifyConnection()
-            break
-          case 'operations':
-            results.operations = await verifyOperations()
-            break
-          case 'database':
-            results.database = await verifyDatabase()
-            break
-        }
-      } catch (error) {
-        results[step.id] = {
-          success: false,
-          error: error.message,
-          details: null
-        }
-      }
-
-      // Pequeña pausa para mejor UX
-      await new Promise(resolve => setTimeout(resolve, 500))
-    }
-
-    setVerificationResults(results)
-    setLoading(false)
-    setCurrentStep(verificationSteps.length)
-  }
-
-  const verifyEnvironment = async () => {
+  const verifyEnvironment = useCallback(async () => {
     const envVars = {
       clientId: process.env.REACT_APP_GOOGLE_CLIENT_ID,
       clientSecret: process.env.REACT_APP_GOOGLE_CLIENT_SECRET,
@@ -105,9 +56,9 @@ const GoogleDriveConnectionVerifier = () => {
           : 'http://localhost:3000/auth/google/callback'
       }
     }
-  }
+  }, [])
 
-  const verifyService = async () => {
+  const verifyService = useCallback(async () => {
     try {
       // Verificar que el servicio esté inicializado correctamente
       const serviceInitialized = !!userGoogleDriveService.clientId
@@ -135,9 +86,9 @@ const GoogleDriveConnectionVerifier = () => {
         details: null
       }
     }
-  }
+  }, [user])
 
-  const verifyConnection = async () => {
+  const verifyConnection = useCallback(async () => {
     try {
       if (!user) {
         throw new Error('Usuario no autenticado')
@@ -163,9 +114,9 @@ const GoogleDriveConnectionVerifier = () => {
         details: null
       }
     }
-  }
+  }, [user])
 
-  const verifyOperations = async () => {
+  const verifyOperations = useCallback(async () => {
     try {
       if (!user) {
         throw new Error('Usuario no autenticado')
@@ -242,9 +193,9 @@ const GoogleDriveConnectionVerifier = () => {
         details: null
       }
     }
-  }
+  }, [user])
 
-  const verifyDatabase = async () => {
+  const verifyDatabase = useCallback(async () => {
     try {
       if (!user) {
         throw new Error('Usuario no autenticado')
@@ -271,14 +222,65 @@ const GoogleDriveConnectionVerifier = () => {
         details: null
       }
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    
+    const runCompleteVerification = async () => {
+      setLoading(true)
+      const results = {}
+
+      for (let i = 0; i < verificationSteps.length; i++) {
+        setCurrentStep(i)
+        const step = verificationSteps[i]
+        
+        try {
+          switch (step.id) {
+            case 'env':
+              results.env = await verifyEnvironment()
+              break
+            case 'service':
+              results.service = await verifyService()
+              break
+            case 'connection':
+              results.connection = await verifyConnection()
+              break
+            case 'operations':
+              results.operations = await verifyOperations()
+              break
+            case 'database':
+              results.database = await verifyDatabase()
+              break
+            default:
+              results[step.id] = {
+                success: false,
+                error: `Paso desconocido: ${step.id}`,
+                details: null
+              }
+          }
+        } catch (error) {
+          results[step.id] = {
+            success: false,
+            error: error.message,
+            details: null
+          }
+        }
+
+        // Pequeña pausa para mejor UX
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      setVerificationResults(results)
+      setLoading(false)
+      setCurrentStep(verificationSteps.length)
+    }
+    
+    runCompleteVerification()
+  }, [user, verificationSteps, verifyEnvironment, verifyService, verifyConnection, verifyOperations, verifyDatabase])
 
   const getStatusIcon = (success) => {
     return success ? '✅' : '❌'
-  }
-
-  const getStatusColor = (success) => {
-    return success ? '#10b981' : '#ef4444'
   }
 
   const runTestConnection = async () => {
@@ -297,264 +299,148 @@ const GoogleDriveConnectionVerifier = () => {
     }
   }
 
-  if (loading && currentStep < verificationSteps.length) {
+  const renderStepResult = (step, result) => {
+    if (!result) return null
+
     return (
-      <div className="connection-verifier">
-        <div className="loading-state">
-          <div className="step-indicator">
-            <div className="step-number">{currentStep + 1}</div>
-            <div className="step-info">
-              <h3>{verificationSteps[currentStep].icon} {verificationSteps[currentStep].name}</h3>
-              <p>Verificando...</p>
-            </div>
-          </div>
-          <div className="progress-bar">
-            <div 
-              className="progress-fill" 
-              style={{ width: `${((currentStep + 1) / verificationSteps.length) * 100}%` }}
-            ></div>
-          </div>
+      <div key={step.id} className={`p-4 rounded-lg border-2 ${
+        result.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+      }`}>
+        <div className="flex items-center space-x-2 mb-2">
+          <span className="text-lg">{step.icon}</span>
+          <h3 className={`font-semibold ${result.success ? 'text-green-800' : 'text-red-800'}`}>
+            {step.name}
+          </h3>
+          <span className="text-lg">{getStatusIcon(result.success)}</span>
         </div>
+        
+        {result.error && (
+          <p className="text-red-600 text-sm mb-2">❌ {result.error}</p>
+        )}
+        
+        {result.details && (
+          <div className="text-sm text-gray-700">
+            {step.id === 'env' && result.details.vars && (
+              <div className="space-y-1">
+                {Object.entries(result.details.vars).map(([key, value]) => (
+                  <div key={key} className="flex justify-between">
+                    <span className="font-medium">{key}:</span>
+                    <span className={value.includes('❌') ? 'text-red-600' : 'text-green-600'}>
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {step.id === 'service' && (
+              <div className="space-y-1">
+                <div>Servicio inicializado: {result.details.serviceInitialized ? '✅' : '❌'}</div>
+                <div>URL de auth generada: {result.details.authUrlGenerated ? '✅' : '❌'}</div>
+                <div>Scopes: {result.details.scopes?.length || 0}</div>
+              </div>
+            )}
+            
+            {step.id === 'connection' && (
+              <div className="space-y-1">
+                <div>Conectado: {result.details.isConnected ? '✅' : '❌'}</div>
+                <div>Credenciales: {result.details.hasCredentials ? '✅' : '❌'}</div>
+                <div>Estado de sync: {result.details.syncStatus || 'N/A'}</div>
+              </div>
+            )}
+            
+            {step.id === 'operations' && result.details.operations && (
+              <div className="space-y-1">
+                {result.details.operations.map((op, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span>{op.name}:</span>
+                    <span className={op.success ? 'text-green-600' : 'text-red-600'}>
+                      {op.details}
+                    </span>
+                  </div>
+                ))}
+                <div className="mt-2 font-semibold">
+                  Total: {result.details.passedTests}/{result.details.totalTests} pruebas pasaron
+                </div>
+              </div>
+            )}
+            
+            {step.id === 'database' && (
+              <div className="space-y-1">
+                <div>Acceso a BD: {result.details.canAccessDatabase ? '✅' : '❌'}</div>
+                <div>Credenciales: {result.details.hasCredentials ? '✅' : '❌'}</div>
+                <div>Registro existe: {result.details.recordExists ? '✅' : '❌'}</div>
+                <div>Última sync: {result.details.lastSyncAt || 'N/A'}</div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="connection-verifier">
-      <div className="verifier-header">
-        <h1>🔍 Verificación Completa del Sistema</h1>
-        <p>Análisis exhaustivo de todos los componentes del sistema de Google Drive</p>
-      </div>
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">
+            🔍 Verificador de Conexión Google Drive
+          </h2>
+          <button
+            onClick={runTestConnection}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Verificando...' : 'Probar Conexión'}
+          </button>
+        </div>
 
-      {/* Resumen General */}
-      <div className="summary-card">
-        <h2>📊 Resumen de Verificación</h2>
-        <div className="summary-grid">
+        {loading && (
+          <div className="mb-6">
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="text-gray-600">
+                Verificando paso {currentStep + 1} de {verificationSteps.length}: {verificationSteps[currentStep]?.name}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${((currentStep + 1) / verificationSteps.length) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4">
           {verificationSteps.map((step, index) => {
             const result = verificationResults[step.id]
-            return (
-              <div key={step.id} className="summary-item">
-                <div className="summary-icon">
-                  {step.icon} {getStatusIcon(result?.success)}
-                </div>
-                <div className="summary-text">
-                  <h4>{step.name}</h4>
-                  <p>{result?.success ? '✅ Pasó' : result?.error ? '❌ Error' : '⏳ Pendiente'}</p>
-                </div>
-              </div>
-            )
+            return renderStepResult(step, result)
           })}
         </div>
-      </div>
 
-      {/* Detalles de Verificación */}
-      <div className="details-section">
-        <h2>🔋 Detalles de Verificación</h2>
-        
-        {/* Variables de Entorno */}
-        <div className="detail-card">
-          <h3>🔧 Variables de Entorno</h3>
-          {verificationResults.env ? (
-            <div className="detail-content">
-              <div className="env-vars">
-                <div className="env-var">
-                  <span>Client ID:</span>
-                  <code>{verificationResults.env.details.vars.clientId}</code>
-                </div>
-                <div className="env-var">
-                  <span>Client Secret:</span>
-                  <span>{verificationResults.env.details.vars.clientSecret}</span>
-                </div>
-                <div className="env-var">
-                  <span>API Key:</span>
-                  <span>{verificationResults.env.details.vars.apiKey}</span>
-                </div>
-                <div className="env-var">
-                  <span>Environment:</span>
-                  <span>{verificationResults.env.details.vars.environment}</span>
-                </div>
-                <div className="env-var">
-                  <span>Netlify URL:</span>
-                  <span>{verificationResults.env.details.vars.netlifyUrl}</span>
-                </div>
-                <div className="env-var">
-                  <span>Redirect URI:</span>
-                  <code>{verificationResults.env.details.redirectUri}</code>
-                </div>
+        {Object.keys(verificationResults).length > 0 && !loading && (
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-semibold text-gray-900 mb-2">📊 Resumen General</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium">Pasos completados:</span> {Object.keys(verificationResults).length}/{verificationSteps.length}
+              </div>
+              <div>
+                <span className="font-medium">Exitosos:</span> {Object.values(verificationResults).filter(r => r.success).length}
+              </div>
+              <div>
+                <span className="font-medium">Fallidos:</span> {Object.values(verificationResults).filter(r => !r.success).length}
+              </div>
+              <div>
+                <span className="font-medium">Estado general:</span> 
+                <span className={Object.values(verificationResults).every(r => r.success) ? 'text-green-600' : 'text-red-600'}>
+                  {Object.values(verificationResults).every(r => r.success) ? '✅ Todo OK' : '⚠️ Hay problemas'}
+                </span>
               </div>
             </div>
-          ) : (
-            <p>⏳ Verificando...</p>
-          )}
-        </div>
-
-        {/* Servicio de Autenticación */}
-        <div className="detail-card">
-          <h3>🔐 Servicio de Autenticación</h3>
-          {verificationResults.service ? (
-            <div className="detail-content">
-              <div className="service-info">
-                <div className="service-item">
-                  <span>Servicio Inicializado:</span>
-                  <span>{verificationResults.service.details.serviceInitialized ? '✅' : '❌'}</span>
-                </div>
-                <div className="service-item">
-                  <span>URL de Autenticación:</span>
-                  <span>{verificationResults.service.details.authUrlGenerated ? '✅' : '❌'}</span>
-                </div>
-                <div className="service-item">
-                  <span>Redirect URI:</span>
-                  <code>{verificationResults.service.details.redirectUri}</code>
-                </div>
-                <div className="service-item">
-                  <span>Scopes:</span>
-                  <div className="scopes">
-                    {verificationResults.service.details.scopes.map((scope, index) => (
-                      <code key={index} className="scope-tag">{scope}</code>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p>⏳ Verificando...</p>
-          )}
-        </div>
-
-        {/* Conexión */}
-        <div className="detail-card">
-          <h3>🔗 Conexión con Google Drive</h3>
-          {verificationResults.connection ? (
-            <div className="detail-content">
-              <div className="connection-info">
-                <div className="connection-item">
-                  <span>Estado de Conexión:</span>
-                  <span>{verificationResults.connection.details.isConnected ? '✅ Conectado' : '❌ No conectado'}</span>
-                </div>
-                <div className="connection-item">
-                  <span>Email de Google:</span>
-                  <span>{verificationResults.connection.details.connectionInfo.googleEmail || 'No disponible'}</span>
-                </div>
-                <div className="connection-item">
-                  <span>Nombre:</span>
-                  <span>{verificationResults.connection.details.connectionInfo.googleName || 'No disponible'}</span>
-                </div>
-                <div className="connection-item">
-                  <span>Estado de Sincronización:</span>
-                  <span>{verificationResults.connection.details.connectionInfo.syncStatus}</span>
-                </div>
-                <div className="connection-item">
-                  <span>Última Sincronización:</span>
-                  <span>{verificationResults.connection.details.connectionInfo.lastSyncAt || 'Nunca'}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p>⏳ Verificando...</p>
-          )}
-        </div>
-
-        {/* Operaciones */}
-        <div className="detail-card">
-          <h3>⚡ Operaciones de API</h3>
-          {verificationResults.operations ? (
-            <div className="detail-content">
-              <div className="operations-summary">
-                <p>Total de pruebas: <strong>{verificationResults.operations.details.totalTests}</strong></p>
-                <p>Pruebas pasadas: <strong>{verificationResults.operations.details.passedTests}</strong></p>
-              </div>
-              <div className="operations-list">
-                {verificationResults.operations.details.operations.map((op, index) => (
-                  <div key={index} className="operation-item">
-                    <span className="operation-status">{op.success ? '✅' : '❌'}</span>
-                    <span className="operation-name">{op.name}</span>
-                    <span className="operation-details">{op.details}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p>⏳ Verificando...</p>
-          )}
-        </div>
-
-        {/* Base de Datos */}
-        <div className="detail-card">
-          <h3>💾 Base de Datos</h3>
-          {verificationResults.database ? (
-            <div className="detail-content">
-              <div className="database-info">
-                <div className="database-item">
-                  <span>Acceso a Base de Datos:</span>
-                  <span>{verificationResults.database.details.canAccessDatabase ? '✅' : '❌'}</span>
-                </div>
-                <div className="database-item">
-                  <span>Tabla:</span>
-                  <code>{verificationResults.database.details.tableName}</code>
-                </div>
-                <div className="database-item">
-                  <span>Registro Existe:</span>
-                  <span>{verificationResults.database.details.recordExists ? '✅' : '❌'}</span>
-                </div>
-                <div className="database-item">
-                  <span>Credenciales Almacenadas:</span>
-                  <span>{verificationResults.database.details.hasCredentials ? '✅' : '❌'}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p>⏳ Verificando...</p>
-          )}
-        </div>
-      </div>
-
-      {/* Acciones */}
-      <div className="actions-section">
-        <h2>🎯 Acciones Rápidas</h2>
-        <div className="action-buttons">
-          <button onClick={runCompleteVerification} className="btn btn-primary" disabled={loading}>
-            🔄 Re-ejecutar Verificación
-          </button>
-          <button onClick={runTestConnection} className="btn btn-secondary" disabled={loading}>
-            🔗 Probar Conexión
-          </button>
-          <button onClick={() => window.open('/integrations/my-google-drive', '_blank')} className="btn btn-secondary">
-            📁 Ir a Conexión Google Drive
-          </button>
-          <button onClick={() => window.open('/google-drive-uri-checker', '_blank')} className="btn btn-secondary">
-            🔍 Diagnóstico URI
-          </button>
-        </div>
-      </div>
-
-      {/* Recomendaciones */}
-      <div className="recommendations-section">
-        <h2>💡 Recomendaciones</h2>
-        <div className="recommendations">
-          {Object.entries(verificationResults).map(([key, result]) => {
-            if (!result) return null
-            
-            if (result.success) {
-              return (
-                <div key={key} className="recommendation success">
-                  <span className="rec-icon">✅</span>
-                  <span className="rec-text">
-                    {verificationSteps.find(s => s.id === key)?.name}: Todo funciona correctamente
-                  </span>
-                </div>
-              )
-            } else {
-              return (
-                <div key={key} className="recommendation error">
-                  <span className="rec-icon">⚠️</span>
-                  <span className="rec-text">
-                    {verificationSteps.find(s => s.id === key)?.name}: {result.error || 'Requiere atención'}
-                  </span>
-                </div>
-              )
-            }
-          })}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

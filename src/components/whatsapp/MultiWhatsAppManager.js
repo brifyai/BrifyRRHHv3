@@ -54,10 +54,21 @@ const MultiWhatsAppManager = () => {
 
   // Cargar configuraciones al montar el componente
   useEffect(() => {
+    const loadCompanies = async () => {
+      try {
+        const result = await communicationService.getCompanies();
+        if (result) {
+          setCompanies(result);
+        }
+      } catch (error) {
+        console.error('Error cargando empresas:', error);
+      }
+    };
+
     loadConfigurations();
     loadCompanies();
     loadTemplates();
-  }, [loadCompanies]);
+  }, []);
 
   const loadConfigurations = async () => {
     try {
@@ -70,17 +81,6 @@ const MultiWhatsAppManager = () => {
       console.error('Error cargando configuraciones:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadCompanies = async () => {
-    try {
-      const result = await communicationService.getCompanies();
-      if (result) {
-        setCompanies(result);
-      }
-    } catch (error) {
-      console.error('Error cargando empresas:', error);
     }
   };
 

@@ -197,81 +197,34 @@ const AchievementNotification = ({ user, employeeId, onDismiss }) => {
 };
 
 // Componente para mostrar notificaciones de puntos
-export  const getActivityIcon = (activityType) => {
-    switch (activityType) {
-      case 'message_sent':
-        return <GiftIcon className="h-5 w-5 text-green-600" />;
-      case 'message_read':
-        return <CheckCircleIcon className="h-5 w-5 text-blue-600" />;
-      case 'file_uploaded':
-        return <StarIcon className="h-5 w-5 text-purple-600" />;
-      case 'daily_login':
-        return <FireIcon className="h-5 w-5 text-orange-600" />;
-      default:
-        return <SparklesIcon className="h-5 w-5 text-indigo-600" />;
-    }
-  };
-
-  const getActivityText = (activityType) => {
-    switch (activityType) {
-      case 'message_sent':
-        return 'Mensaje enviado';
-      case 'message_read':
-        return 'Mensaje leído';
-      case 'file_uploaded':
-        return 'Archivo subido';
-      case 'daily_login':
-        return 'Inicio de sesión diario';
-      default:
-        return 'Actividad completada';
-    }
-  };
-
-  return (
-    <div className="fixed bottom-4 right-4 z-40 animate-bounce">
-      <div className="bg-white rounded-2xl shadow-2xl p-4 border-2 border-green-200 flex items-center space-x-3">
-        <div className="bg-green-100 p-2 rounded-xl">
-          {getActivityIcon(activity)}
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-900">
-            +{points} puntos - {getActivityText(activity)}
-          </p>
-        </div>
-        <button
-          onClick={onDismiss}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <XMarkIcon className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
+const getActivityIcon = (activityType) => {
+  switch (activityType) {
+    case 'message_sent':
+      return <GiftIcon className="h-5 w-5 text-green-600" />;
+    case 'message_read':
+      return <CheckCircleIcon className="h-5 w-5 text-blue-600" />;
+    case 'file_uploaded':
+      return <StarIcon className="h-5 w-5 text-purple-600" />;
+    case 'daily_login':
+      return <FireIcon className="h-5 w-5 text-orange-600" />;
+    default:
+      return <SparklesIcon className="h-5 w-5 text-indigo-600" />;
+  }
 };
 
-// Hook personalizado para manejar notificaciones de gamificación
-export  const showPointsNotification = (points, activity) => {
-    setPointsNotification({
-      isVisible: true,
-      points,
-      activity
-    });
-
-    // Auto ocultar después de 3 segundos
-    setTimeout(() => {
-      setPointsNotification(prev => ({ ...prev, isVisible: false }));
-    }, 3000);
-  };
-
-  const hidePointsNotification = () => {
-    setPointsNotification(prev => ({ ...prev, isVisible: false }));
-  };
-
-  return {
-    pointsNotification,
-    showPointsNotification,
-    hidePointsNotification
-  };
+const getActivityText = (activityType) => {
+  switch (activityType) {
+    case 'message_sent':
+      return 'Mensaje enviado';
+    case 'message_read':
+      return 'Mensaje leído';
+    case 'file_uploaded':
+      return 'Archivo subido';
+    case 'daily_login':
+      return 'Inicio de sesión diario';
+    default:
+      return 'Actividad completada';
+  }
 };
 
 export default AchievementNotification;

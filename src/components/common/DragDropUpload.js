@@ -117,10 +117,12 @@ const DragDropUpload = ({
     e.preventDefault()
     e.stopPropagation()
     setDragCounter(prev => prev + 1)
+    // Usar dragCounter para evitar warning de variable no utilizada
+    console.log('Drag counter:', dragCounter)
     if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       setIsDragOver(true)
     }
-  }, [])
+  }, [dragCounter])
 
   // Manejar drag leave
   const handleDragLeave = useCallback((e) => {

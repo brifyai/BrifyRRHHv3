@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import { db, supabase } from '../../lib/supabase.js'
 import {
@@ -31,8 +31,7 @@ const Profile = () => {
     confirmPassword: ''
   })
 
-
-  const loadPaymentHistory = async () => {
+  const loadPaymentHistory = useCallback(async () => {
     try {
       const { data, error } = await db.payments.getByUserId(user.id)
       if (error) {
@@ -46,7 +45,7 @@ const Profile = () => {
       console.error('Network error loading payment history:', error)
       setPayments([])
     }
-  }
+  }, [user.id])
 
   useEffect(() => {
     if (userProfile) {
@@ -56,7 +55,7 @@ const Profile = () => {
       })
     }
     loadPaymentHistory()
-  }, [userProfile])
+  }, [userProfile, loadPaymentHistory])
 
 
   const handleProfileUpdate = async (e) => {

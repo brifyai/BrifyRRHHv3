@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import googleDriveConsolidatedService from '../../lib/googleDriveConsolidated.js';
 
 const GoogleDriveProductionDiagnosis = () => {
@@ -12,13 +12,7 @@ const GoogleDriveProductionDiagnosis = () => {
     error: null
   });
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    performDiagnosis();
-  }, []);
-
-  const performDiagnosis = () => {
+  const performDiagnosis = useCallback(() => {
     try {
       const hostname = window.location.hostname;
       const isProduction = hostname.includes('netlify.app');
@@ -32,8 +26,8 @@ useEffect(() => {
       
       // Verificar credenciales
       const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-      const hasValidCredentials = clientId && 
-                                !clientId.includes('tu_google_client_id') && 
+      const hasValidCredentials = clientId &&
+                                !clientId.includes('tu_google_client_id') &&
                                 !clientId.includes('your-google-client-id') &&
                                 clientId !== 'your-google-client-id';
 
@@ -55,7 +49,11 @@ useEffect(() => {
         error: error.message
       }));
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    performDiagnosis();
+  }, [performDiagnosis]);
 
   const initializeAndDiagnoseService = async () => {
     try {

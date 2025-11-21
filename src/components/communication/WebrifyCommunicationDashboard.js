@@ -9,9 +9,7 @@ import {
   FolderIcon,
   Bars3Icon,
   XMarkIcon,
-  ArrowUpTrayIcon,
-  ChevronDownIcon,
-  ChevronUpIcon
+  ArrowUpTrayIcon
 } from '@heroicons/react/24/outline';
 import EmployeeSelector from './EmployeeSelector.js';
 import SendMessages from './SendMessages.js';
@@ -70,10 +68,6 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
   const [sentMessages, setSentMessages] = useState(0);
   const [readRate, setReadRate] = useState(0);
   const [companyInsights, setCompanyInsights] = useState({});
-  const [expandedSections, setExpandedSections] = useState({
-    insights: true,
-    recommendations: true
-  });
   const [employees, setEmployees] = useState([]);
 
   // Estados para el selector de empresas
@@ -233,7 +227,7 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
     } finally {
       setLoadingCompanies(false);
     }
-  }, [companiesFromDB.length]); // Añadir dependencia para tracking
+  }, [companiesFromDB.length]); // ✅ CORRECCIÓN: Incluir dependencia para evitar warning
 
   // Función para cargar métricas específicas de una empresa usando datos reales de Supabase
   const loadCompanyMetrics = useCallback(async (companyId) => {
@@ -299,9 +293,7 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
         
         // ✅ OPTIMIZACIÓN: Cargar todas las fuentes de datos en paralelo
         // PASO 1: Cargar empresas y datos auxiliares simultáneamente
-        const [companiesResult, templatesResult, dashboardStatsResult] = await Promise.all([
-          // Cargar empresas (internamente ya carga empleados en paralelo)
-          loadCompaniesFromDB(),
+        const [templatesResult, dashboardStatsResult] = await Promise.all([
           // Cargar conteo de plantillas
           templateService.getTemplatesCount(),
           // Cargar estadísticas del dashboard
@@ -314,15 +306,6 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
         setTemplatesCount(templatesResult);
         setSentMessages(dashboardStatsResult.sentMessages);
         setReadRate(dashboardStatsResult.readRate);
-        
-        // PASO 2: Una vez cargadas las empresas, cargar insights
-        // Nota: companiesFromDB se actualizará después de loadCompaniesFromDB
-        // Usamos setTimeout para esperar a que el estado se actualice
-        setTimeout(() => {
-          if (companiesFromDB.length > 0) {
-            loadCompanyInsights();
-          }
-        }, 100);
         
         console.log('✅ Dashboard inicializado completamente');
       } catch (error) {
@@ -338,9 +321,7 @@ const WebrifyCommunicationDashboard = ({ activeTab = 'dashboard' }) => {
   }, []); // Solo al montar el componente
 
   // Efecto para cargar métricas cuando cambia la empresa seleccionada
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
+  useEffect(() => {
     loadCompanyMetrics(selectedCompany);
   }, [selectedCompany, loadCompanyMetrics]);
 
@@ -380,106 +361,24 @@ useEffect(() => {
     }
   }, [location, companiesFromDB]); // ✅ Depender de companiesFromDB, no de lista estática
 
+  // ✅ CORRECCIÓN: Efecto único para cargar empresas y insights de forma limpia
+  useEffect(() => {
+    const initializeData = async () => {
+      // Cargar empresas desde la BD
+      await loadCompaniesFromDB();
+    };
+    
+    initializeData();
+  }, [loadCompaniesFromDB]); // ✅ CORRECCIÓN: Incluir dependencia
 
-
-
-  // Orden específico para los insights (incluyendo variaciones)
-  const insightOrder = [
-    "Éxito",
-    "Exito",
-    "Tendencia Positiva",
-    "Tendencia positiva",
-    "Oportunidad",
-    "Insight",
-    "Patrón Identificado",
-    "Patrón identificado",
-    "Tema Recurrente",
-    "Tema recurrente",
-    "Área de Mejora",
-    "Área de mejora",
-    "Tendencias negativas",
-    "Tendencias Negativas",
-    "Alerta"
-  ];
-
-  // Función para obtener el índice de orden basado en keywords
-  const getOrderIndex = (title) => {
-    for (let i = 0; i < insightOrder.length; i++) {
-      if (title.toLowerCase().includes(insightOrder[i].toLowerCase())) {
-        return i;
-      }
+  // ✅ CORRECCIÓN: Efecto separado para cargar insights cuando las empresas cambien
+  useEffect(() => {
+    if (companiesFromDB.length > 0) {
+      loadCompanyInsights();
     }
-    return insightOrder.length; // Si no coincide, va al final
-  };
+  }, [companiesFromDB.length, loadCompanyInsights]);
 
-  // Función para ordenar insights por título
-  const sortInsights = (insights) => {
-    return insights.sort((a, b) => getOrderIndex(a.title) - getOrderIndex(b.title));
-  };
-
-  // Función para renderizar insights dinámicos
-  const renderCompanyInsights = (companyName, insights) => {
-    if (!insights) return null;
-
-    const sortedFrontInsights = sortInsights([...(insights.frontInsights || [])]);
-
-    if (companyName === 'Corporación Chilena') {
-      console.log('Corporación Chilena front insights titles:', insights.frontInsights?.map(i => i.title));
-      console.log('Corporación Chilena sorted front insights titles:', sortedFrontInsights.map(i => i.title));
-    }
-
-    return (
-      <div className="space-y-4">
-        {sortedFrontInsights.map((insight, index) => (
-          <div key={index} className="bg-white/70 rounded-lg p-4">
-            <div className="flex items-center mb-2">
-              <div className={`w-2 h-2 rounded-full mr-2 ${
-                insight.type === 'positive' ? 'bg-green-500' :
-                insight.type === 'negative' ? 'bg-red-500' :
-                insight.type === 'warning' ? 'bg-orange-500' :
-                insight.type === 'info' ? 'bg-blue-500' :
-                'bg-gray-500'
-              }`}></div>
-              <span className="text-sm font-medium text-gray-700">{insight.title}</span>
-            </div>
-            <p className="text-sm text-gray-600">{insight.description}</p>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  // Función para renderizar insights del reverso
-  const renderBackInsights = (companyName, insights) => {
-    if (!insights) return null;
-
-    const sortedBackInsights = sortInsights([...(insights.backInsights || [])]);
-
-    if (companyName === 'Corporación Chilena') {
-      console.log('Corporación Chilena back insights titles:', insights.backInsights?.map(i => i.title));
-      console.log('Corporación Chilena sorted back insights titles:', sortedBackInsights.map(i => i.title));
-    }
-
-    return (
-      <div className="space-y-4">
-        {sortedBackInsights.map((insight, index) => (
-          <div key={index} className="bg-white/70 rounded-lg p-4">
-            <div className="flex items-center mb-2">
-              <div className={`w-2 h-2 rounded-full mr-2 ${
-                insight.type === 'positive' ? 'bg-green-500' :
-                insight.type === 'negative' ? 'bg-red-500' :
-                insight.type === 'warning' ? 'bg-orange-500' :
-                insight.type === 'info' ? 'bg-blue-500' :
-                'bg-gray-500'
-              }`}></div>
-              <span className="text-sm font-medium text-gray-700">{insight.title}</span>
-            </div>
-            <p className="text-sm text-gray-600">{insight.description}</p>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  // Funciones de ordenamiento de insights eliminadas - no se utilizaban
 
 
 
@@ -524,7 +423,7 @@ useEffect(() => {
       case 'reports':
         return <ReportsDashboard />;
       case 'bulk-upload':
-        return <EmployeeBulkUpload />; // Agregar la nueva pestaña
+        return <EmployeeBulkUpload />;
       default:
         return (
           <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-200">
@@ -594,7 +493,7 @@ useEffect(() => {
                   <InsightsPanel
                     companyInsights={
                       selectedCompany !== 'all' && companiesFromDB.find(c => c.id === selectedCompany)
-                        ? companyInsights[companiesFromDB.find(c => c.id === selectedCompany).name]
+                        ? companyInsights[companiesFromDB.find(c => c.id === selectedCompany).name]?.frontInsights || []
                         : []
                     }
                     selectedCompany={selectedCompany}

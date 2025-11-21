@@ -42,7 +42,60 @@ const MicroservicesDashboard = () => {
 
   /**
    * Carga las empresas desde Supabase
+/**
+   * Procesa una empresa individualmente
    */
+  const processSingleCompany = async (company) => {
+    try {
+      console.log(`🔄 Procesando empresa individualmente: ${company.name}`);
+      
+      // Simular procesamiento individual
+      const jobId = `job_${Date.now()}_${company.id}`;
+      
+      setJobs(prev => ({
+        ...prev,
+        [company.id]: {
+          jobId,
+          status: 'processing',
+          startTime: new Date(),
+          companyName: company.name
+        }
+      }));
+      
+      // Simular tiempo de procesamiento
+      setTimeout(() => {
+        setJobs(prev => ({
+          ...prev,
+          [company.id]: {
+            ...prev[company.id],
+            status: 'completed',
+            endTime: new Date()
+          }
+        }));
+        
+        // Simular insights recibidos
+        setInsights(prev => ({
+          ...prev,
+          [company.id]: {
+            insights: `Insights generados para ${company.name}`,
+            timestamp: new Date()
+          }
+        }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error procesando empresa:', error);
+      setJobs(prev => ({
+        ...prev,
+        [company.id]: {
+          ...prev[company.id],
+          status: 'error',
+          error: error.message
+        }
+      }));
+    }
+  };
+
   const loadCompanies = async () => {
     try {
       const { data, error } = await supabase
@@ -479,12 +532,22 @@ const MicroservicesDashboard = () => {
   );
 };
 
-// Componente auxiliar para mostrar estado  const labels = {
+// Componente auxiliar para mostrar estado
+const JobStatusBadge = ({ status }) => {
+  const labels = {
     queued: 'En Cola',
     processing: 'Procesando',
     completed: 'Completado',
     error: 'Error',
     cancelled: 'Cancelado'
+  };
+
+  const styles = {
+    queued: 'bg-gray-100 text-gray-800',
+    processing: 'bg-blue-100 text-blue-800',
+    completed: 'bg-green-100 text-green-800',
+    error: 'bg-red-100 text-red-800',
+    cancelled: 'bg-yellow-100 text-yellow-800'
   };
 
   return (

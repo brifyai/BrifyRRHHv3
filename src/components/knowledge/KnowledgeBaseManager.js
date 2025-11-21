@@ -212,7 +212,7 @@ const KnowledgeBaseManager = ({ companyId }) => {
   };
 
   const handleDeleteFAQ = async (faqId) => {
-    if (!confirm('¿Estás seguro de eliminar esta FAQ?')) return;
+    if (!window.confirm('¿Estás seguro de eliminar esta FAQ?')) return;
 
     try {
       const { error } = await supabase
@@ -282,7 +282,7 @@ const KnowledgeBaseManager = ({ companyId }) => {
   };
 
   const handleDeleteDocument = async (docId) => {
-    if (!confirm('¿Estás seguro de eliminar este documento?')) return;
+    if (!window.confirm('¿Estás seguro de eliminar este documento?')) return;
 
     try {
       // Obtener información del documento
@@ -365,7 +365,7 @@ const KnowledgeBaseManager = ({ companyId }) => {
   };
 
   const handleDeleteCategory = async (categoryId) => {
-    if (!confirm('¿Estás seguro de eliminar esta categoría?')) return;
+    if (!window.confirm('¿Estás seguro de eliminar esta categoría?')) return;
 
     try {
       const { error } = await supabase

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import googleDriveConsolidatedService from '../../lib/googleDriveConsolidated.js';
 
 const GoogleDriveLocalTest = () => {
@@ -8,13 +8,7 @@ const GoogleDriveLocalTest = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-// eslint-disable-next-line no-use-before-define, react-hooks/exhaustive-deps
-useEffect(() => {
-    initializeService();
-  }, []);
-
-  const initializeService = async () => {
+  const initializeService = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -51,7 +45,11 @@ useEffect(() => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    initializeService();
+  }, [initializeService]);
 
   const loadFiles = async () => {
     try {

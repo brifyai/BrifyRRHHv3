@@ -190,11 +190,14 @@ const PaginationControls = ({
   );
 };
 
-/**
- * Versión simplificada para navegación básica
- */
-export  const hasNext = currentPage < totalPages;
-
+export const SimplePagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  hasPrevious,
+  hasNext,
+  className = ""
+}) => {
   return (
     <div className={`flex items-center justify-between ${className}`}>
       <div className="flex items-center space-x-2">

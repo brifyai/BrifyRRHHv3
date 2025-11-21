@@ -50,123 +50,109 @@ const OptimizedLoader = ({
       transition={{ duration: UI_CONFIG.ANIMATION_DURATION.FAST / 1000 }}
       className="flex flex-col items-center justify-center space-y-6"
     >
+      {/* Spinner principal */}
       <div className="relative">
-        <motion.div
+        <motion.div 
           className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full"
           animate={{ rotate: 360 }}
-          transition={{ 
-            duration: 1.5, 
-            repeat: Infinity, 
-            ease: "linear" 
-          }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
-        
-        {/* Punto central animado */}
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center"
-          initial={{ scale: 0 }}
-          animate={{ scale: [0, 1, 0.8, 1] }}
-          transition={{ 
-            duration: 1.5, 
-            repeat: Infinity,
-            times: [0, 0.2, 0.8, 1]
-          }}
-        >
-          <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-        </motion.div>
+        <motion.div 
+          className="absolute inset-0 w-16 h-16 border-4 border-transparent border-r-purple-600 rounded-full"
+          animate={{ rotate: -360 }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+        />
       </div>
 
+      {/* Mensaje de carga */}
       <motion.div 
-        className="text-center space-y-2"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
+        className="text-center"
       >
-        <p className="text-gray-600 font-medium">{message}</p>
-        
+        <p className="text-lg font-semibold text-gray-800 mb-2">{message}</p>
         {showProgress && (
-          <motion.div 
-            className="w-48 h-2 bg-gray-200 rounded-full overflow-hidden"
-            initial={{ width: 0 }}
-            animate={{ width: "100%" }}
-            transition={{ duration: 0.5 }}
-          >
+          <div className="w-64 bg-gray-200 rounded-full h-2">
             <motion.div 
-              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
-              initial={{ width: "0%" }}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full"
+              initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.3 }}
             />
-          </motion.div>
+          </div>
         )}
       </motion.div>
 
-      {hasTimedOut && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-2"
-        >
-          <p className="text-yellow-600 text-sm">Esto está tardando más de lo normal...</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
-          >
-            Recargar página
-          </button>
-        </motion.div>
-      )}
+      {/* Indicadores de estado */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.4 }}
+        className="flex space-x-2"
+      >
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="w-2 h-2 bg-blue-500 rounded-full"
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.5, 1, 0.5]
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              delay: i * 0.2
+            }}
+          />
+        ))}
+      </motion.div>
     </motion.div>
   );
 
   useEffect(() => {
-    startTimeRef.current = Date.now();
-    setIsVisible(true);
+    // Mostrar loader con un pequeño delay para evitar parpadeos
+    const showTimer = setTimeout(() => {
+      setIsVisible(true);
+      startTimeRef.current = Date.now();
+    }, 100);
 
-    // Simular progreso si está habilitado
-    if (showProgress) {
-      let currentProgress = 0;
-      progressIntervalRef.current = setInterval(() => {
-        currentProgress = Math.min(currentProgress + Math.random() * 15, 90);
-        setProgress(currentProgress);
-      }, 300);
+    // Configurar timeout
+    if (timeout > 0) {
+      timeoutRef.current = setTimeout(() => {
+        setHasTimedOut(true);
+        if (onTimeout) {
+          onTimeout();
+        }
+      }, timeout);
     }
 
-    // Configurar timeout principal
-    timeoutRef.current = setTimeout(() => {
-      setHasTimedOut(true);
-      setProgress(100);
-      if (onTimeout) {
-        onTimeout();
-      }
-    }, timeout);
+    // Configurar progreso si está habilitado
+    if (showProgress) {
+      progressIntervalRef.current = setInterval(() => {
+        setProgress(prev => {
+          const newProgress = prev + Math.random() * 15;
+          return newProgress >= 100 ? 90 : newProgress; // Máximo 90% hasta completar
+        });
+      }, 200);
+    }
 
-    // Asegurar tiempo mínimo de visualización
-    minDisplayTimeoutRef.current = setTimeout(() => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-    }, minDisplayTime);
-
+    // Cleanup
     return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      if (minDisplayTimeoutRef.current) {
-        clearTimeout(minDisplayTimeoutRef.current);
-      }
+      clearTimeout(showTimer);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (minDisplayTimeoutRef.current) clearTimeout(minDisplayTimeoutRef.current);
     };
-  }, [message, timeout, showProgress, minDisplayTime, onTimeout]);
+  }, [timeout, onTimeout, showProgress]);
 
+  // No renderizar si no es visible
   if (!isVisible) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-white bg-opacity-90 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="max-w-md w-full mx-auto p-8">
         {isLowEndDevice() ? renderSimpleLoader() : renderFullLoader()}
         
@@ -186,7 +172,9 @@ const OptimizedLoader = ({
 /**
  * Hook personalizado para manejar estados de carga optimizados
  */
-export  const [loadingMessage, setLoadingMessage] = useState('Cargando...');
+export const useOptimizedLoading = () => {
+  const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('Cargando...');
   const [startTime, setStartTime] = useState(null);
   const timeoutRef = useRef(null);
 

@@ -218,7 +218,7 @@ class GoogleDrivePersistenceService {
         this.refreshTimers.delete(userId);
       }
 
-      const { data, error } = await supabaseDatabase.googleDriveCredentials.delete(userId);
+      const { error } = await supabaseDatabase.googleDriveCredentials.delete(userId);
 
       if (error) {
         console.error('Error desconectando Google Drive:', error);

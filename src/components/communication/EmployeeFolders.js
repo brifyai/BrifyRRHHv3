@@ -28,7 +28,6 @@ const EmployeeFolders = () => {
   const { user } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [folders, setFolders] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
   
   const [loading, setLoading] = useState(true);
   const [loadingFolders, setLoadingFolders] = useState(false);
@@ -50,41 +49,6 @@ const EmployeeFolders = () => {
   const [uniqueContractTypes, setUniqueContractTypes] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-// Índice global email -> company_id para resolver empresa real del empleado
-const [employeeCompanyIndex, setEmployeeCompanyIndex] = useState(new Map());
-
-// Construir el índice una sola vez al montar
-useEffect(() => {
-  let cancelled = false;
-
-  const buildEmployeeCompanyIndex = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('email, company_id');
-
-      if (error) {
-        console.error('❌ Error construyendo índice empleados->empresa:', error);
-        return;
-      }
-
-      const map = new Map();
-      (data || []).forEach((e) => {
-        const key = String(e.email || '').trim().toLowerCase();
-        if (key) map.set(key, e.company_id);
-      });
-
-      if (!cancelled) setEmployeeCompanyIndex(map);
-    } catch (err) {
-      console.error('❌ Error inesperado construyendo índice empleados->empresa:', err);
-    }
-  };
-
-  buildEmployeeCompanyIndex();
-  return () => {
-    cancelled = true;
-  };
-}, []);
 
   // Inicializar token bridge cuando el usuario está autenticado
   useEffect(() => {
@@ -105,26 +69,17 @@ useEffect(() => {
     }
   }, [companyId, filters.companyId]);
 
-  // ÚNICO efecto para cargar carpetas - consolidado para evitar duplicaciones
-  useEffect(() => {
-    if (!loading && employees.length > 0) {
-      console.log('🔄 Cargando carpetas - trigger:', {
-        currentPage,
-        searchTerm: searchTerm || 'empty',
-        hasFilters: Object.values(filters).some(Boolean),
-        employeesCount: employees.length,
-        companiesCount: companies.length
-      });
-      loadFoldersForCurrentPage();
-    }
-  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length]);
-
-  // Resetear a página 1 cuando cambian filtros o búsqueda
-  useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [searchTerm, filters, employees, currentPage]);
+  const extractUniqueFilters = useCallback((employeesData) => {
+    const departments = [...new Set(employeesData.map(emp => emp.department))];
+    const levels = [...new Set(employeesData.map(emp => emp.level))];
+    const workModes = [...new Set(employeesData.map(emp => emp.work_mode))];
+    const contractTypes = [...new Set(employeesData.map(emp => emp.contract_type))];
+    
+    setUniqueDepartments(departments.sort());
+    setUniqueLevels(levels.sort());
+    setUniqueWorkModes(workModes.sort());
+    setUniqueContractTypes(contractTypes.sort());
+  }, []);
 
   const loadEmployeesOnly = useCallback(async () => {
     try {
@@ -161,7 +116,6 @@ useEffect(() => {
         companyName: e.companies?.name || e.company?.name || ''
       }));
       setEmployees(normalizedEmployees);
-      setTotalItems(normalizedEmployees.filter(emp => emp.email).length);
 
       // Extraer valores únicos para los filtros
       extractUniqueFilters(employeesData);
@@ -179,19 +133,9 @@ useEffect(() => {
       setLoading(false);
       console.log('🏁 Carga de empleados completada');
     }
-  }, [companyId, filters]);
-
-  useEffect(() => {
-    loadEmployeesOnly();
-  }, [companyId, filters, loadEmployeesOnly]);
+  }, [companyId, filters, extractUniqueFilters]);
 
   const loadFoldersForCurrentPage = useCallback(async () => {
-    // Prevenir múltiples cargas simultáneas
-    if (loadingFolders) {
-      console.log('⏳ Ya se están cargando carpetas, ignorando solicitud duplicada...');
-      return;
-    }
-
     try {
       setLoadingFolders(true);
       console.log(`📁 Cargando carpetas reales desde la base de datos...`);
@@ -332,7 +276,6 @@ useEffect(() => {
       // Si no hay filtros, mostrar todas las carpetas
       if (!searchTerm && !Object.values(filters).some(Boolean)) {
         setFolders(foldersToShow);
-        setTotalItems(foldersToShow.length);
         return;
       }
 
@@ -377,7 +320,6 @@ useEffect(() => {
       console.log('🧭 Filtro de empresa aplicado:', filters.companyId);
       
       setFolders(filteredFolders);
-      setTotalItems(filteredFolders.length);
       
     } catch (error) {
       console.error('❌ Error cargando carpetas:', error);
@@ -394,20 +336,33 @@ useEffect(() => {
     }
   }, [employees, searchTerm, filters, companies]);
 
-  // Función de compatibilidad para mantener el código existente
-  const loadEmployeesAndFolders = loadEmployeesOnly;
+  // ÚNICO efecto para cargar carpetas - consolidado para evitar duplicaciones
+  useEffect(() => {
+    if (!loading && employees.length > 0) {
+      console.log('🔄 Cargando carpetas - trigger:', {
+        currentPage,
+        searchTerm: searchTerm || 'empty',
+        hasFilters: Object.values(filters).some(Boolean),
+        employeesCount: employees.length,
+        companiesCount: companies.length
+      });
+      loadFoldersForCurrentPage();
+    }
+  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length, loadFoldersForCurrentPage]);
 
-  const extractUniqueFilters = (employeesData) => {
-    const departments = [...new Set(employeesData.map(emp => emp.department))];
-    const levels = [...new Set(employeesData.map(emp => emp.level))];
-    const workModes = [...new Set(employeesData.map(emp => emp.work_mode))];
-    const contractTypes = [...new Set(employeesData.map(emp => emp.contract_type))];
-    
-    setUniqueDepartments(departments.sort());
-    setUniqueLevels(levels.sort());
-    setUniqueWorkModes(workModes.sort());
-    setUniqueContractTypes(contractTypes.sort());
-  };
+  // Resetear a página 1 cuando cambian filtros o búsqueda
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, filters, employees, currentPage]);
+
+  useEffect(() => {
+    loadEmployeesOnly();
+  }, [companyId, filters, loadEmployeesOnly]);
+
+  // Función de compatibilidad para mantener el código existente
+  // const loadEmployeesAndFolders = loadEmployeesOnly; // Eliminado - no se usa
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({
@@ -523,7 +478,7 @@ useEffect(() => {
       }
       
       // Recargar los datos después de procesar todos los archivos
-      await loadEmployeesAndFolders();
+      await loadEmployeesOnly();
       
       MySwal.fire({
         title: '¡Éxito!',
