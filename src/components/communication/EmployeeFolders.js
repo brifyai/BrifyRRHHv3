@@ -72,12 +72,6 @@ const EmployeeFolders = () => {
     }
   }, [searchTerm, filters, employees, currentPage]);
 
-  useEffect(() => {
-    loadEmployeesOnly();
-  }, [companyId, filters, loadEmployeesOnly]);
-
-  // Función de compatibilidad para mantener el código existente
-  // const loadEmployeesAndFolders = loadEmployeesOnly; // Eliminado - no se usa
 // ===== FUNCIONES DE CARGA DE DATOS FALTANTES =====
 
   const loadEmployeesOnly = useCallback(async () => {
