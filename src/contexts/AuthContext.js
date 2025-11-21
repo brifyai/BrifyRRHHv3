@@ -3,6 +3,7 @@ import { auth, db } from '../lib/supabase.js'
 import toast from 'react-hot-toast'
 import unifiedEmployeeFolderService from '../services/unifiedEmployeeFolderService.js'
 import { showFriendlyError, showSimpleError, showAuthError } from '../utils/friendlyErrorHandler.js'
+import { protectedSupabaseRequest } from '../lib/supabaseCircuitBreaker.js'
 
 const AuthContext = createContext({})
 
@@ -86,12 +87,19 @@ export const AuthProvider = ({ children }) => {
       
       profileLoadProcessed.current.add(userId)
       
-      const { data, error } = await db.users.getById(userId)
+      // 🔥 OPTIMIZACIÓN: Usar circuit breaker para evitar ERR_INSUFFICIENT_RESOURCES
+      const { data, error } = await protectedSupabaseRequest(
+        () => db.users.getById(userId),
+        'loadUserProfile.getById'
+      )
       
       // Cargar también las credenciales de Google Drive
       let googleCredentials = null
       try {
-        const { data: credData } = await db.userCredentials.getByUserId(userId)
+        const { data: credData } = await protectedSupabaseRequest(
+          () => db.userCredentials.getByUserId(userId),
+          'loadUserProfile.getCredentials'
+        )
         googleCredentials = credData
       } catch (credError) {
         console.log('No Google credentials found for user:', userId)
@@ -135,7 +143,11 @@ export const AuthProvider = ({ children }) => {
           avatar_url: currentUser?.user_metadata?.avatar_url || null
         }
         
-        const { data: newUserData, error: createError } = await db.users.upsert(userProfileData)
+        // 🔥 OPTIMIZACIÓN: Usar circuit breaker para upsert
+        const { data: newUserData, error: createError } = await protectedSupabaseRequest(
+          () => db.users.upsert(userProfileData),
+          'loadUserProfile.upsertUser'
+        )
         
         if (createError) {
           console.error('Error creating user profile:', createError)
@@ -153,12 +165,15 @@ export const AuthProvider = ({ children }) => {
           return basicProfile
         }
         
-        // Crear registro inicial en user_tokens_usage usando upsert
-        const { error: tokenError } = await db.userTokensUsage.upsert({
-          user_id: userId,
-          total_tokens: 0,
-          last_updated_at: new Date().toISOString()
-        })
+        // 🔥 OPTIMIZACIÓN: Usar circuit breaker para upsert de tokens
+        const { error: tokenError } = await protectedSupabaseRequest(
+          () => db.userTokensUsage.upsert({
+            user_id: userId,
+            total_tokens: 0,
+            last_updated_at: new Date().toISOString()
+          }),
+          'loadUserProfile.upsertTokens'
+        )
         
         if (tokenError) {
           console.error('Error creating initial token usage record:', tokenError)
