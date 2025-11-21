@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import unifiedEmployeeFolderService from '../services/unifiedEmployeeFolderService.js'
 import { showFriendlyError, showSimpleError, showAuthError } from '../utils/friendlyErrorHandler.js'
 import { protectedSupabaseRequest } from '../lib/supabaseCircuitBreaker.js'
+import { executeWithEmergencyProtection } from '../lib/emergencyResourceManager.js'
 
 const AuthContext = createContext({})
 
@@ -87,8 +88,8 @@ export const AuthProvider = ({ children }) => {
       
       profileLoadProcessed.current.add(userId)
       
-      // 🔥 OPTIMIZACIÓN: Usar circuit breaker para evitar ERR_INSUFFICIENT_RESOURCES
-      const { data, error } = await protectedSupabaseRequest(
+      // 🔥 OPTIMIZACIÓN: Usar sistema de emergencia para evitar ERR_INSUFFICIENT_RESOURCES
+      const { data, error } = await executeWithEmergencyProtection(
         () => db.users.getById(userId),
         'loadUserProfile.getById'
       )

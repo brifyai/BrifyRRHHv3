@@ -611,10 +611,27 @@ const ModernDashboardRedesigned = () => {
                   className="text-xl font-light text-gray-900"
                 >
                   {getGreeting()}, <span className="font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    {userProfile?.full_name ||
-                     user?.user_metadata?.name ||
-                     user?.user_metadata?.full_name ||
-                     (user?.email ? user.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Usuario')}
+                    {(() => {
+                      // Debug: Mostrar qué datos tenemos disponibles
+                      console.log('🔍 Debug - Datos de usuario disponibles:', {
+                        userProfile: userProfile,
+                        user: user,
+                        full_name: userProfile?.full_name,
+                        metadata_name: user?.user_metadata?.name,
+                        metadata_full_name: user?.user_metadata?.full_name,
+                        email: user?.email
+                      });
+                      
+                      // Intentar obtener nombre de múltiples fuentes
+                      const displayName = userProfile?.full_name ||
+                                         userProfile?.name ||
+                                         user?.user_metadata?.name ||
+                                         user?.user_metadata?.full_name ||
+                                         (user?.email ? user.email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Usuario');
+                      
+                      console.log('👤 Nombre a mostrar:', displayName);
+                      return displayName;
+                    })()}
                   </span>
                 </motion.h1>
                 <motion.p 
