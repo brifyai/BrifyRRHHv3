@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { BuildingOfficeIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import CompanyCard from './CompanyCard.js'
-import organizedDatabaseService from '../../services/organizedDatabaseService.js'
+import companySyncService from '../../services/companySyncService.js'
 
 const DatabaseCompanySummary = () => {
   const [companies, setCompanies] = useState([])
@@ -18,23 +18,13 @@ const DatabaseCompanySummary = () => {
       setError(null)
       const startTime = performance.now()
 
-      // ✅ SOLUCIÓN AGRESIVA: Forzar limpieza de caché múltiple veces
-      organizedDatabaseService.forceClearCache()
-      console.log('🧹 DatabaseCompanySummary: Caché limpiado forzosamente (1/3)')
-      
-      // Esperar un momento para asegurar que la caché se limpie
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      organizedDatabaseService.forceClearCache()
-      console.log('🧹 DatabaseCompanySummary: Caché limpiado forzosamente (2/3)')
-      
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      organizedDatabaseService.forceClearCache()
-      console.log('🧹 DatabaseCompanySummary: Caché limpiado forzosamente (3/3)')
+      // ✅ SOLUCIÓN: Invalidar caché del servicio de sincronización
+      companySyncService.invalidateCache('companies_all')
+      companySyncService.invalidateCache('companies_with_stats')
+      console.log('🧹 DatabaseCompanySummary: Caché invalidada en companySyncService')
 
-      // Usar el servicio organizado para obtener empresas con estadísticas
-      const companiesWithStats = await organizedDatabaseService.getCompaniesWithStats()
+      // Usar el servicio de sincronización para obtener empresas con estadísticas
+      const companiesWithStats = await companySyncService.getCompaniesWithStats()
       
       console.log(`📊 DatabaseCompanySummary: ${companiesWithStats.length} empresas cargadas con estadísticas`)
       
@@ -116,9 +106,10 @@ const DatabaseCompanySummary = () => {
     try {
       setSyncing(true)
       setError(null)
-      // Forzar limpieza completa de caché y recargar datos
-      organizedDatabaseService.forceClearCache()
-      console.log('🔄 DatabaseCompanySummary: Caché limpiado, recargando datos reales...')
+      // Invalidar caché del servicio de sincronización y recargar datos
+      companySyncService.invalidateCache('companies_all')
+      companySyncService.invalidateCache('companies_with_stats')
+      console.log('🔄 DatabaseCompanySummary: Caché invalidada en companySyncService, recargando datos reales...')
       await loadCompanyData()
     } catch (error) {
       console.error('Error syncing with dashboard:', error)

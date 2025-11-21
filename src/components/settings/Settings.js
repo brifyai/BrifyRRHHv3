@@ -369,10 +369,96 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
 
   // Cargar datos iniciales
   useEffect(() => {
+<<<<<<< HEAD
+=======
+    if (propCompanyId === true) {
+      // Estamos en modo empresa específica, extraer el ID de la URL
+      const pathParts = location.pathname.split('/')
+      const companyIdFromUrl = pathParts[pathParts.length - 1]
+      if (companyIdFromUrl && companyIdFromUrl !== 'empresas') {
+        setCompanyId(companyIdFromUrl)
+        
+        // Cargar la empresa específica para editar
+        const loadSpecificCompany = async () => {
+          try {
+            const companiesData = await companySyncService.getCompanies()
+            const specificCompany = companiesData.find(c => c.id === companyIdFromUrl)
+            if (specificCompany) {
+              setEditingCompany(specificCompany)
+              setShowCompanyForm(true)
+            }
+          } catch (error) {
+            console.error('Error loading specific company:', error)
+            toast.error('Error al cargar la empresa especificada')
+          }
+        }
+        
+        if (companies.length === 0) {
+          loadCompanies().then(() => {
+            loadSpecificCompany()
+          })
+        } else {
+          loadSpecificCompany()
+        }
+      } else {
+        // Resetear estados si no hay companyId válido
+        setCompanyId(null)
+        setEditingCompany(null)
+        setShowCompanyForm(false)
+      }
+    }
+  }, [propCompanyId, location.pathname, companies.length])
+
+  // ✅ FIX MINIFICACIÓN: Mover loadData ANTES de useEffect con useCallback
+  const loadData = useCallback(async () => {
+    try {
+      // Cargar datos de forma secuencial para evitar parpadeo
+      await loadCompanies()
+      
+      // Cargar configuraciones locales en paralelo (no causan re-renders significativos)
+      await Promise.all([
+        loadNotificationSettings(),
+        loadSecuritySettings(),
+        loadActiveSessions(),
+        loadSecurityLogs(),
+        loadBackupSettings(),
+        loadHierarchyMode(),
+        checkGoogleDriveConnection(),
+        checkBrevoConfiguration(),
+        checkGroqConfiguration(),
+        checkWhatsAppConfiguration(),
+        checkWhatsAppOfficialConfiguration(),
+        checkWhatsAppWahaConfiguration(),
+        checkTelegramConfiguration()
+      ])
+    } catch (error) {
+      console.error('Error loading settings data:', error)
+    }
+  }, [
+    loadCompanies,
+    loadNotificationSettings,
+    loadSecuritySettings,
+    loadActiveSessions,
+    loadSecurityLogs,
+    loadBackupSettings,
+    loadHierarchyMode,
+    checkGoogleDriveConnection,
+    checkBrevoConfiguration,
+    checkGroqConfiguration,
+    checkWhatsAppConfiguration,
+    checkWhatsAppOfficialConfiguration,
+    checkWhatsAppWahaConfiguration,
+    checkTelegramConfiguration
+  ])
+
+  useEffect(() => {
+    // Evitar ejecución múltiple si no hay usuario
+>>>>>>> cca9ec15fd78cc51adf2b68f2885f79a3c0f6309
     if (!user?.id) return
     
     let isMounted = true
     
+<<<<<<< HEAD
     const loadData = async () => {
       try {
         await loadCompanies()
@@ -399,6 +485,8 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       }
     }
     
+=======
+>>>>>>> cca9ec15fd78cc51adf2b68f2885f79a3c0f6309
     if (isMounted) {
       loadData()
     }
@@ -406,7 +494,11 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     return () => {
       isMounted = false
     }
+<<<<<<< HEAD
   }, [user?.id, loadCompanies, loadNotificationSettings, loadSecuritySettings, loadActiveSessions, loadSecurityLogs, loadBackupSettings, loadHierarchyMode, checkGoogleDriveConnection, checkBrevoConfiguration, checkGroqConfiguration, checkWhatsAppConfiguration, checkWhatsAppOfficialConfiguration, checkWhatsAppWahaConfiguration, checkTelegramConfiguration])
+=======
+  }, [user?.id, loadData]) // Incluir loadData en dependencias
+>>>>>>> cca9ec15fd78cc51adf2b68f2885f79a3c0f6309
 
   // Handlers para Companies
   const handleCreateCompany = () => {
@@ -551,9 +643,42 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     }
   }
 
+<<<<<<< HEAD
   // Handlers para Seguridad
   const handleSecuritySettingsChange = (key, value) => {
     setSecuritySettings(prev => ({ ...prev, [key]: value }))
+=======
+  const loadCompanies = useCallback(async () => {
+    try {
+      setLoading(true)
+
+      // Invalidar caché para forzar lectura fresca de Supabase
+      companySyncService.invalidateCache('companies_all')
+      
+      // Usar el servicio de sincronización para cargar empresas (maneja caché e invalidación)
+      const companiesData = await companySyncService.getCompanies()
+      
+      // 🐛 DEBUG: Verificar valores reales de status
+      console.log('=== DEBUG: Empresas cargadas ===')
+      companiesData?.forEach(company => {
+        console.log(`Empresa: ${company.name}, Status: "${company.status}" (${typeof company.status})`)
+      })
+      
+      setCompanies(companiesData || [])
+
+    } catch (error) {
+      console.error('Error loading companies:', error)
+      // En caso de error, usar datos mínimos
+      setCompanies([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const handleCreateCompany = () => {
+    setEditingCompany(null)
+    setShowCompanyForm(true)
+>>>>>>> cca9ec15fd78cc51adf2b68f2885f79a3c0f6309
   }
 
   const handleToggle2FA = () => {
@@ -650,6 +775,7 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
         cancelButtonText: 'Cancelar'
       })
       
+<<<<<<< HEAD
       if (!result.isConfirmed) {
         setConnectingGoogleDrive(false)
         return
@@ -667,6 +793,20 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       } else {
         throw new Error(disconnectResult.error?.message || 'Error al desconectar')
       }
+=======
+      // Invalidar caché para forcer lectura fresca de Supabase
+      companySyncService.invalidateCache('companies_all')
+      companySyncService.invalidateCache('company_' + company.id)
+      
+      // Actualizar estado local
+      setCompanies(prev => prev.map(c =>
+        c.id === company.id
+          ? { ...c, status: newStatus, updated_at: new Date().toISOString() }
+          : c
+      ))
+      toast.success(`Empresa ${newStatus === 'active' ? 'activada' : 'desactivada'}`)
+
+>>>>>>> cca9ec15fd78cc51adf2b68f2885f79a3c0f6309
     } catch (error) {
       console.error('Error disconnecting Google Drive:', error)
       toast.error('Error al desconectar Google Drive')
