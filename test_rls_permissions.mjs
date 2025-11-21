@@ -1,208 +1,96 @@
 #!/usr/bin/env node
 
-/**
- * SCRIPT DE VERIFICACIÓN DE PERMISOS RLS
- * 
- * Este script verifica si las políticas RLS están bloqueando el acceso a los datos
- */
-
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
 
-// Cargar variables de entorno
-dotenv.config();
+// Configuración de Supabase
+const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcWdsbnljaXZsY2ppam95bXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NTQ1NDYsImV4cCI6MjA3NjEzMDU0Nn0.ILwxm7pKdFZtG-Xz8niMSHaTwMvE4S7VlU8yDSgxOpE';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ ERROR: Variables de entorno REACT_APP_SUPABASE_URL o REACT_APP_SUPABASE_ANON_KEY no están definidas');
-  process.exit(1);
-}
-
-console.log('🔐 VERIFICACIÓN DE PERMISOS RLS');
-console.log('================================');
-console.log(`📍 URL: ${supabaseUrl}`);
-console.log(`🔑 Key: ${supabaseKey.substring(0, 20)}...`);
-console.log('');
-
-// Crear cliente Supabase
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Función para verificar una tabla con diferentes métodos
-async function checkTablePermissions(tableName) {
-  console.log(`🔍 Verificando permisos para tabla: ${tableName}`);
+async function testRLSPermissions() {
+  console.log('🔍 TESTING RLS PERMISSIONS PARA employee_folders');
+  console.log('================================================');
   
   try {
-    // Método 1: Consulta simple con count
-    console.log(`   📊 Método 1: Consulta con count...`);
-    const { count, error: countError } = await supabase
-      .from(tableName)
-      .select('*', { count: 'exact', head: true });
-
-    if (countError) {
-      console.log(`   ❌ Error en count: ${countError.message}`);
-    } else {
-      console.log(`   ✅ Count exitoso: ${count} registros`);
-    }
-
-    // Método 2: Consulta con límite
-    console.log(`   📋 Método 2: Consulta con límite...`);
-    const { data: limitedData, error: limitedError } = await supabase
-      .from(tableName)
+    // 1. Test con usuario anónimo (como en el frontend)
+    console.log('\n📊 1. Testing con usuario anónimo (como frontend)...');
+    const { data: anonFolders, error: anonError } = await supabase
+      .from('employee_folders')
       .select('*')
-      .limit(5);
-
-    if (limitedError) {
-      console.log(`   ❌ Error en consulta limitada: ${limitedError.message}`);
-    } else {
-      console.log(`   ✅ Consulta limitada exitosa: ${limitedData?.length || 0} registros`);
-      if (limitedData && limitedData.length > 0) {
-        console.log(`   📄 Ejemplo de registro:`, JSON.stringify(limitedData[0], null, 2).split('\n')[0] + '...');
-      }
-    }
-
-    // Método 3: Consulta sin filtros
-    console.log(`   🔍 Método 3: Consulta sin filtros...`);
-    const { data: allData, error: allError } = await supabase
-      .from(tableName)
-      .select('*');
-
-    if (allError) {
-      console.log(`   ❌ Error en consulta completa: ${allError.message}`);
-    } else {
-      console.log(`   ✅ Consulta completa exitosa: ${allData?.length || 0} registros`);
-    }
-
-    return {
-      count: count || 0,
-      limited: limitedData?.length || 0,
-      all: allData?.length || 0,
-      hasData: (allData?.length || 0) > 0,
-      sample: allData?.[0] || null
-    };
-
-  } catch (err) {
-    console.log(`   💥 Excepción: ${err.message}`);
-    return {
-      count: 0,
-      limited: 0,
-      all: 0,
-      hasData: false,
-      sample: null,
-      error: err.message
-    };
-  }
-}
-
-// Función para verificar políticas RLS
-async function checkRLSPolicies() {
-  console.log('\n🔐 Verificando políticas RLS...');
-  
-  try {
-    // Verificar si RLS está habilitado en las tablas
-    const tables = ['companies', 'employees', 'folders', 'documents', 'users', 'communication_logs'];
+      .limit(3);
     
-    for (const table of tables) {
-      console.log(`\n📋 Tabla: ${table}`);
-      
-      // Verificar si RLS está habilitado
-      const { data: rlsData, error: rlsError } = await supabase
-        .rpc('check_rls_enabled', { table_name: table })
-        .single()
-        .catch(() => ({ data: null, error: 'Función no existe' }));
-      
-      if (rlsError) {
-        console.log(`   ⚠️  No se pudo verificar RLS: ${rlsError}`);
-      } else {
-        console.log(`   🔐 RLS habilitado: ${rlsData ? 'Sí' : 'No'}`);
-      }
-      
-      // Intentar consultar políticas
-      const { data: policies, error: policiesError } = await supabase
-        .from('pg_policies')
-        .select('*')
-        .eq('tablename', table);
-      
-      if (policiesError) {
-        console.log(`   ❌ Error consultando políticas: ${policiesError.message}`);
-      } else {
-        console.log(`   📜 Políticas encontradas: ${policies?.length || 0}`);
-        if (policies && policies.length > 0) {
-          policies.forEach((policy, index) => {
-            console.log(`      ${index + 1}. ${policy.policyname} (${policy.cmd})`);
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.log(`❌ Error verificando RLS: ${err.message}`);
-  }
-}
-
-// Función principal
-async function runRLSCheck() {
-  console.log('🚀 Iniciando verificación de permisos RLS...\n');
-
-  // Verificar políticas RLS primero
-  await checkRLSPolicies();
-
-  // Verificar cada tabla
-  const tables = ['companies', 'employees', 'folders', 'documents', 'users', 'communication_logs'];
-  const results = {};
-
-  for (const table of tables) {
-    console.log(`\n${'='.repeat(50)}`);
-    results[table] = await checkTablePermissions(table);
-  }
-
-  // Resumen final
-  console.log(`\n${'='.repeat(50)}`);
-  console.log('📊 RESUMEN FINAL:');
-  console.log('==================');
-  
-  let totalIssues = 0;
-  
-  for (const [table, result] of Object.entries(results)) {
-    console.log(`\n📋 ${table}:`);
-    console.log(`   Count: ${result.count}`);
-    console.log(`   Limit(5): ${result.limited}`);
-    console.log(`   All: ${result.all}`);
-    
-    if (result.count === 0 && result.all === 0 && !result.error) {
-      console.log(`   ❌ PROBLEMA: Sin acceso a datos (posible RLS)`);
-      totalIssues++;
-    } else if (result.count !== result.all) {
-      console.log(`   ⚠️  ADVERTENCIA: Inconsistencia en conteos`);
-      totalIssues++;
+    if (anonError) {
+      console.error('❌ Error con usuario anónimo:', anonError.message);
+      console.log('   → Esto explica por qué no se ven las carpetas en el frontend');
     } else {
-      console.log(`   ✅ OK: Acceso correcto a datos`);
+      console.log(`✅ Usuario anónimo puede ver ${anonFolders?.length || 0} carpetas`);
     }
+    
+    // 2. Verificar estructura de una carpeta específica
+    if (anonFolders && anonFolders.length > 0) {
+      console.log('\n📋 2. Estructura de carpeta de ejemplo:');
+      const sampleFolder = anonFolders[0];
+      console.log(JSON.stringify(sampleFolder, null, 2));
+    }
+    
+    // 3. Test de consulta más específica
+    console.log('\n📊 3. Testing consulta específica...');
+    const { data: specificFolders, error: specificError } = await supabase
+      .from('employee_folders')
+      .select('id, employee_name, employee_email, company_name')
+      .limit(3);
+    
+    if (specificError) {
+      console.error('❌ Error en consulta específica:', specificError.message);
+    } else {
+      console.log(`✅ Consulta específica exitosa: ${specificFolders?.length || 0} resultados`);
+    }
+    
+    // 4. Verificar si el problema está en el JOIN con employees
+    console.log('\n📊 4. Testing JOIN con employees...');
+    const { data: joinedData, error: joinError } = await supabase
+      .from('employee_folders')
+      .select(`
+        *,
+        employees!inner (
+          email,
+          first_name,
+          last_name
+        )
+      `)
+      .limit(3);
+    
+    if (joinError) {
+      console.error('❌ Error en JOIN con employees:', joinError.message);
+      console.log('   → Esto puede ser la causa del problema');
+    } else {
+      console.log(`✅ JOIN exitoso: ${joinedData?.length || 0} resultados`);
+    }
+    
+    // 5. Test directo de employees
+    console.log('\n📊 5. Testing tabla employees...');
+    const { data: employees, error: employeesError } = await supabase
+      .from('employees')
+      .select('*')
+      .limit(3);
+    
+    if (employeesError) {
+      console.error('❌ Error accediendo a employees:', employeesError.message);
+    } else {
+      console.log(`✅ Employees accesible: ${employees?.length || 0} resultados`);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error durante el test:', error.message);
   }
-
-  // Diagnóstico y recomendaciones
-  console.log(`\n${'='.repeat(50)}`);
-  console.log('🎯 DIAGNÓSTICO Y RECOMENDACIONES:');
-  console.log('=================================');
-  
-  if (totalIssues === 0) {
-    console.log('✅ No se detectaron problemas de permisos');
-  } else {
-    console.log(`❌ Se detectaron ${totalIssues} problemas de permisos`);
-    console.log('\n🔧 SOLUCIONES POSIBLES:');
-    console.log('1. 🔐 Verificar políticas RLS en Supabase Dashboard');
-    console.log('2. 👤 Asegurar que el usuario tiene permisos de lectura');
-    console.log('3. 🛠️  Desactivar RLS temporalmente para pruebas:');
-    console.log('   ALTER TABLE tabla_name DISABLE ROW LEVEL SECURITY;');
-    console.log('4. 📝 Crear políticas RLS que permitan lectura pública:');
-    console.log('   CREATE POLICY "Allow read access" ON tabla_name FOR SELECT USING (true);');
-  }
-
-  console.log('\n🎉 VERIFICACIÓN COMPLETADA');
 }
 
-// Ejecutar verificación
-runRLSCheck().catch(err => {
-  console.error('💥 Error fatal en la verificación:', err);
+// Ejecutar test
+testRLSPermissions().then(() => {
+  console.log('\n🏁 Test de RLS completado');
+  process.exit(0);
+}).catch(error => {
+  console.error('💥 Error fatal:', error);
   process.exit(1);
 });
