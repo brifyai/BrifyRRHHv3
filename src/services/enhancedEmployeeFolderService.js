@@ -316,7 +316,7 @@ import { hybridGoogleDrive } from '../lib/hybridGoogleDrive.js';
   async createDriveFolder(employeeEmail, employeeName, companyName) {
     try {
       // Crear estructura de carpetas
-      const parentFolderName = `Empleados - ${companyName}`;
+      const parentFolderName = `${companyName}/Empleados`;
       
       // Buscar o crear carpeta principal de la empresa
       let parentFolder = await this.findOrCreateParentFolder(parentFolderName);

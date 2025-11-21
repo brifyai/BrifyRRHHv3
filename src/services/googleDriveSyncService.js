@@ -264,7 +264,7 @@ class GoogleDriveSyncService {
         }
 
         // Crear carpeta principal de la empresa
-        const parentFolderName = `Empleados - ${companyName}`
+        const parentFolderName = `${companyName}/Empleados`
         logger.info('GoogleDriveSyncService', `🔍 Buscando/creando carpeta padre: ${parentFolderName}`)
         let parentFolder = await this.findOrCreateParentFolder(parentFolderName)
 

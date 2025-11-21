@@ -148,7 +148,7 @@ class UnifiedEmployeeFolderService {
       const companyName = 'Empresa' // Se puede obtener de employeeData
       
       // Buscar carpeta principal de la empresa
-      const parentFolderName = `Empleados - ${companyName}`
+      const parentFolderName = `${companyName}/Empleados`
       const folders = await googleDriveConsolidatedService.listFiles()
       const parentFolder = folders.find(folder =>
         folder.name === parentFolderName &&
@@ -209,7 +209,7 @@ class UnifiedEmployeeFolderService {
    */
   async createDriveFolder(employeeEmail, employeeName, companyName, userId) {
     try {
-      const parentFolderName = `Empleados - ${companyName}`
+      const parentFolderName = `${companyName}/Empleados`
       
       // Buscar o crear carpeta principal
       let parentFolder = await this.findOrCreateParentFolder(parentFolderName, userId)
