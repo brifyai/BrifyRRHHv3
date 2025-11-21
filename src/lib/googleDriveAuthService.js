@@ -119,7 +119,18 @@ class GoogleDriveAuthService {
         expires_in: tokens.expires_in
       }))
       
-      logger.info('GoogleDriveAuthService', `✅ Tokens guardados (expira en ${this.getTimeUntilExpiry()}ms)`)
+      logger.info('GoogleDriveAuthService', `✅ Tokens guardados en localStorage (expira en ${this.getTimeUntilExpiry()}ms)`)
+      
+      // NUEVA FUNCIONALIDAD: Sincronizar con Supabase (NO DISRUPTIVO)
+      this.syncTokensToSupabase({
+        access_token: this.accessToken,
+        refresh_token: this.refreshToken,
+        expires_at: this.expiresAt?.toISOString(),
+        expires_in: tokens.expires_in
+      }).catch(error => {
+        logger.warn('GoogleDriveAuthService', `⚠️ Error sincronizando con Supabase: ${error.message}`)
+        // No lanzar error para no interrumpir el flujo existente
+      })
       
       // Configurar refresh automático
       this.scheduleTokenRefresh()

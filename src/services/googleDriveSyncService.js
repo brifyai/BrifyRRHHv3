@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '../lib/supabaseClient.js'
-import googleDriveService from '../lib/googleDrive.js'
+import googleDriveConsolidatedService from '../lib/googleDriveConsolidated.js'
 import googleDriveAuthService from '../lib/googleDriveAuthService.js'
 import distributedLockService from '../lib/distributedLockService.js'
 import logger from '../lib/logger.js'
@@ -25,7 +25,7 @@ class GoogleDriveSyncService {
       logger.info('GoogleDriveSyncService', '🔄 Inicializando servicio de sincronización...')
       
       // Inicializar servicio de Google Drive
-      await googleDriveService.initialize()
+      await googleDriveConsolidatedService.initialize(this.currentUserId || 'system')
       
       // Verificar que Google Drive esté autenticado
       if (!googleDriveAuthService.isAuthenticated()) {
@@ -241,7 +241,7 @@ class GoogleDriveSyncService {
           // Verificar si la carpeta de Drive todavía existe
           if (existingFolder.drive_folder_id) {
             try {
-              const driveFolder = await googleDriveService.getFileInfo(existingFolder.drive_folder_id)
+              const driveFolder = await googleDriveConsolidatedService.getFileInfo(existingFolder.drive_folder_id)
               if (driveFolder) {
                 logger.info('GoogleDriveSyncService', `✅ Carpeta ya existe en Google Drive: ${existingFolder.drive_folder_id}`)
                 
@@ -273,7 +273,7 @@ class GoogleDriveSyncService {
         logger.info('GoogleDriveSyncService', `🔍 Verificando si la carpeta ya existe en Google Drive...`)
         
         try {
-          const existingFiles = await googleDriveService.listFiles(parentFolder.id)
+          const existingFiles = await googleDriveConsolidatedService.listFiles(parentFolder.id)
           const existingDriveFolder = existingFiles.find(file =>
             file.name === folderName &&
             file.mimeType === 'application/vnd.google-apps.folder'
@@ -341,7 +341,7 @@ class GoogleDriveSyncService {
 
         // TERCERO: Si no existe en ningún lugar, crear nueva carpeta
         logger.info('GoogleDriveSyncService', `📁 Creando nueva carpeta del empleado: ${folderName}`)
-        const employeeFolder = await googleDriveService.createFolder(folderName, parentFolder.id)
+        const employeeFolder = await googleDriveConsolidatedService.createFolder(folderName, parentFolder.id)
 
         if (!employeeFolder || !employeeFolder.id) {
           throw new Error('No se pudo crear carpeta en Google Drive')
@@ -389,7 +389,7 @@ class GoogleDriveSyncService {
 
       // Crear carpeta del empleado
       const folderName = `${employeeName} (${employeeEmail}) - NO GMAIL`
-      const employeeFolder = await googleDriveService.createFolder(folderName, parentFolder.id)
+      const employeeFolder = await googleDriveConsolidatedService.createFolder(folderName, parentFolder.id)
 
       if (!employeeFolder || !employeeFolder.id) {
         throw new Error('No se pudo crear carpeta en Google Drive')
@@ -541,7 +541,7 @@ class GoogleDriveSyncService {
     try {
       logger.info('GoogleDriveSyncService', `🔍 Buscando carpeta: ${folderName}`)
       
-      const folders = await googleDriveService.listFiles()
+      const folders = await googleDriveConsolidatedService.listFiles()
       const parentFolder = folders.find(folder =>
         folder.name === folderName &&
         folder.mimeType === 'application/vnd.google-apps.folder'
@@ -553,7 +553,7 @@ class GoogleDriveSyncService {
       }
 
       logger.info('GoogleDriveSyncService', `📁 Creando nueva carpeta: ${folderName}`)
-      return await googleDriveService.createFolder(folderName)
+      return await googleDriveConsolidatedService.createFolder(folderName)
     } catch (error) {
       logger.error('GoogleDriveSyncService', `❌ Error buscando/creando carpeta ${folderName}: ${error.message}`)
       this.recordError(error.message)
@@ -578,7 +578,7 @@ class GoogleDriveSyncService {
 
       // Obtener archivos de la carpeta en Google Drive
       logger.info('GoogleDriveSyncService', `📂 Listando archivos de ${folderId}...`)
-      const files = await googleDriveService.listFiles(folderId)
+      const files = await googleDriveConsolidatedService.listFiles(folderId)
 
       if (!files || files.length === 0) {
         logger.info('GoogleDriveSyncService', `ℹ️ No hay archivos para sincronizar en ${employeeEmail}`)
@@ -726,7 +726,7 @@ class GoogleDriveSyncService {
 
       // Subir archivo a Google Drive
       logger.info('GoogleDriveSyncService', `📤 Subiendo archivo a Google Drive...`)
-      const uploadedFile = await googleDriveService.uploadFile(file, folderId)
+      const uploadedFile = await googleDriveConsolidatedService.uploadFile(file, folderId)
 
       if (!uploadedFile || !uploadedFile.id) {
         throw new Error('No se pudo subir archivo a Google Drive')
@@ -837,7 +837,7 @@ class GoogleDriveSyncService {
       if (deleteFromDrive && folder.drive_folder_id) {
         try {
           logger.info('GoogleDriveSyncService', `🗑️ Eliminando carpeta de Google Drive: ${folder.drive_folder_id}`)
-          await googleDriveService.deleteFile(folder.drive_folder_id)
+          await googleDriveConsolidatedService.deleteFile(folder.drive_folder_id)
           logger.info('GoogleDriveSyncService', `✅ Carpeta eliminada de Google Drive`)
         } catch (driveError) {
           logger.warn('GoogleDriveSyncService', `⚠️ Error eliminando de Google Drive: ${driveError.message}`)
@@ -921,7 +921,7 @@ class GoogleDriveSyncService {
       for (const folder of supabaseFolders) {
         if (folder.drive_folder_id) {
           try {
-            const driveFolder = await googleDriveService.getFileInfo(folder.drive_folder_id)
+            const driveFolder = await googleDriveConsolidatedService.getFileInfo(folder.drive_folder_id)
             if (!driveFolder) {
               auditResults.inconsistencies.push({
                 type: 'missing_in_drive',
@@ -946,7 +946,7 @@ class GoogleDriveSyncService {
 
       // 3. Buscar carpetas en Google Drive
       try {
-        const driveFolders = await googleDriveService.listFiles()
+        const driveFolders = await googleDriveConsolidatedService.listFiles()
         auditResults.totalDriveFolders = driveFolders.filter(f =>
           f.mimeType === 'application/vnd.google-apps.folder'
         ).length
@@ -1136,8 +1136,8 @@ class GoogleDriveSyncService {
         throw new Error(error)
       }
 
-      // Usar el método shareFolder existente en googleDriveService
-      const shareResult = await googleDriveService.shareFolder(folderId, employeeEmail, role)
+      // Usar el método shareFolder existente en googleDriveConsolidatedService
+      const shareResult = await googleDriveConsolidatedService.shareFolder(folderId, employeeEmail, role)
       
       logger.info('GoogleDriveSyncService', `✅ Carpeta compartida exitosamente con ${employeeEmail}`)
       

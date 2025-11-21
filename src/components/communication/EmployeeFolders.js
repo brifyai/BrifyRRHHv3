@@ -49,101 +49,102 @@ const EmployeeFolders = () => {
   const [uniqueContractTypes, setUniqueContractTypes] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Inicializar token bridge cuando el usuario está autenticado
   useEffect(() => {
-    if (user?.id) {
-      googleDriveTokenBridge.initializeForUser(user.id);
+    if (!loading && employees.length > 0) {
+      console.log('🔄 [PAGINATION DEBUG] useEffect triggered:', {
+        currentPage,
+        searchTerm: searchTerm || 'empty',
+        hasFilters: Object.values(filters).some(Boolean),
+        employeesCount: employees.length,
+        companiesCount: companies.length
+      });
+      loadFoldersForCurrentPage();
     }
-    
-    return () => {
-      // Limpiar cuando el componente se desmonta
-      googleDriveTokenBridge.cleanup();
-    };
-  }, [user?.id]);
+  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length]);;
 
-  // Alinear filtro de empresa con el parámetro de ruta para evitar desajustes
+  // Resetear a página 1 cuando cambian filtros o búsqueda
   useEffect(() => {
-    if (companyId && filters.companyId !== companyId) {
-      setFilters(prev => ({ ...prev, companyId }));
+    if (currentPage !== 1) {
+      setCurrentPage(1);
     }
-  }, [companyId, filters.companyId]);
+  }, [searchTerm, filters, employees, currentPage]);
 
-  const extractUniqueFilters = useCallback((employeesData) => {
-    const departments = [...new Set(employeesData.map(emp => emp.department))];
-    const levels = [...new Set(employeesData.map(emp => emp.level))];
-    const workModes = [...new Set(employeesData.map(emp => emp.work_mode))];
-    const contractTypes = [...new Set(employeesData.map(emp => emp.contract_type))];
-    
-    setUniqueDepartments(departments.sort());
-    setUniqueLevels(levels.sort());
-    setUniqueWorkModes(workModes.sort());
-    setUniqueContractTypes(contractTypes.sort());
-  }, []);
+  useEffect(() => {
+    loadEmployeesOnly();
+  }, [companyId, filters, loadEmployeesOnly]);
+
+  // Función de compatibilidad para mantener el código existente
+  // const loadEmployeesAndFolders = loadEmployeesOnly; // Eliminado - no se usa
+// ===== FUNCIONES DE CARGA DE DATOS FALTANTES =====
 
   const loadEmployeesOnly = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('🚀 Iniciando carga de empleados...');
+      console.log('👥 Cargando empleados desde la base de datos...');
       
-      // Cargar empresas - misma fuente que EmployeeSelector
-      const companyData = await organizedDatabaseService.getCompanies();
-      setCompanies(companyData);
-      
-      // SOLUCIÓN: Usar consulta simple sin JOIN cuando no hay filtros específicos
-      let employeesData = [];
-      if (companyId) {
-        employeesData = await organizedDatabaseService.getEmployees({ companyId });
-      } else {
-        // SOLUCIÓN: Si no hay filtros activos, usar consulta simple sin JOIN
-        const hasActiveFilters = Object.values(filters).some(value => value && value.trim() !== '');
-        if (!hasActiveFilters) {
-          console.log('🔧 [EmployeeFolders] Sin filtros activos, usando consulta simple...');
-          // Consulta simple sin JOIN para evitar error 400
-          const { data: simpleEmployees, error } = await supabase
-            .from('employees')
-            .select('*')
-            .order('created_at', { ascending: false });
-          
-          if (!error && simpleEmployees) {
-            employeesData = simpleEmployees;
-            console.log(`✅ [EmployeeFolders] Cargados ${employeesData.length} empleados con consulta simple`);
-          } else {
-            console.error('❌ [EmployeeFolders] Error en consulta simple:', error);
-            employeesData = [];
-          }
-        } else {
-          // Solo usar JOIN cuando hay filtros activos
-          employeesData = await organizedDatabaseService.getEmployees(filters);
-        }
+      // Cargar empleados desde la tabla employees con esquema correcto
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, first_name, last_name, full_name, email, position, department, company_id, status, phone, region, level, work_mode, contract_type, created_at')
+        .order('created_at', { ascending: false });
+
+      if (employeesError) {
+        console.error('Error cargando empleados:', employeesError);
+        throw employeesError;
       }
 
-      console.log(`📊 Cargados ${employeesData.length} empleados (${Object.values(filters).filter(Boolean).length} filtros aplicados)`);
-      // Normalizar para asegurar compatibilidad: employee.company disponible aunque venga como 'companies' en la relación
-      const normalizedEmployees = (employeesData || []).map(e => ({
-        ...e,
-        company: e.companies || e.company || null, // Priorizar companies como en EmployeeSelector
-        // Campos adicionales para compatibilidad con vista de carpetas
-        employeeName: e.first_name && e.last_name ? `${e.first_name} ${e.last_name}` : e.first_name || e.last_name || 'Sin nombre',
-        employeeEmail: e.email,
-        employeeDepartment: e.department,
-        employeePosition: e.position,
-        employeePhone: e.phone,
-        employeeLevel: e.level,
-        employeeWorkMode: e.work_mode,
-        employeeContractType: e.contract_type,
-        companyName: e.companies?.name || e.company?.name || ''
-      }));
-      setEmployees(normalizedEmployees);
-
-      // Extraer valores únicos para los filtros
-      extractUniqueFilters(employeesData);
+      console.log(`✅ Cargados ${employeesData?.length || 0} empleados`);
       
+      // Transformar datos para compatibilidad con el resto del código
+      const transformedEmployees = (employeesData || []).map(emp => ({
+        ...emp,
+        employeeName: emp.full_name || `${emp.first_name} ${emp.last_name}`.trim(),
+        employeeEmail: emp.email,
+        employeePosition: emp.position,
+        employeeDepartment: emp.department,
+        employeeLevel: emp.level,
+        employeeWorkMode: emp.work_mode,
+        employeeContractType: emp.contract_type,
+        employeePhone: emp.phone,
+        employeeRegion: emp.region
+      }));
+      
+      setEmployees(transformedEmployees);
+
+      // Cargar empresas
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('*')
+        .order('name');
+
+      if (companiesError) {
+        console.warn('Error cargando empresas:', companiesError);
+      } else {
+        console.log(`✅ Cargadas ${companiesData?.length || 0} empresas`);
+        setCompanies(companiesData || []);
+      }
+
+      // Extraer valores únicos para filtros
+      if (transformedEmployees && transformedEmployees.length > 0) {
+        const departments = [...new Set(transformedEmployees.map(emp => emp.department).filter(Boolean))];
+        const levels = [...new Set(transformedEmployees.map(emp => emp.level).filter(Boolean))];
+        const workModes = [...new Set(transformedEmployees.map(emp => emp.work_mode).filter(Boolean))];
+        const contractTypes = [...new Set(transformedEmployees.map(emp => emp.contract_type).filter(Boolean))];
+        
+        setUniqueDepartments(departments.sort());
+        setUniqueLevels(levels.sort());
+        setUniqueWorkModes(workModes.sort());
+        setUniqueContractTypes(contractTypes.sort());
+      }
+
     } catch (error) {
-      console.error('❌ Error cargando empleados:', error);
+      console.error('❌ Error en loadEmployeesOnly:', error);
       MySwal.fire({
         title: 'Error',
-        text: 'Hubo un problema al cargar los empleados',
+        text: 'No se pudieron cargar los empleados',
         icon: 'error',
         confirmButtonText: 'Aceptar',
         confirmButtonColor: '#0693e3'
@@ -152,136 +153,44 @@ const EmployeeFolders = () => {
       setLoading(false);
       console.log('🏁 Carga de empleados completada');
     }
-  }, [companyId, filters, extractUniqueFilters]);
+  }, []);
 
   const loadFoldersForCurrentPage = useCallback(async () => {
+    // Prevenir múltiples cargas simultáneas
+    if (loadingFolders) {
+      console.log('⏳ Ya se están cargando carpetas, ignorando solicitud duplicada...');
+      return;
+    }
+
     try {
       setLoadingFolders(true);
-      console.log(`📁 [EmployeeFolders] Iniciando carga de carpetas...`);
-      console.log(`📊 [EmployeeFolders] Estado actual - employees: ${employees.length}, folders: ${folders.length}`);
+      console.log(`📁 Cargando carpetas reales desde la base de datos...`);
       
-      // SOLUCIÓN: Cargar carpetas sin relaciones de foreign key (que fallan)
+      // Primero intentar cargar carpetas reales desde la base de datos con sus relaciones
       let realFolders = [];
       try {
-        console.log('📁 [EmployeeFolders] Cargando carpetas desde employee_folders...');
-        
-        // Consulta simple sin relaciones de foreign key
         const { data: employeeFolders, error } = await supabase
           .from('employee_folders')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        console.log(`📊 [EmployeeFolders] Resultado consulta employee_folders:`, {
-          data: employeeFolders?.length || 0,
-          error: error?.message || 'sin error'
-        });
-        
-        if (error) {
-          console.error('❌ [EmployeeFolders] Error en consulta employee_folders:', error);
-        } else if (employeeFolders && employeeFolders.length > 0) {
-          console.log('✅ [EmployeeFolders] Carpetas encontradas:', employeeFolders.length);
-          console.log('📋 [EmployeeFolders] Primeras 3 carpetas:', employeeFolders.slice(0, 3));
-        }
-      } catch (err) {
-        console.error('❌ [EmployeeFolders] Excepción al cargar employee_folders:', err);
-      }
-      
-      try {
-        console.log('📁 [EmployeeFolders] Cargando empleados desde employees...');
-        
-        // Consulta simple de empleados
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        console.log(`📊 [EmployeeFolders] Resultado consulta employees:`, {
-          data: employeesData?.length || 0,
-          error: employeesError?.message || 'sin error'
-        });
-        
-        if (employeesError) {
-          console.error('❌ [EmployeeFolders] Error en consulta employees:', employeesError);
-        } else if (employeesData && employeesData.length > 0) {
-          console.log('✅ [EmployeeFolders] Empleados encontrados:', employeesData.length);
-          console.log('📋 [EmployeeFolders] Primeros 3 empleados:', employeesData.slice(0, 3));
-        }
-      } catch (err) {
-        console.error('❌ [EmployeeFolders] Excepción al cargar employees:', err);
-      }
-      
-      try {
-        console.log('📁 [EmployeeFolders] Cargando companies desde companies...');
-        
-        // Consulta simple de companies
-        const { data: companiesData, error: companiesError } = await supabase
-          .from('companies')
-          .select('*')
-          .order('created_at', { ascending: false });
-          
-        console.log(`📊 [EmployeeFolders] Resultado consulta companies:`, {
-          data: companiesData?.length || 0,
-          error: companiesError?.message || 'sin error'
-        });
-        
-        if (companiesError) {
-          console.error('❌ [EmployeeFolders] Error en consulta companies:', companiesError);
-        } else if (companiesData && companiesData.length > 0) {
-          console.log('✅ [EmployeeFolders] Companies encontradas:', companiesData.length);
-          console.log('📋 [EmployeeFolders] Primeras 3 companies:', companiesData.slice(0, 3));
-        }
-      } catch (err) {
-        console.error('❌ [EmployeeFolders] Excepción al cargar companies:', err);
-      }
-      
-      try {
-        console.log('📁 [EmployeeFolders] Cargando carpetas desde employee_folders (segunda vez)...');
-        
-        // Consulta simple sin relaciones de foreign key
-        const { data: employeeFolders, error } = await supabase
-          .from('employee_folders')
-          .select('*')
+          .select(`
+            *,
+            employee_documents(id, document_name, document_type, description, status),
+            employee_faqs(id, question, answer, category, status)
+          `)
           .order('created_at', { ascending: false });
 
         if (!error && employeeFolders) {
           console.log(`✅ Encontradas ${employeeFolders.length} carpetas reales en la base de datos`);
-          console.log('📊 Muestra de carpetas:', employeeFolders.slice(0, 3).map(f => ({
+          console.log('📊 Muestra de carpetas reales con relaciones:', employeeFolders.slice(0, 3).map(f => ({
             email: f.employee_email,
-            name: f.employee_name,
-            company: f.company_name
+            documents_count: f.employee_documents?.length || 0,
+            faqs_count: f.employee_faqs?.length || 0
           })));
-          
-          // Cargar documentos y FAQs por separado
-          const [documentsResult, faqsResult] = await Promise.all([
-            supabase.from('employee_documents').select('*'),
-            supabase.from('employee_faqs').select('*')
-          ]);
-          
-          const documents = documentsResult.data || [];
-          const faqs = faqsResult.data || [];
-          
-          console.log(`📄 Documentos cargados: ${documents.length}`);
-          console.log(`❓ FAQs cargados: ${faqs.length}`);
-          
-          // Combinar datos en el frontend
-          realFolders = employeeFolders.map(folder => {
-            const folderDocuments = documents.filter(doc => doc.employee_folder_id === folder.id);
-            const folderFaqs = faqs.filter(faq => faq.employee_folder_id === folder.id);
-            
-            return {
-              ...folder,
-              employee_documents: folderDocuments,
-              employee_faqs: folderFaqs
-            };
-          });
-          
+          realFolders = employeeFolders;
         } else if (error) {
-          console.warn('⚠️ Error cargando carpetas:', error.message);
-          realFolders = [];
+          console.warn('⚠️ No se pudieron cargar carpetas reales, usando datos de empleados:', error.message);
         }
       } catch (dbError) {
-        console.warn('⚠️ Error consultando carpetas:', dbError.message);
-        realFolders = [];
+        console.warn('⚠️ Error consultando carpetas reales:', dbError.message);
       }
 
       // Si no hay carpetas reales, generar carpetas virtuales desde los empleados
@@ -341,15 +250,15 @@ const EmployeeFolders = () => {
             id: folder.id,
             email: folder.employee_email,
             employeeEmail: folder.employee_email,
-            employeeName: folder.employee_name || employee?.employeeName || 'Sin nombre',
+            employeeName: folder.employee_name || employee?.employeeName || employee?.full_name || 'Sin nombre',
             companyName: folder.company_name || employee?.companyName || 'Sin empresa',
             companyIdResolved: folder.company_id || employee?.company_id,
-            employeeDepartment: folder.employee_department || employee?.employeeDepartment,
-            employeePosition: folder.employee_position || employee?.employeePosition,
-            employeePhone: folder.employee_phone || employee?.employeePhone,
-            employeeLevel: folder.employee_level || employee?.employeeLevel,
-            employeeWorkMode: folder.employee_work_mode || employee?.employeeWorkMode,
-            employeeContractType: folder.employee_contract_type || employee?.employeeContractType,
+            employeeDepartment: folder.employee_department || employee?.employeeDepartment || employee?.department,
+            employeePosition: folder.employee_position || employee?.employeePosition || employee?.position,
+            employeePhone: folder.employee_phone || employee?.employeePhone || employee?.phone,
+            employeeLevel: folder.employee_level || employee?.employeeLevel || employee?.level,
+            employeeWorkMode: folder.employee_work_mode || employee?.employeeWorkMode || employee?.work_mode,
+            employeeContractType: folder.employee_contract_type || employee?.employeeContractType || employee?.contract_type,
             lastUpdated: folder.updated_at || new Date().toISOString(),
             driveFolderId: folder.drive_folder_id,
             driveFolderUrl: folder.drive_folder_url,
@@ -358,30 +267,9 @@ const EmployeeFolders = () => {
           };
         });
       } else {
-        console.log(`📂 Generando carpetas virtuales desde ${employees.length} empleados...`);
-        foldersToShow = employees.map(employee => ({
-          id: `virtual-${employee.email}`,
-          email: employee.email,
-          employeeEmail: employee.email,
-          employeeName: employee.employeeName || employee.first_name || 'Sin nombre',
-          companyName: employee.companyName || employee.companies?.name || 'Sin empresa',
-          companyIdResolved: employee.company_id,
-          employeeDepartment: employee.employeeDepartment || employee.department,
-          employeePosition: employee.employeePosition || employee.position,
-          employeePhone: employee.employeePhone || employee.phone,
-          employeeLevel: employee.employeeLevel || employee.level,
-          employeeWorkMode: employee.employeeWorkMode || employee.work_mode,
-          employeeContractType: employee.employeeContractType || employee.contract_type,
-          lastUpdated: new Date().toISOString(),
-          driveFolderId: null,
-          driveFolderUrl: null,
-          knowledgeBase: {
-            faqs: [],
-            documents: [],
-            policies: [],
-            procedures: []
-          }
-        }));
+        // Si no hay carpetas reales, no mostrar carpetas virtuales
+        console.log(`📂 No hay carpetas reales en la base de datos para mostrar`);
+        foldersToShow = [];
       }
 
       console.log(`✅ Total de carpetas a mostrar: ${foldersToShow.length}`);
@@ -389,6 +277,7 @@ const EmployeeFolders = () => {
       // Si no hay filtros, mostrar todas las carpetas
       if (!searchTerm && !Object.values(filters).some(Boolean)) {
         setFolders(foldersToShow);
+        setTotalItems(foldersToShow.length);
         return;
       }
 
@@ -433,6 +322,7 @@ const EmployeeFolders = () => {
       console.log('🧭 Filtro de empresa aplicado:', filters.companyId);
       
       setFolders(filteredFolders);
+      setTotalItems(filteredFolders.length);
       
     } catch (error) {
       console.error('❌ Error cargando carpetas:', error);
@@ -447,35 +337,10 @@ const EmployeeFolders = () => {
       setLoadingFolders(false);
       console.log('🏁 Carga de carpetas completada');
     }
-  }, [employees, searchTerm, filters, companies]);
-
-  // ÚNICO efecto para cargar carpetas - consolidado para evitar duplicaciones
-  useEffect(() => {
-    if (!loading && employees.length > 0) {
-      console.log('🔄 Cargando carpetas - trigger:', {
-        currentPage,
-        searchTerm: searchTerm || 'empty',
-        hasFilters: Object.values(filters).some(Boolean),
-        employeesCount: employees.length,
-        companiesCount: companies.length
-      });
-      loadFoldersForCurrentPage();
-    }
-  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length, loadFoldersForCurrentPage]);
-
-  // Resetear a página 1 cuando cambian filtros o búsqueda
-  useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [searchTerm, filters, employees, currentPage]);
-
-  useEffect(() => {
-    loadEmployeesOnly();
-  }, [companyId, filters, loadEmployeesOnly]);
+  }, [searchTerm, filters, loadingFolders, companies, employees]);
 
   // Función de compatibilidad para mantener el código existente
-  // const loadEmployeesAndFolders = loadEmployeesOnly; // Eliminado - no se usa
+  const loadEmployeesAndFolders = loadEmployeesOnly;
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({
@@ -505,6 +370,13 @@ const EmployeeFolders = () => {
       }
     });
     
+    console.log('📁 [PAGINATION DEBUG] getFilteredFolders():', {
+      totalFolders: folders.length,
+      filteredFolders: uniqueFolders.length,
+      searchTerm: searchTerm || 'none',
+      activeFilters: Object.values(filters).filter(Boolean).length
+    });
+    
     return uniqueFolders;
   };
 
@@ -516,14 +388,25 @@ const EmployeeFolders = () => {
   };
 
   const getTotalPages = () => {
-    return Math.ceil(getFilteredFolders().length / itemsPerPage || 1);
+    const foldersCount = getFilteredFolders().length;
+    const pages = Math.ceil(foldersCount / itemsPerPage || 1);
+    console.log('📊 [PAGINATION DEBUG] getTotalPages():', {
+      foldersCount,
+      itemsPerPage,
+      totalPages: pages,
+      currentPage
+    });
+    return pages;
   };
 
   const handlePageChange = (page) => {
+    console.log('🔘 [PAGINATION DEBUG] handlePageChange called:', { page, currentPage });
     if (page !== currentPage) {
-      console.log(`📄 Cambiando a página ${page}`);
+      console.log(`📄 [PAGINATION DEBUG] Changing from page ${currentPage} to page ${page}`);
       setCurrentPage(page);
       // No limpiar carpetas, el useEffect se encargará de cargar los datos correctos
+    } else {
+      console.log('⚠️ [PAGINATION DEBUG] Page change ignored - same page:', page);
     }
   };
 
@@ -966,6 +849,11 @@ const EmployeeFolders = () => {
   // Calcular páginas totales
   const totalPages = getTotalPages();
   const hasMorePages = currentPage < totalPages;
+  console.log('📈 [PAGINATION DEBUG] hasMorePages calculated:', { 
+    currentPage, 
+    totalPages, 
+    hasMorePages 
+  });
 
   if (loading) {
     return (
