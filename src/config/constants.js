@@ -16,7 +16,7 @@ export const SUPABASE_CONFIG = {
 export const GOOGLE_CONFIG = {
   CLIENT_ID: process.env.REACT_APP_GOOGLE_CLIENT_ID || '',
   CLIENT_SECRET: process.env.REACT_APP_GOOGLE_CLIENT_SECRET || '',
-  API_KEY: process.env.REACT_APP_GOOGLE_API_KEY || 'AIzaSyAt-R5l7xY5Sts-JKpgarcvA4HZLCi50xg'
+  API_KEY: process.env.REACT_APP_GOOGLE_API_KEY || ''
 };
 
 // Configuración de Groq AI
