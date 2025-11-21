@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js'
+import { withRateLimit } from './supabaseRateLimiter.js'
 
-// Función auxiliar para reintentos con backoff exponencial simple
+// 🔥 NUEVO: Función auxiliar para reintentos con backoff exponencial simple
 const retryWithBackoff = async (fn, maxRetries = 3, baseDelay = 1000) => {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -91,18 +92,23 @@ export const db = {
           throw new Error('ID es requerido');
         }
 
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', id)
-          .maybeSingle()
+        // 🔥 NUEVO: Usar rate limiting para evitar ERR_INSUFFICIENT_RESOURCES
+        const result = await withRateLimit(`users.getById.${id}`, async () => {
+          const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle()
+          
+          if (error) {
+            console.error('Error fetching user by ID:', error)
+            return { data: null, error }
+          }
+          
+          return { data, error: null }
+        })
         
-        if (error) {
-          console.error('Error fetching user by ID:', error)
-          return { data: null, error }
-        }
-        
-        return { data, error: null }
+        return result
       } catch (fetchError) {
         console.error('Network error fetching user:', fetchError)
         return { data: null, error: { code: 'NETWORK_ERROR', message: 'Failed to fetch user data' } }

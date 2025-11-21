@@ -526,7 +526,7 @@ const ErrorNotificationsAccessible = ({ position = 'top-right', maxVisible = 5 }
         )}
 
         {/* Estilos para animaciones */}
-        <style jsx>{`
+        <style>{`
           @keyframes slideIn {
             from {
               opacity: 0;

@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
   const currentUserIdRef = useRef(null) // 🔥 SOLUCIÓN: Ref para rastrear usuario actual sin causar re-renders
   const lastUserObjectRef = useRef(null) // 🔥 SOLUCIÓN: Guardar referencia al último objeto user para estabilidad
   const profileLoadInProgressRef = useRef(false) // 🔥 SOLUCIÓN DEFINITIVA: Prevenir llamadas simultáneas
+  const profileLoadDebounceRef = useRef(null) // 🔥 NUEVO: Timer para debouncing
 
   // Función para extraer nombre del email si no hay nombre disponible
   const extractNameFromEmail = (email) => {
@@ -43,6 +44,12 @@ export const AuthProvider = ({ children }) => {
       // 🔥 DEBUGGING: Log cada llamada a loadUserProfile
       if (window.infiniteLoopDebugger) {
         window.infiniteLoopDebugger.logRender('ProfileLoad', { userId, forceReload })
+      }
+      
+      // 🔥 NUEVO: Debouncing - Cancelar llamadas previas si es necesario
+      if (profileLoadDebounceRef.current) {
+        clearTimeout(profileLoadDebounceRef.current)
+        profileLoadDebounceRef.current = null
       }
       
       // 🔥 SOLUCIÓN DEFINITIVA: Usar refs para evitar dependencias problemáticas
@@ -222,7 +229,8 @@ export const AuthProvider = ({ children }) => {
       // 🔥 SOLUCIÓN DEFINITIVA: Asegurar que siempre limpiemos el flag
       profileLoadInProgressRef.current = false
     }
-  }, []) // 🔥 SOLUCIÓN DEFINITIVA: Sin dependencias para evitar bucles infinitos
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // 🔥 SOLUCIÓN DEFINITIVA: Sin dependencias para evitar bucles infinitos
   // user y userProfile se acceden via variables locales para evitar re-creación
 
   // Registro de usuario
