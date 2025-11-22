@@ -403,9 +403,40 @@ const EmployeeFolders = () => {
           };
         });
       } else {
-        // Si no hay carpetas reales, no mostrar carpetas virtuales
-        console.log(`📂 No hay carpetas reales en la base de datos para mostrar`);
-        foldersToShow = [];
+        // Si no hay carpetas reales, generar carpetas virtuales desde los empleados
+        console.log(`📂 No hay carpetas reales, generando carpetas virtuales desde empleados...`);
+        foldersToShow = employees.map(employee => {
+          // Crear knowledgeBase vacío para carpetas virtuales
+          const knowledgeBase = {
+            faqs: [],
+            documents: [],
+            policies: [],
+            procedures: []
+          };
+          
+          return {
+            id: `virtual-${employee.id}`,
+            email: employee.email,
+            employeeEmail: employee.email,
+            employeeName: employee.employeeName || employee.full_name || `${employee.first_name} ${employee.last_name}`.trim(),
+            companyName: companies.find(c => c.id === employee.company_id)?.name || 'Sin empresa',
+            companyIdResolved: employee.company_id,
+            employeeDepartment: employee.employeeDepartment || employee.department,
+            employeePosition: employee.employeePosition || employee.position,
+            employeePhone: employee.employeePhone || employee.phone,
+            employeeLevel: employee.employeeLevel || employee.level,
+            employeeWorkMode: employee.employeeWorkMode || employee.work_mode,
+            employeeContractType: employee.employeeContractType || employee.contract_type,
+            lastUpdated: new Date().toISOString(),
+            driveFolderId: null,
+            driveFolderUrl: null,
+            // Usar knowledgeBase vacío para carpetas virtuales
+            knowledgeBase: knowledgeBase,
+            isVirtual: true // Marcar como carpeta virtual
+          };
+        });
+        
+        console.log(`✅ Generadas ${foldersToShow.length} carpetas virtuales desde empleados`);
       }
 
       console.log(`✅ Total de carpetas a mostrar: ${foldersToShow.length}`);
