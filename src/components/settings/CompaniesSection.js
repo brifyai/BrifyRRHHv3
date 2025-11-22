@@ -91,86 +91,99 @@ const CompaniesSection = ({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {companies.map((company) => (
-        <div
-          key={company.id}
-          className="relative bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-100"
+    <>
+      {/* Botón flotante para agregar empresa */}
+      <div className="mb-6 flex justify-end">
+        <button
+          onClick={onCreateCompany}
+          className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
         >
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg mr-3">
-                <BuildingOfficeIcon className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">{company.name}</h3>
-                <div className="flex items-center mt-1">
-                  {company.status === 'active' ? (
-                    <CheckCircleIcon className="h-4 w-4 text-green-500 mr-1" />
-                  ) : (
-                    <XCircleIcon className="h-4 w-4 text-red-500 mr-1" />
-                  )}
-                  <span className={`text-xs font-medium ${company.status === 'active' ? 'text-green-700' : 'text-red-700'}`}>
-                    {company.status === 'active' ? 'Activa' : 'Inactiva'}
-                  </span>
+          <PlusIcon className="h-5 w-5 mr-2" />
+          Agregar Empresa
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {companies.map((company) => (
+          <div
+            key={company.id}
+            className="relative bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-gray-100"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg mr-3">
+                  <BuildingOfficeIcon className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{company.name}</h3>
+                  <div className="flex items-center mt-1">
+                    {company.status === 'active' ? (
+                      <CheckCircleIcon className="h-4 w-4 text-green-500 mr-1" />
+                    ) : (
+                      <XCircleIcon className="h-4 w-4 text-red-500 mr-1" />
+                    )}
+                    <span className={`text-xs font-medium ${company.status === 'active' ? 'text-green-700' : 'text-red-700'}`}>
+                      {company.status === 'active' ? 'Activa' : 'Inactiva'}
+                    </span>
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={() => handleToggleStatus(company)}
+                className={`p-1 rounded-full ${
+                  company.status === 'active'
+                    ? 'text-green-600 hover:bg-green-50'
+                    : 'text-red-600 hover:bg-red-50'
+                }`}
+                title={company.status === 'active' ? 'Desactivar empresa' : 'Activar empresa'}
+              >
+                {company.status === 'active' ? (
+                  <CheckCircleIcon className="h-5 w-5" />
+                ) : (
+                  <XCircleIcon className="h-5 w-5" />
+                )}
+              </button>
             </div>
-            <button
-              onClick={() => handleToggleStatus(company)}
-              className={`p-1 rounded-full ${
-                company.status === 'active'
-                  ? 'text-green-600 hover:bg-green-50'
-                  : 'text-red-600 hover:bg-red-50'
-              }`}
-              title={company.status === 'active' ? 'Desactivar empresa' : 'Activar empresa'}
-            >
-              {company.status === 'active' ? (
-                <CheckCircleIcon className="h-5 w-5" />
-              ) : (
-                <XCircleIcon className="h-5 w-5" />
+
+            {company.description && (
+              <p className="text-sm text-gray-600 mb-4 line-clamp-2">{company.description}</p>
+            )}
+
+            <div className="space-y-2 mb-4">
+              {company.telegram_bot && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="font-medium mr-2">Telegram:</span>
+                  <span className="truncate">{company.telegram_bot}</span>
+                </div>
               )}
-            </button>
-          </div>
+              {company.whatsapp_number && (
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="font-medium mr-2">WhatsApp:</span>
+                  <span>{company.whatsapp_number}</span>
+                </div>
+              )}
+            </div>
 
-          {company.description && (
-            <p className="text-sm text-gray-600 mb-4 line-clamp-2">{company.description}</p>
-          )}
-
-          <div className="space-y-2 mb-4">
-            {company.telegram_bot && (
-              <div className="flex items-center text-sm text-gray-600">
-                <span className="font-medium mr-2">Telegram:</span>
-                <span className="truncate">{company.telegram_bot}</span>
-              </div>
-            )}
-            {company.whatsapp_number && (
-              <div className="flex items-center text-sm text-gray-600">
-                <span className="font-medium mr-2">WhatsApp:</span>
-                <span>{company.whatsapp_number}</span>
-              </div>
-            )}
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => navigate(`/configuracion/empresas/${company.id}`)}
+                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                title="Configurar canales de comunicación"
+              >
+                <Cog6ToothIcon className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteCompany(company.id)}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                title="Eliminar empresa"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-
-          <div className="flex justify-end space-x-2">
-            <button
-              onClick={() => navigate(`/configuracion/empresas/${company.id}`)}
-              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-              title="Configurar canales de comunicación"
-            >
-              <Cog6ToothIcon className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => handleDeleteCompany(company.id)}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Eliminar empresa"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   )
 }
 
