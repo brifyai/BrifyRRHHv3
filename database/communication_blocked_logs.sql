@@ -2,8 +2,8 @@
 -- Esto permite auditar y monitorear qué comunicaciones se están bloqueando
 
 CREATE TABLE IF NOT EXISTS communication_blocked_logs (
-    id BIGSERIAL PRIMARY KEY,
-    company_id BIGINT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
     communication_type VARCHAR(50) NOT NULL CHECK (communication_type IN ('whatsapp', 'email', 'sms', 'telegram', 'slack', 'teams')),
     blocked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     user_agent TEXT,
