@@ -263,10 +263,13 @@ class GoogleDriveSyncService {
           }
         }
 
-        // Crear carpeta principal de la empresa
-        const parentFolderName = `${companyName}/Empleados`
-        logger.info('GoogleDriveSyncService', `🔍 Buscando/creando carpeta padre: ${parentFolderName}`)
-        let parentFolder = await this.findOrCreateParentFolder(parentFolderName)
+        // NUEVA ESTRUCTURA: Crear estructura de carpetas para la empresa
+        logger.info('GoogleDriveSyncService', `🔍 Creando estructura de carpetas para ${companyName}`)
+        const folderStructure = await this.createCompanyFolderStructure(companyName)
+        
+        // Seleccionar la carpeta padre según el tipo de email
+        const parentFolder = isGmail ? folderStructure.gmailFolder : folderStructure.nonGmailFolder
+        logger.info('GoogleDriveSyncService', `📁 Usando carpeta padre: ${parentFolder.name} (${parentFolder.id})`)
 
         // SEGUNDO: Verificar si la carpeta ya existe en Google Drive (antes de crear)
         const folderName = `${employeeName} (${employeeEmail})`
@@ -383,12 +386,16 @@ class GoogleDriveSyncService {
     try {
       logger.info('GoogleDriveSyncService', `📁 Creando carpeta para empleado no-Gmail: ${employeeEmail}`)
       
-      // Crear carpeta principal de la empresa
-      const parentFolderName = `Empleados No-Gmail - ${companyName}`
-      let parentFolder = await this.findOrCreateParentFolder(parentFolderName)
+      // NUEVA ESTRUCTURA: Crear estructura de carpetas para la empresa
+      logger.info('GoogleDriveSyncService', `🔍 Creando estructura de carpetas para ${companyName}`)
+      const folderStructure = await this.createCompanyFolderStructure(companyName)
+      
+      // Usar la carpeta "No Gmail" como carpeta padre
+      const parentFolder = folderStructure.nonGmailFolder
+      logger.info('GoogleDriveSyncService', `📁 Usando carpeta padre: ${parentFolder.name} (${parentFolder.id})`)
 
       // Crear carpeta del empleado
-      const folderName = `${employeeName} (${employeeEmail}) - NO GMAIL`
+      const folderName = `${employeeName} (${employeeEmail})`
       const employeeFolder = await googleDriveConsolidatedService.createFolder(folderName, parentFolder.id)
 
       if (!employeeFolder || !employeeFolder.id) {
@@ -557,7 +564,67 @@ class GoogleDriveSyncService {
     } catch (error) {
       logger.error('GoogleDriveSyncService', `❌ Error buscando/creando carpeta ${folderName}: ${error.message}`)
       this.recordError(error.message)
-      throw error
+      throw error;
+    }
+  }
+/**
+   * NUEVA FUNCIONALIDAD: Crea la estructura de carpetas para una empresa
+   * Estructura: [Empresa] > [Gmail] y [No Gmail]
+   */
+  async createCompanyFolderStructure(companyName) {
+    try {
+      logger.info('GoogleDriveSyncService', `🔍 Creando estructura de carpetas para ${companyName}`);
+      
+      // 1. Crear o encontrar la carpeta principal de la empresa
+      const companyFolderName = `${companyName}`;
+      const companyFolder = await this.findOrCreateParentFolder(companyFolderName);
+      
+      // 2. Crear o encontrar la subcarpeta de Gmail
+      const gmailFolderName = 'Gmail';
+      const gmailFolder = await this.findOrCreateSubFolder(companyFolder.id, gmailFolderName);
+      
+      // 3. Crear o encontrar la subcarpeta de No Gmail
+      const nonGmailFolderName = 'No Gmail';
+      const nonGmailFolder = await this.findOrCreateSubFolder(companyFolder.id, nonGmailFolderName);
+      
+      logger.info('GoogleDriveSyncService', `✅ Estructura de carpetas creada para ${companyName}`);
+      
+      return {
+        companyFolder,
+        gmailFolder,
+        nonGmailFolder
+      };
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error creando estructura de carpetas para ${companyName}: ${error.message}`);
+      this.recordError(error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Busca o crea una subcarpeta dentro de una carpeta padre
+   */
+  async findOrCreateSubFolder(parentFolderId, subFolderName) {
+    try {
+      logger.info('GoogleDriveSyncService', `🔍 Buscando subcarpeta: ${subFolderName}`);
+      
+      const subFolders = await googleDriveConsolidatedService.listFiles(parentFolderId);
+      const subFolder = subFolders.find(folder =>
+        folder.name === subFolderName &&
+        folder.mimeType === 'application/vnd.google-apps.folder'
+      );
+
+      if (subFolder) {
+        logger.info('GoogleDriveSyncService', `✅ Subcarpeta encontrada: ${subFolder.id}`);
+        return subFolder;
+      }
+
+      logger.info('GoogleDriveSyncService', `📁 Creando nueva subcarpeta: ${subFolderName}`);
+      return await googleDriveConsolidatedService.createFolder(subFolderName, parentFolderId);
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error buscando/creando subcarpeta ${subFolderName}: ${error.message}`);
+      this.recordError(error.message);
+      throw error;
     }
   }
 
@@ -648,6 +715,124 @@ class GoogleDriveSyncService {
       logger.error('GoogleDriveSyncService', `❌ Error sincronizando archivos para ${employeeEmail}: ${error.message}`)
       this.recordError(error.message)
       throw error
+    }
+  }
+/**
+   * Sincroniza archivos de Supabase a Google Drive
+   */
+  async syncFilesToDrive(employeeEmail, folderId) {
+    try {
+      logger.info('GoogleDriveSyncService', `🔄 Sincronizando archivos de Supabase a Drive para ${employeeEmail}...`);
+      
+      // Verificar autenticación
+      if (!googleDriveAuthService.isAuthenticated()) {
+        const error = `❌ No se puede sincronizar archivos para ${employeeEmail}: Google Drive no está autenticado`;
+        logger.error('GoogleDriveSyncService', error);
+        this.recordError(error);
+        throw new Error(error);
+      }
+
+      // Obtener documentos de Supabase que no están en Google Drive
+      const { data: documents, error } = await supabase
+        .from('employee_documents')
+        .select('*')
+        .eq('folder_id', folderId)
+        .is('google_file_id', null);
+
+      if (error) {
+        logger.error('GoogleDriveSyncService', `❌ Error obteniendo documentos de Supabase: ${error.message}`);
+        this.recordError(error.message);
+        throw error;
+      }
+
+      if (!documents || documents.length === 0) {
+        logger.info('GoogleDriveSyncService', `ℹ️ No hay documentos para sincronizar en Supabase para ${employeeEmail}`);
+        return { synced: 0, errors: 0 };
+      }
+
+      logger.info('GoogleDriveSyncService', `📊 ${documents.length} documentos encontrados en Supabase`);
+
+      let synced = 0;
+      let errors = 0;
+
+      // Sincronizar cada documento
+      for (const document of documents) {
+        try {
+          logger.info('GoogleDriveSyncService', `📄 Procesando documento: ${document.document_name}`);
+          
+          // Crear archivo en Google Drive
+          const driveFile = await googleDriveConsolidatedService.createFile(
+            document.document_name,
+            document.document_type,
+            folderId,
+            document.file_url
+          );
+
+          if (driveFile && driveFile.id) {
+            // Actualizar documento en Supabase con el ID del archivo de Google Drive
+            const { error: updateError } = await supabase
+              .from('employee_documents')
+              .update({ google_file_id: driveFile.id })
+              .eq('id', document.id);
+
+            if (updateError) {
+              logger.warn('GoogleDriveSyncService', `⚠️ Error actualizando documento ${document.document_name}: ${updateError.message}`);
+              errors++;
+            } else {
+              synced++;
+              logger.info('GoogleDriveSyncService', `✅ Documento sincronizado: ${document.document_name}`);
+            }
+          } else {
+            logger.warn('GoogleDriveSyncService', `⚠️ No se pudo crear archivo en Google Drive: ${document.document_name}`);
+            errors++;
+          }
+        } catch (error) {
+          logger.error('GoogleDriveSyncService', `❌ Error procesando documento ${document.document_name}: ${error.message}`);
+          this.recordError(error.message);
+          errors++;
+        }
+      }
+
+      logger.info('GoogleDriveSyncService', `📊 Sincronización completada: ${synced} sincronizados, ${errors} errores`);
+      return { synced, errors };
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error sincronizando documentos para ${employeeEmail}: ${error.message}`);
+      this.recordError(error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Sincroniza carpetas primero con Supabase y luego desde Supabase a Google Drive
+   */
+  async syncDriveFromSupabase(employeeEmail, folderId) {
+    try {
+      logger.info('GoogleDriveSyncService', `🔄 Iniciando sincronización completa para ${employeeEmail}...`);
+      
+      // Paso 1: Sincronizar desde Google Drive a Supabase
+      logger.info('GoogleDriveSyncService', `📥 Paso 1: Sincronizando desde Google Drive a Supabase...`);
+      const driveToSupabaseResult = await this.syncFilesFromDrive(folderId, employeeEmail);
+      
+      // Paso 2: Sincronizar desde Supabase a Google Drive
+      logger.info('GoogleDriveSyncService', `📤 Paso 2: Sincronizando desde Supabase a Google Drive...`);
+      const supabaseToDriveResult = await this.syncFilesToDrive(employeeEmail, folderId);
+      
+      // Resultado combinado
+      const totalSynced = driveToSupabaseResult.synced + supabaseToDriveResult.synced;
+      const totalErrors = driveToSupabaseResult.errors + supabaseToDriveResult.errors;
+      
+      logger.info('GoogleDriveSyncService', `✅ Sincronización completa finalizada: ${totalSynced} sincronizados, ${totalErrors} errores`);
+      
+      return {
+        driveToSupabase: driveToSupabaseResult,
+        supabaseToDrive: supabaseToDriveResult,
+        totalSynced,
+        totalErrors
+      };
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error en sincronización completa para ${employeeEmail}: ${error.message}`);
+      this.recordError(error.message);
+      throw error;
     }
   }
 

@@ -32,6 +32,7 @@ const EmployeeFolders = () => {
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingFolders, setLoadingFolders] = useState(false);
+  const [syncingDrive, setSyncingDrive] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -609,6 +610,119 @@ const EmployeeFolders = () => {
         confirmButtonText: 'Aceptar',
         confirmButtonColor: '#0693e3'
       });
+    }
+  };
+/**
+   * Sincroniza las carpetas de empleados con Google Drive
+   */
+  const syncDriveFromSupabase = async () => {
+    try {
+      setSyncingDrive(true);
+      
+      // Verificar autenticación de Google Drive
+      if (!googleDriveTokenBridge.isAuthenticated()) {
+        MySwal.fire({
+          title: 'Autenticación requerida',
+          text: 'Necesitas autenticar tu cuenta de Google Drive para continuar.',
+          icon: 'warning',
+          showConfirmButton: true,
+          confirmButtonText: 'Autenticar'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            googleDriveTokenBridge.authenticate();
+          }
+        });
+        return;
+      }
+      
+      MySwal.fire({
+        title: 'Sincronizando con Google Drive...',
+        text: 'Por favor espera mientras se sincronizan las carpetas con Google Drive',
+        icon: 'info',
+        showConfirmButton: false,
+        allowOutsideClick: false
+      });
+
+      let syncedCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      // Obtener todas las carpetas de empleados
+      const { data: employeeFolders, error: foldersError } = await supabase
+        .from('employee_folders')
+        .select('*');
+
+      if (foldersError) {
+        throw new Error(`Error obteniendo carpetas: ${foldersError.message}`);
+      }
+
+      if (!employeeFolders || employeeFolders.length === 0) {
+        MySwal.fire({
+          title: 'No hay carpetas para sincronizar',
+          text: 'No se encontraron carpetas de empleados para sincronizar.',
+          icon: 'info',
+          showConfirmButton: true
+        });
+        return;
+      }
+
+      // Sincronizar cada carpeta
+      for (const folder of employeeFolders) {
+        try {
+          console.log(`🔄 Sincronizando carpeta: ${folder.employee_email}`);
+          
+          // Sincronizar archivos de la carpeta
+          const result = await googleDriveSyncService.syncDriveFromSupabase(
+            folder.employee_email,
+            folder.drive_folder_id
+          );
+
+          if (result && result.totalSynced !== undefined) {
+            syncedCount += result.totalSynced;
+            errorCount += result.totalErrors;
+            
+            if (result.totalErrors > 0) {
+              errors.push(`${folder.employee_email}: ${result.totalErrors} errores`);
+            }
+            
+            console.log(`✅ Sincronizada carpeta ${folder.employee_email}: ${result.totalSynced} archivos sincronizados`);
+          }
+
+          if (syncedCount % 5 === 0) {
+            console.log(`📊 Progreso: ${syncedCount} archivos sincronizados...`);
+          }
+
+        } catch (error) {
+          errorCount++;
+          errors.push(`${folder.employee_email}: ${error.message}`);
+          console.error(`❌ Error sincronizando carpeta ${folder.employee_email}:`, error);
+        }
+      }
+
+      // Mostrar resultado final
+      MySwal.fire({
+        title: 'Sincronización completada',
+        html: `
+          <div>
+            <p><strong>Archivos sincronizados:</strong> ${syncedCount}</p>
+            <p><strong>Errores:</strong> ${errorCount}</p>
+            ${errors.length > 0 ? `<details><summary>Ver errores</summary><ul>${errors.map(e => `<li>${e}</li>`).join('')}</ul></details>` : ''}
+          </div>
+        `,
+        icon: errorCount > 0 ? 'warning' : 'success',
+        showConfirmButton: true
+      });
+
+    } catch (error) {
+      console.error('Error en sincronización:', error);
+      MySwal.fire({
+        title: 'Error en la sincronización',
+        text: error.message,
+        icon: 'error',
+        showConfirmButton: true
+      });
+    } finally {
+      setSyncingDrive(false);
     }
   };
 
@@ -1297,7 +1411,7 @@ const EmployeeFolders = () => {
                           : 'No hay carpetas de empleados disponibles'}
                   </p>
                   {!searchTerm && !Object.values(filters).some(Boolean) && !loading && employees.length > 0 && (
-                    <div className="mt-6">
+                    <div className="mt-6 flex flex-col sm:flex-row gap-4">
                       <button
                         onClick={createAllEmployeeFolders}
                         disabled={loadingFolders}
@@ -1312,6 +1426,24 @@ const EmployeeFolders = () => {
                           <>
                             <FolderIcon className="h-5 w-5 mr-3" />
                             Crear Carpetas para Todos los Empleados
+                          </>
+                        )}
+                      </button>
+                      
+                      <button
+                        onClick={syncDriveFromSupabase}
+                        disabled={syncingDrive}
+                        className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {syncingDrive ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                            Sincronizando con Drive...
+                          </>
+                        ) : (
+                          <>
+                            <CloudArrowUpIcon className="h-5 w-5 mr-3" />
+                            Sincronizar con Google Drive
                           </>
                         )}
                       </button>
