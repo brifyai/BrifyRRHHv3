@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   CloudIcon,
   PuzzlePieceIcon,
@@ -6,6 +6,18 @@ import {
   ChatBubbleLeftRightIcon,
   BuildingStorefrontIcon
 } from '@heroicons/react/24/outline'
+
+// Importar los componentes de configuración
+import GoogleMeetConfig from '../integrations/GoogleMeetConfig.js'
+import SlackConfig from '../integrations/SlackConfig.js'
+import TeamsConfig from '../integrations/TeamsConfig.js'
+import HubSpotConfig from '../integrations/HubSpotConfig.js'
+import BrevoConfig from '../integrations/BrevoConfig.js'
+import GroqConfig from '../integrations/GroqConfig.js'
+import WhatsAppConfig from '../integrations/WhatsAppConfig.js'
+import WhatsAppOfficialConfig from '../integrations/WhatsAppOfficialConfig.js'
+import WhatsAppWahaConfig from '../integrations/WhatsAppWahaConfig.js'
+import TelegramConfig from '../integrations/TelegramConfig.js'
 
 const IntegrationsSection = ({
   integrations,
@@ -18,6 +30,29 @@ const IntegrationsSection = ({
   onDisconnectIntegration,
   getStatusBadge
 }) => {
+  // Estado para controlar qué componente de configuración se está mostrando
+  const [showConfig, setShowConfig] = useState(null)
+  
+  // Handler para mostrar el componente de configuración correspondiente
+  const handleShowConfig = (integrationId) => {
+    setShowConfig(integrationId)
+  }
+  
+  // Handler para cerrar el componente de configuración
+  const handleCloseConfig = () => {
+    setShowConfig(null)
+  }
+  
+  // Handler para guardar la configuración
+  const handleSaveConfig = (integrationId, config) => {
+    // Aquí se guardaría la configuración en el estado global o en la base de datos
+    console.log(`Guardando configuración para ${integrationId}:`, config)
+    setShowConfig(null)
+    
+    // Actualizar el estado de la integración para reflejar que está conectada
+    onConfigureIntegration(integrationId, config)
+  }
+  
   const integrationCards = [
     {
       id: 'google',
@@ -35,7 +70,7 @@ const IntegrationsSection = ({
       description: 'Videoconferencias',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-green-500 to-green-600',
-      action: () => onConfigureIntegration('googlemeet')
+      action: () => handleShowConfig('googlemeet')
     },
     {
       id: 'slack',
@@ -43,7 +78,7 @@ const IntegrationsSection = ({
       description: 'Notificaciones colaborativas',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-purple-500 to-purple-600',
-      action: () => onConfigureIntegration('slack')
+      action: () => handleShowConfig('slack')
     },
     {
       id: 'teams',
@@ -51,7 +86,7 @@ const IntegrationsSection = ({
       description: 'Notificaciones empresariales',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-indigo-500 to-indigo-600',
-      action: () => onConfigureIntegration('teams')
+      action: () => handleShowConfig('teams')
     },
     {
       id: 'hubspot',
@@ -59,7 +94,7 @@ const IntegrationsSection = ({
       description: 'CRM y marketing',
       icon: BuildingStorefrontIcon,
       gradient: 'from-orange-500 to-orange-600',
-      action: () => onConfigureIntegration('hubspot')
+      action: () => handleShowConfig('hubspot')
     },
     {
       id: 'brevo',
@@ -67,7 +102,7 @@ const IntegrationsSection = ({
       description: 'SMS y Email Masivo',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-blue-500 to-blue-600',
-      action: () => onConfigureIntegration('brevo')
+      action: () => handleShowConfig('brevo')
     },
     {
       id: 'groq',
@@ -75,7 +110,7 @@ const IntegrationsSection = ({
       description: 'Inteligencia Artificial',
       icon: PuzzlePieceIcon,
       gradient: 'from-teal-500 to-teal-600',
-      action: () => onConfigureIntegration('groq')
+      action: () => handleShowConfig('groq')
     },
     {
       id: 'whatsapp',
@@ -83,7 +118,7 @@ const IntegrationsSection = ({
       description: 'Mensajería empresarial',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-green-500 to-green-600',
-      action: () => onConfigureIntegration('whatsapp')
+      action: () => handleShowConfig('whatsapp')
     },
     {
       id: 'whatsappOfficial',
@@ -91,7 +126,7 @@ const IntegrationsSection = ({
       description: 'API oficial de WhatsApp',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-green-500 to-green-600',
-      action: () => onConfigureIntegration('whatsappOfficial')
+      action: () => handleShowConfig('whatsappOfficial')
     },
     {
       id: 'whatsappWaha',
@@ -99,7 +134,7 @@ const IntegrationsSection = ({
       description: 'API alternativa de WhatsApp',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-purple-500 to-purple-600',
-      action: () => onConfigureIntegration('whatsappWaha')
+      action: () => handleShowConfig('whatsappWaha')
     },
     {
       id: 'telegram',
@@ -107,12 +142,60 @@ const IntegrationsSection = ({
       description: 'Mensajería segura',
       icon: ChatBubbleLeftRightIcon,
       gradient: 'from-blue-500 to-blue-600',
-      action: () => onConfigureIntegration('telegram')
+      action: () => handleShowConfig('telegram')
     }
   ]
 
   const handleHierarchyModeChange = (newMode) => {
     onConfigureIntegration('hierarchy', newMode)
+  }
+  
+  // Renderizar el componente de configuración correspondiente
+  const renderConfigComponent = () => {
+    switch (showConfig) {
+      case 'googlemeet':
+        return <GoogleMeetConfig onSave={(config) => handleSaveConfig('googlemeet', config)} onCancel={handleCloseConfig} />
+      case 'slack':
+        return <SlackConfig onSave={(config) => handleSaveConfig('slack', config)} onCancel={handleCloseConfig} />
+      case 'teams':
+        return <TeamsConfig onSave={(config) => handleSaveConfig('teams', config)} onCancel={handleCloseConfig} />
+      case 'hubspot':
+        return <HubSpotConfig onSave={(config) => handleSaveConfig('hubspot', config)} onCancel={handleCloseConfig} />
+      case 'brevo':
+        return <BrevoConfig onSave={(config) => handleSaveConfig('brevo', config)} onCancel={handleCloseConfig} />
+      case 'groq':
+        return <GroqConfig onSave={(config) => handleSaveConfig('groq', config)} onCancel={handleCloseConfig} />
+      case 'whatsapp':
+        return <WhatsAppConfig onSave={(config) => handleSaveConfig('whatsapp', config)} onCancel={handleCloseConfig} />
+      case 'whatsappOfficial':
+        return <WhatsAppOfficialConfig onSave={(config) => handleSaveConfig('whatsappOfficial', config)} onCancel={handleCloseConfig} />
+      case 'whatsappWaha':
+        return <WhatsAppWahaConfig onSave={(config) => handleSaveConfig('whatsappWaha', config)} onCancel={handleCloseConfig} />
+      case 'telegram':
+        return <TelegramConfig onSave={(config) => handleSaveConfig('telegram', config)} onCancel={handleCloseConfig} />
+      default:
+        return null
+    }
+  }
+
+  // Si se está mostrando un componente de configuración, renderizarlo
+  if (showConfig) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <button 
+            onClick={handleCloseConfig}
+            className="flex items-center text-blue-600 hover:text-blue-800"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            </svg>
+            Volver a integraciones
+          </button>
+        </div>
+        {renderConfigComponent()}
+      </div>
+    )
   }
 
   return (
