@@ -466,14 +466,27 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
   const handleToggleCompanyStatus = async (company) => {
     try {
       const newStatus = company.status === 'active' ? 'inactive' : 'active'
+      
+      // Actualizar en la base de datos
       await companySyncService.updateCompany(company.id, { status: newStatus })
+      
+      // Actualizar estado local inmediatamente para feedback visual
       setCompanies(prev => prev.map(c =>
         c.id === company.id ? { ...c, status: newStatus, updated_at: new Date().toISOString() } : c
       ))
+      
+      // Refrescar datos desde la base de datos para asegurar sincronización
+      await loadCompanies()
+      
       toast.success(`Empresa ${newStatus === 'active' ? 'activada' : 'desactivada'}`)
     } catch (error) {
       console.error('Error toggling company status:', error)
       toast.error('Error al cambiar el estado de la empresa')
+      
+      // Revertir cambio local en caso de error
+      setCompanies(prev => prev.map(c =>
+        c.id === company.id ? { ...c, status: company.status, updated_at: new Date().toISOString() } : c
+      ))
     }
   }
 

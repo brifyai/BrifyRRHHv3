@@ -280,6 +280,21 @@ class MultiWhatsAppService {
     try {
       console.log(`📤 Enviando mensaje WhatsApp para empresa ${companyId}`);
       
+      // NUEVA FUNCIONALIDAD: Verificar estado de la empresa
+      const companyStatusService = await import('./companyStatusVerificationService.js');
+      const companyStatus = await companyStatusService.default.isCompanyActive(companyId);
+      
+      if (!companyStatus.isActive) {
+        // Registrar intento bloqueado
+        await companyStatusService.default.logBlockedCommunication(companyId, 'whatsapp', {
+          userAgent: params.userAgent,
+          ipAddress: params.ipAddress,
+          messagePreview: params.message?.substring(0, 100)
+        });
+        
+        throw new Error(`No se puede enviar mensaje: ${companyStatus.reason}`);
+      }
+
       // Obtener configuración de la empresa
       const config = await this.getWhatsAppConfigByCompany(companyId);
       
@@ -319,7 +334,8 @@ class MultiWhatsAppService {
         success: false,
         message: `Error enviando mensaje: ${error.message}`,
         error: error.message,
-        companyId
+        companyId,
+        blocked: error.message.includes('No se puede enviar mensaje') // Marcar si fue bloqueado por estado
       };
     }
   }
