@@ -302,28 +302,24 @@ const EmployeeFolders = () => {
       setLoadingFolders(true);
       console.log(`📁 Cargando carpetas reales desde la base de datos...`);
       
-      // Primero intentar cargar carpetas reales desde la base de datos con sus relaciones
+      // Primero intentar cargar carpetas reales desde la base de datos SIN relaciones problemáticas
       let realFolders = [];
       try {
         const { data: employeeFolders, error } = await supabase
           .from('employee_folders')
-          .select(`
-            *,
-            employee_documents(id, document_name, document_type, description, status),
-            employee_faqs(id, question, answer, category, status)
-          `)
+          .select('*')
           .order('created_at', { ascending: false });
 
         if (!error && employeeFolders) {
           console.log(`✅ Encontradas ${employeeFolders.length} carpetas reales en la base de datos`);
-          console.log('📊 Muestra de carpetas reales con relaciones:', employeeFolders.slice(0, 3).map(f => ({
+          console.log('📊 Muestra de carpetas reales:', employeeFolders.slice(0, 3).map(f => ({
             email: f.employee_email,
-            documents_count: f.employee_documents?.length || 0,
-            faqs_count: f.employee_faqs?.length || 0
+            name: f.employee_name,
+            company: f.company_name
           })));
           realFolders = employeeFolders;
         } else if (error) {
-          console.warn('⚠️ No se pudieron cargar carpetas reales, usando datos de empleados:', error.message);
+          console.warn('⚠️ No se pudieron cargar carpetas reales:', error.message);
         }
       } catch (dbError) {
         console.warn('⚠️ Error consultando carpetas reales:', dbError.message);
@@ -336,50 +332,19 @@ const EmployeeFolders = () => {
         foldersToShow = realFolders.map(folder => {
           const employee = employees.find(emp => emp.email === folder.employee_email);
           
-          // Construir knowledgeBase 100% real desde las relaciones de la base de datos
+          // Construir knowledgeBase básico (sin relaciones problemáticas)
           const knowledgeBase = {
-            faqs: (folder.employee_faqs || [])
-              .filter(faq => faq.status === 'active')
-              .map(faq => ({
-                id: faq.id,
-                question: faq.question,
-                answer: faq.answer,
-                category: faq.category,
-                type: 'faq'
-              })),
-            documents: (folder.employee_documents || [])
-              .filter(doc => doc.status === 'active')
-              .map(doc => ({
-                id: doc.id,
-                name: doc.document_name,
-                description: doc.description,
-                type: doc.document_type,
-                fileType: doc.document_type,
-                category: doc.document_type
-              })),
-            policies: (folder.employee_documents || [])
-              .filter(doc => doc.status === 'active' && doc.document_type === 'policy')
-              .map(doc => ({
-                id: doc.id,
-                name: doc.document_name,
-                description: doc.description,
-                type: 'policy'
-              })),
-            procedures: (folder.employee_documents || [])
-              .filter(doc => doc.status === 'active' && doc.document_type === 'procedure')
-              .map(doc => ({
-                id: doc.id,
-                name: doc.document_name,
-                description: doc.description,
-                type: 'procedure'
-              }))
+            faqs: [],
+            documents: [],
+            policies: [],
+            procedures: []
           };
           
-          console.log(`📊 Carpeta ${folder.employee_email}:`, {
-            faqs: knowledgeBase.faqs.length,
-            documents: knowledgeBase.documents.length,
-            policies: knowledgeBase.policies.length,
-            procedures: knowledgeBase.procedures.length
+          console.log(`📊 Carpeta real ${folder.employee_email}:`, {
+            name: folder.employee_name,
+            company: folder.company_name,
+            hasKnowledgeBase: true,
+            knowledgeBaseReady: 'Preparado para contenido futuro'
           });
           
           return {
