@@ -1,233 +1,199 @@
+import React, { useState, useEffect } from 'react'
+import resourceRecoveryService from '../../lib/resourceRecoveryService.js'
+
 /**
- * Componente de Monitoreo del Sistema de Recuperación de Recursos
- * Muestra estado en tiempo real y permite diagnóstico manual
+ * 🔥 MONITOR DE RECUPERACIÓN DE RECURSOS EN TIEMPO REAL
+ * 
+ * Componente que muestra el estado del sistema y permite monitoreo
+ * de los errores ERR_INSUFFICIENT_RESOURCES y ChunkLoadError
  */
 
-import React, { useState, useEffect } from 'react';
-import resourceRecoveryService from '../../lib/resourceRecoveryService.js';
-
 const ResourceRecoveryMonitor = () => {
-  const [systemStatus, setSystemStatus] = useState(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [logs, setLogs] = useState([]);
+  const [systemStatus, setSystemStatus] = useState(resourceRecoveryService.getSystemStatus())
+  const [logs, setLogs] = useState([])
+  const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
     // Actualizar estado cada 2 segundos
     const interval = setInterval(() => {
-      const status = resourceRecoveryService.getSystemStatus();
-      setSystemStatus(status);
-    }, 2000);
+      const status = resourceRecoveryService.getSystemStatus()
+      setSystemStatus(status)
+      
+      // Agregar log si hay cambios importantes
+      if (status.emergencyMode || status.resourcePressure > 75) {
+        setLogs(prev => [{
+          timestamp: new Date().toLocaleTimeString(),
+          level: status.emergencyMode ? 'ERROR' : 'WARNING',
+          message: `Presión de recursos: ${status.resourcePressure}%`,
+          details: status
+        }, ...prev.slice(0, 9)]) // Mantener solo los últimos 10 logs
+      }
+    }, 2000)
 
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleManualRecovery = async () => {
-    try {
-      await resourceRecoveryService.initiateRecovery();
-      alert('🔄 Recuperación manual iniciada. Revisa los logs para más detalles.');
-    } catch (error) {
-      alert(`❌ Error en recuperación manual: ${error.message}`);
-    }
-  };
-
-  const handleClearCache = async () => {
-    try {
-      await resourceRecoveryService.clearBrowserCache();
-      await resourceRecoveryService.cleanupLocalStorage();
-      alert('✅ Caché y localStorage limpiados exitosamente');
-    } catch (error) {
-      alert(`❌ Error limpiando caché: ${error.message}`);
-    }
-  };
+    return () => clearInterval(interval)
+  }, [])
 
   const getStatusColor = () => {
-    if (!systemStatus) return 'gray';
-    if (systemStatus.isRecovering) return 'orange';
-    if (systemStatus.recoveryAttempts > 0) return 'yellow';
-    return 'green';
-  };
+    if (systemStatus.emergencyMode) return 'text-red-600'
+    if (systemStatus.resourcePressure > 75) return 'text-orange-600'
+    if (systemStatus.resourcePressure > 50) return 'text-yellow-600'
+    return 'text-green-600'
+  }
 
-  const getStatusText = () => {
-    if (!systemStatus) return 'Cargando...';
-    if (systemStatus.isRecovering) return '🔄 Recuperando...';
-    if (systemStatus.recoveryAttempts > 0) return `⚠️ ${systemStatus.recoveryAttempts} intentos`;
-    return '✅ Sistema estable';
-  };
+  const getStatusIcon = () => {
+    if (systemStatus.emergencyMode) return '🚨'
+    if (systemStatus.resourcePressure > 75) return '⚠️'
+    if (systemStatus.resourcePressure > 50) return '🟡'
+    return '✅'
+  }
+
+  const getPressureBarColor = () => {
+    if (systemStatus.emergencyMode) return 'bg-red-500'
+    if (systemStatus.resourcePressure > 75) return 'bg-orange-500'
+    if (systemStatus.resourcePressure > 50) return 'bg-yellow-500'
+    return 'bg-green-500'
+  }
+
+  const handleDebug = () => {
+    console.log('Estado actual:', resourceRecoveryService.getSystemStatus())
+    alert('Estado del sistema logged en consola')
+  }
+
+  const handleRecovery = () => {
+    if (window.confirm && window.confirm('¿Forzar recuperación del sistema?')) {
+      resourceRecoveryService.attemptRecovery()
+    } else {
+      // Fallback para entornos sin confirm
+      resourceRecoveryService.attemptRecovery()
+    }
+  }
+
+  const handleClear = () => {
+    if (window.confirm && window.confirm('¿Limpiar chunks fallidos?')) {
+      resourceRecoveryService.failedChunks.clear()
+      resourceRecoveryService.chunkRetryCounts.clear()
+      setLogs([])
+    } else {
+      // Fallback para entornos sin confirm
+      resourceRecoveryService.failedChunks.clear()
+      resourceRecoveryService.chunkRetryCounts.clear()
+      setLogs([])
+    }
+  }
 
   if (!isVisible) {
     return (
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          zIndex: 9999,
-          background: `linear-gradient(135deg, #${getStatusColor() === 'green' ? '10b981' : getStatusColor() === 'orange' ? 'f59e0b' : getStatusColor() === 'yellow' ? 'eab308' : '6b7280'}, #${getStatusColor() === 'green' ? '059669' : getStatusColor() === 'orange' ? 'd97706' : getStatusColor() === 'yellow' ? 'ca8a04' : '4b5563'})`,
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '12px',
-          fontWeight: 'bold',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          transition: 'all 0.3s ease'
-        }}
+      <button
         onClick={() => setIsVisible(true)}
-        title="Sistema de Recuperación de Recursos - Click para detalles"
+        className="fixed bottom-4 right-4 z-50 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition-colors"
+        title="Abrir Monitor de Recursos"
       >
-        {getStatusText()}
-      </div>
-    );
+        {getStatusIcon()}
+      </button>
+    )
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        zIndex: 9999,
-        background: 'white',
-        border: '2px solid #e5e7eb',
-        borderRadius: '12px',
-        padding: '16px',
-        width: '350px',
-        maxHeight: '400px',
-        overflow: 'auto',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-        fontSize: '14px'
-      }}
-    >
+    <div className="fixed bottom-4 right-4 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-80 max-h-96 overflow-hidden">
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px',
-        paddingBottom: '8px',
-        borderBottom: '1px solid #e5e7eb'
-      }}>
-        <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>
-          🔧 Sistema de Recuperación
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-800 flex items-center">
+          {getStatusIcon()}
+          <span className="ml-2">Monitor de Recursos</span>
         </h3>
         <button
           onClick={() => setIsVisible(false)}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: '18px',
-            cursor: 'pointer',
-            color: '#6b7280'
-          }}
+          className="text-gray-400 hover:text-gray-600"
         >
-          ×
+          ✕
         </button>
       </div>
 
-      {/* Status */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-          <div
-            style={{
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              backgroundColor: getStatusColor() === 'green' ? '#10b981' : getStatusColor() === 'orange' ? '#f59e0b' : getStatusColor() === 'yellow' ? '#eab308' : '#6b7280',
-              marginRight: '8px'
-            }}
-          />
-          <span style={{ fontWeight: 'bold' }}>{getStatusText()}</span>
+      {/* Estado del Sistema */}
+      <div className="space-y-2 mb-3">
+        <div className="flex justify-between text-sm">
+          <span>Modo Emergencia:</span>
+          <span className={getStatusColor()}>
+            {systemStatus.emergencyMode ? 'ACTIVO' : 'Inactivo'}
+          </span>
         </div>
-
-        {systemStatus && (
-          <div style={{ fontSize: '12px', color: '#6b7280', marginLeft: '20px' }}>
-            <div>Intentos: {systemStatus.recoveryAttempts}/{systemStatus.maxRecoveryAttempts}</div>
-            {systemStatus.memoryUsage && (
-              <div>
-                Memoria: {systemStatus.memoryUsage.used}MB / {systemStatus.memoryUsage.limit}MB
-              </div>
-            )}
-            <div>Conexión: {systemStatus.connection}</div>
-          </div>
-        )}
+        
+        <div className="flex justify-between text-sm">
+          <span>Requests Activos:</span>
+          <span className="text-blue-600">
+            {systemStatus.activeRequests}/{systemStatus.maxConcurrentRequests}
+          </span>
+        </div>
+        
+        <div className="flex justify-between text-sm">
+          <span>Chunks Fallidos:</span>
+          <span className="text-orange-600">
+            {systemStatus.failedChunks.length}
+          </span>
+        </div>
       </div>
 
-      {/* Memory Usage Bar */}
-      {systemStatus?.memoryUsage && (
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '12px', marginBottom: '4px' }}>Uso de Memoria</div>
-          <div style={{
-            width: '100%',
-            height: '8px',
-            backgroundColor: '#e5e7eb',
-            borderRadius: '4px',
-            overflow: 'hidden'
-          }}>
-            <div
-              style={{
-                width: `${(systemStatus.memoryUsage.used / systemStatus.memoryUsage.limit) * 100}%`,
-                height: '100%',
-                backgroundColor: systemStatus.memoryUsage.used / systemStatus.memoryUsage.limit > 0.8 ? '#ef4444' : 
-                               systemStatus.memoryUsage.used / systemStatus.memoryUsage.limit > 0.6 ? '#f59e0b' : '#10b981',
-                transition: 'width 0.3s ease'
-              }}
-            />
+      {/* Barra de Presión de Recursos */}
+      <div className="mb-3">
+        <div className="flex justify-between text-xs text-gray-600 mb-1">
+          <span>Presión de Recursos</span>
+          <span>{systemStatus.resourcePressure}%</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className={`h-2 rounded-full transition-all duration-500 ${getPressureBarColor()}`}
+            style={{ width: `${systemStatus.resourcePressure}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {/* Logs Recientes */}
+      {logs.length > 0 && (
+        <div className="border-t pt-3">
+          <h4 className="text-xs font-semibold text-gray-600 mb-2">Logs Recientes</h4>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {logs.map((log, index) => (
+              <div key={index} className="text-xs">
+                <div className="flex justify-between">
+                  <span className={`font-medium ${
+                    log.level === 'ERROR' ? 'text-red-600' : 'text-orange-600'
+                  }`}>
+                    {log.level}
+                  </span>
+                  <span className="text-gray-400">{log.timestamp}</span>
+                </div>
+                <div className="text-gray-600 truncate">{log.message}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      {/* Acciones */}
+      <div className="border-t pt-3 mt-3 flex space-x-2">
         <button
-          onClick={handleManualRecovery}
-          style={{
-            flex: 1,
-            padding: '8px',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}
+          onClick={handleDebug}
+          className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs py-1 px-2 rounded"
         >
-          🔄 Recuperar
+          Debug
         </button>
+        
         <button
-          onClick={handleClearCache}
-          style={{
-            flex: 1,
-            padding: '8px',
-            backgroundColor: '#10b981',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: 'bold'
-          }}
+          onClick={handleRecovery}
+          className="flex-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs py-1 px-2 rounded"
         >
-          🧹 Limpiar
+          Recuperar
         </button>
-      </div>
-
-      {/* Info */}
-      <div style={{
-        fontSize: '11px',
-        color: '#6b7280',
-        backgroundColor: '#f9fafb',
-        padding: '8px',
-        borderRadius: '6px'
-      }}>
-        <strong>¿Qué hace este sistema?</strong><br />
-        • Detecta errores de recursos insuficientes<br />
-        • Limpia caché automáticamente<br />
-        • Recarga chunks fallidos<br />
-        • Optimiza para conexiones lentas
+        
+        <button
+          onClick={handleClear}
+          className="flex-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs py-1 px-2 rounded"
+        >
+          Limpiar
+        </button>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ResourceRecoveryMonitor;
+export default ResourceRecoveryMonitor

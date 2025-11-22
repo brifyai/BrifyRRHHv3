@@ -5,7 +5,6 @@
 
 import { supabase } from '../lib/supabaseClient.js'
 import superLockService from '../lib/superLockService.js'
-import organizedDatabaseService from './organizedDatabaseService.js'
 import googleDriveConsolidatedService from '../lib/googleDriveConsolidated.js'
 
 class UnifiedEmployeeFolderService {
@@ -43,378 +42,320 @@ class UnifiedEmployeeFolderService {
   }
 
   /**
+   * NORMALIZAR EMAIL PARA MANEJAR CARACTERES ESPECIALES DEL ESPAÑOL
+   */
+  normalizeEmail(email) {
+    if (!email) return ''
+    
+    return email
+      .toLowerCase()
+      .trim()
+      .normalize('NFD') // Separar caracteres con diacríticos
+      .replace(/[\u0300-\u036f]/g, '') // Remover diacríticos (tildes, acentos)
+      .replace(/ñ/g, 'n') // Convertir ñ a n
+      .replace(/Ñ/g, 'N') // Convertir Ñ a N
+  }
+
+  /**
    * INICIALIZAR GOOGLE DRIVE CONSOLIDADO
    */
   async initializeGoogleDrive(userId) {
     if (this.driveInitialized) return true
     
     try {
-      const success = await googleDriveConsolidatedService.initialize(userId)
-      if (success) {
-        this.driveInitialized = true
-        console.log(`✅ GoogleDriveConsolidated inicializado para servicio unificado`)
-        return true
-      }
-      return false
+      console.log('🚀 Inicializando Google Drive para usuario:', userId)
+      
+      await googleDriveConsolidatedService.initialize(userId)
+      
+      this.driveInitialized = true
+      console.log('✅ Google Drive inicializado')
+      return true
     } catch (error) {
-      console.error('❌ Error inicializando Google Drive Consolidado:', error)
+      console.error('❌ Error inicializando Google Drive:', error)
       return false
     }
   }
 
   /**
-   * CREAR CARPETA CON SUPER LOCK OBLIGATORIO
+   * INICIALIZAR HYBRID DRIVE
    */
-  async createEmployeeFolder(employeeEmail, employeeData, userId) {
-    return await superLockService.withSuperLock(
-      employeeEmail,
-      async () => {
-        await this.initialize()
-        await this.initializeGoogleDrive(userId)
-        
-        // 1. VERIFICAR SI YA EXISTE EN SUPABASE
-        const existingSupabase = await this.checkSupabaseExists(employeeEmail)
-        if (existingSupabase) {
-          console.log(`📂 Carpeta ya existe en Supabase para ${employeeEmail}`)
-          return {
-            folder: existingSupabase,
-            created: false,
-            updated: false,
-            alreadyExists: true
-          }
-        }
-
-        // 2. VERIFICAR SI YA EXISTE EN GOOGLE DRIVE
-        const existingDrive = await this.checkDriveExists(employeeEmail, employeeData.name)
-        if (existingDrive) {
-          console.log(`📂 Carpeta ya existe en Drive para ${employeeEmail}`)
-          
-          // Crear registro en Supabase con datos de Drive existente
-          const folderData = await this.createSupabaseRecord(employeeEmail, employeeData, existingDrive.id, existingDrive.webViewLink)
-          return {
-            folder: folderData,
-            created: true,
-            updated: false,
-            alreadyExistedInDrive: true
-          }
-        }
-
-        // 3. CREAR NUEVA CARPETA
-        const newFolder = await this.createNewFolder(employeeEmail, employeeData, userId)
-        return {
-          folder: newFolder,
-          created: true,
-          updated: false,
-          newlyCreated: true
-        }
-      },
-      'create_folder_unified'
-    )
+  async initializeHybridDrive() {
+    try {
+      console.log('🚀 Inicializando Hybrid Drive...')
+      await googleDriveConsolidatedService.initialize()
+      this.hybridDriveInitialized = true
+      console.log('✅ Hybrid Drive inicializado')
+    } catch (error) {
+      console.warn('⚠️ Hybrid Drive no disponible:', error.message)
+      this.hybridDriveInitialized = false
+    }
   }
 
   /**
-   * VERIFICAR EXISTENCIA EN SUPABASE
+   * OBTENER TODAS LAS CARPETAS
    */
-  async checkSupabaseExists(employeeEmail) {
+  async getAllFolders() {
     try {
-      const { data, error } = await supabase
+      console.log('📁 Obteniendo todas las carpetas de empleados...')
+      
+      // Primero obtener las carpetas
+      const { data: folders, error: foldersError } = await supabase
         .from('employee_folders')
         .select('*')
-        .eq('employee_email', employeeEmail)
-        .maybeSingle()
+        .order('created_at', { ascending: false })
 
-      if (error && error.code !== 'PGRST116') {
-        console.warn(`⚠️ Error verificando Supabase para ${employeeEmail}:`, error.message)
-        return null
+      if (foldersError) {
+        console.error('❌ Error obteniendo carpetas:', foldersError)
+        throw foldersError
       }
 
-      return data
-    } catch (error) {
-      console.warn(`⚠️ Error verificando Supabase para ${employeeEmail}:`, error.message)
-      return null
-    }
-  }
-
-  /**
-   * VERIFICAR EXISTENCIA EN GOOGLE DRIVE
-   */
-  async checkDriveExists(employeeEmail, employeeName) {
-    try {
-      if (!this.driveInitialized) {
-        console.log(`⚠️ Drive no inicializado para ${employeeEmail}`)
-        return null
+      if (!folders || folders.length === 0) {
+        console.log('⚠️ No se encontraron carpetas')
+        return []
       }
 
-      const companyName = 'Empresa' // Se puede obtener de employeeData
-      
-      // Buscar carpeta principal de la empresa
-      const parentFolderName = `${companyName}/Empleados`
-      const folders = await googleDriveConsolidatedService.listFiles()
-      const parentFolder = folders.find(folder =>
-        folder.name === parentFolderName &&
-        folder.mimeType === 'application/vnd.google-apps.folder'
-      )
+      console.log(`📦 Obtenidas ${folders.length} carpetas, vinculando datos de empleados...`)
 
-      if (!parentFolder) {
-        console.log(`📁 No se encontró carpeta principal para ${employeeEmail}`)
-        return null
+      // Obtener todos los empleados para vincular por email
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('*')
+
+      if (employeesError) {
+        console.warn('⚠️ Error obteniendo empleados:', employeesError)
+        // Continuar sin datos de empleados
       }
 
-      // Buscar carpeta del empleado
-      const folderName = `${employeeName} (${employeeEmail})`
-      const employeeFiles = await googleDriveConsolidatedService.listFiles(parentFolder.id)
-      const existingFolder = employeeFiles.find(file =>
-        file.name === folderName &&
-        file.mimeType === 'application/vnd.google-apps.folder'
-      )
-
-      return existingFolder || null
-    } catch (error) {
-      console.warn(`⚠️ Error verificando Drive para ${employeeEmail}:`, error.message)
-      return null
-    }
-  }
-
-  /**
-   * CREAR NUEVA CARPETA
-   */
-  async createNewFolder(employeeEmail, employeeData, userId) {
-    try {
-      const companyName = await this.getCompanyName(employeeData.company_id)
-      
-      // 1. CREAR CARPETA EN GOOGLE DRIVE
-      const driveFolder = await this.createDriveFolder(employeeEmail, employeeData.name, companyName, userId)
-      
-      // 2. CREAR REGISTRO EN SUPABASE
-      const supabaseRecord = await this.createSupabaseRecord(
-        employeeEmail,
-        employeeData,
-        driveFolder.id,
-        driveFolder.webViewLink || `https://drive.google.com/drive/folders/${driveFolder.id}`
-      )
-      
-      // 3. COMPARTIR CARPETA
-      await this.shareDriveFolder(driveFolder.id, employeeEmail, userId)
-      
-      console.log(`✅ Carpeta creada exitosamente para ${employeeEmail}`)
-      return supabaseRecord
-    } catch (error) {
-      console.error(`❌ Error creando carpeta para ${employeeEmail}:`, error)
-      throw error
-    }
-  }
-
-  /**
-   * CREAR CARPETA EN GOOGLE DRIVE
-   */
-  async createDriveFolder(employeeEmail, employeeName, companyName, userId) {
-    try {
-      const parentFolderName = `${companyName}/Empleados`
-      
-      // Buscar o crear carpeta principal
-      let parentFolder = await this.findOrCreateParentFolder(parentFolderName, userId)
-      
-      // Crear carpeta del empleado
-      const folderName = `${employeeName} (${employeeEmail})`
-      const employeeFolder = await googleDriveConsolidatedService.createFolder(folderName, parentFolder.id)
-      
-      return employeeFolder
-    } catch (error) {
-      console.error(`❌ Error creando carpeta en Drive para ${employeeEmail}:`, error)
-      throw error
-    }
-  }
-
-  /**
-   * BUSCAR O CREAR CARPETA PRINCIPAL
-   */
-  async findOrCreateParentFolder(folderName, userId) {
-    try {
-      const folders = await googleDriveConsolidatedService.listFiles()
-      const parentFolder = folders.find(folder =>
-        folder.name === folderName &&
-        folder.mimeType === 'application/vnd.google-apps.folder'
-      )
-
-      if (parentFolder) {
-        return parentFolder
-      } else {
-        return await googleDriveConsolidatedService.createFolder(folderName)
-      }
-    } catch (error) {
-      console.error(`❌ Error buscando/creando carpeta principal ${folderName}:`, error)
-      throw error
-    }
-  }
-
-  /**
-   * CREAR REGISTRO EN SUPABASE
-   */
-  async createSupabaseRecord(employeeEmail, employeeData, driveFolderId, driveFolderUrl) {
-    try {
-      const companyName = await this.getCompanyName(employeeData.company_id)
-      
-      const folderData = {
-        employee_email: employeeEmail,
-        employee_id: employeeData.id,
-        employee_name: employeeData.name,
-        employee_position: employeeData.position,
-        employee_department: employeeData.department,
-        employee_phone: employeeData.phone,
-        employee_region: employeeData.region,
-        employee_level: employeeData.level,
-        employee_work_mode: employeeData.work_mode,
-        employee_contract_type: employeeData.contract_type,
-        company_id: employeeData.company_id,
-        company_name: companyName,
-        drive_folder_id: driveFolderId,
-        drive_folder_url: driveFolderUrl,
-        settings: {
-          notificationPreferences: {
-            whatsapp: true,
-            telegram: true,
-            email: true
-          },
-          responseLanguage: 'es',
-          timezone: 'America/Santiago'
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('employee_folders')
-        .insert(folderData)
-        .select()
-        .single()
-
-      if (error) throw error
-
-      // Crear configuración de notificaciones
-      await this.createNotificationSettings(data.id)
-
-      return data
-    } catch (error) {
-      console.error(`❌ Error creando registro en Supabase para ${employeeEmail}:`, error)
-      throw error
-    }
-  }
-
-  /**
-   * COMPARTIR CARPETA
-   */
-  async shareDriveFolder(folderId, employeeEmail, userId) {
-    try {
-      await googleDriveConsolidatedService.shareFolder(folderId, employeeEmail, 'writer')
-      console.log(`📤 Carpeta compartida con ${employeeEmail}`)
-    } catch (error) {
-      console.warn(`⚠️ No se pudo compartir carpeta con ${employeeEmail}:`, error.message)
-    }
-  }
-
-  /**
-   * CREAR CONFIGURACIÓN DE NOTIFICACIONES
-   */
-  async createNotificationSettings(folderId) {
-    try {
-      const { error } = await supabase
-        .from('employee_notification_settings')
-        .insert({
-          folder_id: folderId,
-          whatsapp_enabled: true,
-          telegram_enabled: true,
-          email_enabled: true,
-          response_language: 'es',
-          timezone: 'America/Santiago',
-          notification_preferences: {
-            whatsapp: true,
-            telegram: true,
-            email: true
+      // Crear mapa de empleados por email para vinculación rápida
+      const employeesMap = new Map()
+      if (employees) {
+        employees.forEach(emp => {
+          if (emp.email) {
+            employeesMap.set(this.normalizeEmail(emp.email), emp)
           }
         })
+      }
 
-      if (error) throw error
+      // Transformar los datos vinculando empleados por email
+      const transformedFolders = folders.map(folder => {
+        const employee = employeesMap.get(this.normalizeEmail(folder.employee_email))
+        
+        return {
+          ...folder,
+          employeeName: employee?.name || folder.employee_email || 'Empleado sin nombre',
+          employeeEmail: folder.employee_email || '',
+          department: employee?.department || 'Sin departamento',
+          position: employee?.position || 'Sin posición',
+          companyId: employee?.company_id || '',
+          level: employee?.level || '',
+          workMode: employee?.work_mode || '',
+          contractType: employee?.contract_type || '',
+          phone: employee?.phone || '',
+          status: folder.status || 'active' // Asegurar que siempre haya un status
+        }
+      })
+
+      console.log(`✅ Obtenidas ${transformedFolders.length} carpetas con datos vinculados`)
+      return transformedFolders
     } catch (error) {
-      console.error(`❌ Error creando configuración de notificaciones:`, error)
+      console.error('❌ Error en getAllFolders:', error)
       throw error
     }
   }
 
   /**
-   * OBTENER NOMBRE DE EMPRESA
+   * OBTENER CARPETA POR ID
    */
-  async getCompanyName(companyId) {
+  async getFolderById(id) {
     try {
-      if (!companyId) return 'Empresa no especificada'
+      console.log('🔍 Obteniendo carpeta por ID:', id)
       
-      const companies = await organizedDatabaseService.getCompanies()
-      const company = companies.find(comp => comp.id === companyId)
-      return company ? company.name : 'Empresa no encontrada'
+      const { data: folder, error } = await supabase
+        .from('employee_folders')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        console.error('❌ Error obteniendo carpeta:', error)
+        throw error
+      }
+
+      if (!folder) {
+        throw new Error('Carpeta no encontrada')
+      }
+
+      // Obtener datos del empleado
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('email', folder.employee_email)
+        .single()
+
+      // Transformar datos
+      const transformedFolder = {
+        ...folder,
+        employeeName: employee?.name || folder.employee_email || 'Empleado sin nombre',
+        employeeEmail: folder.employee_email || '',
+        department: employee?.department || 'Sin departamento',
+        position: employee?.position || 'Sin posición',
+        companyId: employee?.company_id || '',
+        level: employee?.level || '',
+        workMode: employee?.work_mode || '',
+        contractType: employee?.contract_type || '',
+        phone: employee?.phone || '',
+        status: folder.status || 'active'
+      }
+
+      console.log('✅ Carpeta obtenida:', transformedFolder.id)
+      return transformedFolder
     } catch (error) {
-      console.warn(`⚠️ Error obteniendo nombre de empresa para ${companyId}:`, error.message)
-      return 'Empresa no especificada'
+      console.error('❌ Error en getFolderById:', error)
+      throw error
     }
+  }
+
+  /**
+   * CREAR CARPETA PARA EMPLEADO
+   */
+  async createFolderForEmployee(employee) {
+    const lockKey = `folder_${employee.email}`
+    
+    return await superLockService.withLock(lockKey, async () => {
+      try {
+        console.log('📁 Creando carpeta para:', employee.email)
+        
+        // Verificar si ya existe
+        const { data: existing } = await supabase
+          .from('employee_folders')
+          .select('*')
+          .eq('employee_email', employee.email)
+          .single()
+
+        if (existing) {
+          console.log('⚠️ Carpeta ya existe para:', employee.email)
+          return existing
+        }
+
+        // Crear carpeta en Google Drive si está disponible
+        let driveFolderId = null
+        if (this.hybridDriveInitialized) {
+          try {
+            const driveResult = await googleDriveConsolidatedService.createEmployeeFolder(employee)
+            driveFolderId = driveResult?.id || null
+            console.log('📁 Carpeta creada en Google Drive:', driveFolderId)
+          } catch (driveError) {
+            console.warn('⚠️ Error creando carpeta en Google Drive:', driveError.message)
+          }
+        }
+
+        // Crear registro en base de datos
+        const folderData = {
+          employee_email: employee.email,
+          employee_name: employee.name,
+          drive_folder_id: driveFolderId,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        const { data: newFolder, error } = await supabase
+          .from('employee_folders')
+          .insert([folderData])
+          .select()
+          .single()
+
+        if (error) {
+          console.error('❌ Error creando carpeta:', error)
+          throw error
+        }
+
+        console.log('✅ Carpeta creada:', newFolder.id)
+        return newFolder
+      } catch (error) {
+        console.error('❌ Error en createFolderForEmployee:', error)
+        throw error
+      }
+    })
   }
 
   /**
    * CREAR CARPETAS PARA TODOS LOS EMPLEADOS
    */
-  async createFoldersForAllEmployees(userId) {
-    try {
-      console.log('🚀 Iniciando creación masiva con servicio unificado...')
-      
-      const employees = await organizedDatabaseService.getEmployees()
-      let createdCount = 0
-      let updatedCount = 0
-      let alreadyExistsCount = 0
-      let errorCount = 0
-      const errors = []
+  async createFoldersForAllEmployees() {
+    const lockKey = 'bulk_create_folders'
+    
+    return await superLockService.withLock(lockKey, async () => {
+      try {
+        console.log('🚀 Iniciando creación masiva de carpetas...')
+        
+        // Obtener todos los empleados
+        const { data: employees, error } = await supabase
+          .from('employees')
+          .select('*')
+          .order('created_at', { ascending: false })
 
-      for (const employee of employees) {
-        if (!employee.email) {
-          console.warn(`⚠️ Empleado sin email: ${employee.name}`)
-          continue
+        if (error) {
+          console.error('❌ Error obteniendo empleados:', error)
+          throw error
         }
 
-        try {
-          const result = await this.createEmployeeFolder(employee.email, employee, userId)
-          
-          if (result.created) {
-            if (result.newlyCreated) {
-              createdCount++
-            } else if (result.alreadyExistedInDrive) {
+        if (!employees || employees.length === 0) {
+          console.log('⚠️ No se encontraron empleados')
+          return { created: 0, updated: 0, errors: 0 }
+        }
+
+        console.log(`📊 Procesando ${employees.length} empleados...`)
+
+        let createdCount = 0
+        let updatedCount = 0
+        let alreadyExistsCount = 0
+        let errorCount = 0
+        const errors = []
+
+        for (const employee of employees) {
+          try {
+            // Verificar si ya existe
+            const { data: existing } = await supabase
+              .from('employee_folders')
+              .select('*')
+              .eq('employee_email', employee.email)
+              .single()
+
+            if (existing) {
               alreadyExistsCount++
+              console.log(`⏭️ Ya existe carpeta para ${employee.email}`)
+              continue
             }
-          } else if (result.updated) {
-            updatedCount++
-          } else if (result.alreadyExists) {
-            alreadyExistsCount++
-          }
-          
-          // Log de progreso cada 10 empleados
-          if ((createdCount + updatedCount + alreadyExistsCount) % 10 === 0) {
-            console.log(`📊 Progreso: ${createdCount + updatedCount + alreadyExistsCount} carpetas procesadas...`)
-          }
 
-        } catch (error) {
-          errorCount++
-          errors.push(`${employee.email}: ${error.message}`)
-          console.error(`❌ Error procesando ${employee.email}:`, error)
+            // Crear carpeta
+            const result = await this.createFolderForEmployee(employee)
+            if (result) {
+              createdCount++
+              console.log(`✅ Creada carpeta para ${employee.email}`)
+            }
+          } catch (error) {
+            errorCount++
+            errors.push({ email: employee.email, error: error.message })
+            console.error(`❌ Error procesando ${employee.email}:`, error)
+          }
         }
-      }
 
-      const summary = {
-        created: createdCount,
-        updated: updatedCount,
-        alreadyExisted: alreadyExistsCount,
-        errors: errorCount,
-        sampleErrors: errors.slice(0, 10)
-      }
+        const summary = {
+          created: createdCount,
+          updated: updatedCount,
+          alreadyExisted: alreadyExistsCount,
+          errors: errorCount,
+          sampleErrors: errors.slice(0, 10)
+        }
 
-      console.log('📊 Resumen final:', summary)
-      return summary
-    } catch (error) {
-      console.error('❌ Error en creación masiva:', error)
-      throw error
-    }
+        console.log('📊 Resumen final:', summary)
+        return summary
+      } catch (error) {
+        console.error('❌ Error en creación masiva:', error)
+        throw error
+      }
+    })
   }
 
   /**

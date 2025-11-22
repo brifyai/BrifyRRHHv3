@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   FolderIcon,
@@ -13,9 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import unifiedEmployeeFolderService from '../../services/unifiedEmployeeFolderService.js';
 import googleDriveSyncService from '../../services/googleDriveSyncService.js';
-// eslint-disable-next-line no-unused-vars
 import googleDriveTokenBridge from '../../lib/googleDriveTokenBridge.js';
-// eslint-disable-next-line no-unused-vars
 import organizedDatabaseService from '../../services/organizedDatabaseService.js';
 import { supabase } from '../../lib/supabaseClient.js';
 import { useAuth } from '../../contexts/AuthContext.js';
@@ -26,24 +24,23 @@ import '../../styles/responsive-tables.css';
 const MySwal = withReactContent(Swal);
 
 const EmployeeFolders = () => {
-  // eslint-disable-next-line no-unused-vars
   const { companyId } = useParams();
-  // eslint-disable-next-line no-unused-vars
   const { user } = useAuth();
+  
+  // State variables - only declared once
   const [employees, setEmployees] = useState([]);
   const [folders, setFolders] = useState([]);
-  
   const [loading, setLoading] = useState(true);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    companyId: '',
-    department: '',
-    level: '',
-    workMode: '',
-    contractType: ''
+    companyId: null,
+    department: null,
+    level: null,
+    workMode: null,
+    contractType: null
   });
   const [selectedFolders, setSelectedFolders] = useState(new Set());
   const [companies, setCompanies] = useState([]);
@@ -53,246 +50,117 @@ const EmployeeFolders = () => {
   const [uniqueContractTypes, setUniqueContractTypes] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  // eslint-disable-next-line no-unused-vars
   const [totalItems, setTotalItems] = useState(0);
+  const [employeeCompanyIndex, setEmployeeCompanyIndex] = useState(new Map());
 
-  // Cargar empleados inicialmente al montar el componente
+  // Build employee company index
   useEffect(() => {
-    console.log('🚀 [INIT] Cargando empleados inicialmente...');
-    // eslint-disable-next-line no-use-before-define
-    loadEmployeesOnly();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let cancelled = false;
 
-  // Inicializar token bridge cuando el usuario está autenticado
-  useEffect(() => {
-    if (!loading && employees.length > 0) {
-      console.log('🔄 [PAGINATION DEBUG] useEffect triggered:', {
-        currentPage,
-        searchTerm: searchTerm || 'empty',
-        hasFilters: Object.values(filters).some(Boolean),
-        employeesCount: employees.length,
-        companiesCount: companies.length
-      });
-      // eslint-disable-next-line no-use-before-define
-      loadFoldersForCurrentPage();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length]);
-
-  // Resetear a página 1 cuando cambian filtros o búsqueda
-  useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [searchTerm, filters, employees, currentPage]);
-
-// ===== FUNCIONES DE CARGA DE DATOS FALTANTES =====
-
-  const loadEmployeesOnly = useCallback(async () => {
-    try {
-      setLoading(true);
-      console.log('👥 Cargando empleados desde la base de datos...');
-      
-      // Intentar cargar empleados desde Supabase
-      let employeesData = [];
-      let companiesData = [];
-      let usingFallback = false;
-      
+    const buildEmployeeCompanyIndex = async () => {
       try {
-        console.log('🔍 Intentando consulta a Supabase...');
         const { data, error } = await supabase
           .from('employees')
-          .select('id, first_name, last_name, full_name, email, position, department, company_id, status, phone, region, level, work_mode, contract_type, created_at')
-          .order('created_at', { ascending: false });
+          .select('email, company_id');
 
         if (error) {
-          console.warn('⚠️ Error en consulta Supabase:', error.message);
-          throw error;
+          console.error('❌ Error construyendo índice empleados->empresa:', error);
+          return;
         }
-        
-        employeesData = data || [];
-        console.log(`✅ Cargados ${employeesData.length} empleados desde Supabase`);
-        
-      } catch (supabaseError) {
-        console.warn('⚠️ Supabase no disponible, usando datos de prueba:', supabaseError.message);
-        
-        // Datos de prueba cuando Supabase no está disponible
-        employeesData = [
-          {
-            id: '1',
-            first_name: 'Juan',
-            last_name: 'Pérez',
-            full_name: 'Juan Pérez',
-            email: 'juan.perez@empresa.com',
-            position: 'Desarrollador Senior',
-            department: 'Tecnología',
-            company_id: '1',
-            status: 'active',
-            phone: '+56 9 1234 5678',
-            region: 'Santiago',
-            level: 'Senior',
-            work_mode: 'Remoto',
-            contract_type: 'Indefinido',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            first_name: 'María',
-            last_name: 'González',
-            full_name: 'María González',
-            email: 'maria.gonzalez@empresa.com',
-            position: 'Diseñadora UX',
-            department: 'Diseño',
-            company_id: '1',
-            status: 'active',
-            phone: '+56 9 8765 4321',
-            region: 'Santiago',
-            level: 'Mid',
-            work_mode: 'Híbrido',
-            contract_type: 'Indefinido',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: '3',
-            first_name: 'Carlos',
-            last_name: 'Rodríguez',
-            full_name: 'Carlos Rodríguez',
-            email: 'carlos.rodriguez@empresa.com',
-            position: 'Product Manager',
-            department: 'Producto',
-            company_id: '1',
-            status: 'active',
-            phone: '+56 9 1111 2222',
-            region: 'Valparaíso',
-            level: 'Senior',
-            work_mode: 'Presencial',
-            contract_type: 'Indefinido',
-            created_at: new Date().toISOString()
-          }
-        ];
-        
-        usingFallback = true;
-        console.log('📝 Usando datos de prueba:', employeesData.length, 'empleados');
-      }
-      
-      // Intentar cargar empresas
-      try {
-        const { data: companies, error: companiesError } = await supabase
-          .from('companies')
-          .select('*')
-          .order('name');
 
-        if (companiesError) {
-          console.warn('⚠️ Error cargando empresas:', companiesError.message);
-          companiesData = [
-            { id: '1', name: 'Empresa Demo', status: 'active' }
-          ];
-        } else {
-          companiesData = companies || [];
-        }
-      } catch (companiesError) {
-        console.warn('⚠️ Error cargando empresas, usando default:', companiesError.message);
-        companiesData = [
-          { id: '1', name: 'Empresa Demo', status: 'active' }
-        ];
+        const map = new Map();
+        (data || []).forEach((e) => {
+          const key = String(e.email || '').trim().toLowerCase();
+          if (key) map.set(key, e.company_id);
+        });
+
+        if (!cancelled) setEmployeeCompanyIndex(map);
+      } catch (err) {
+        console.error('❌ Error inesperado construyendo índice empleados->empresa:', err);
       }
+    };
+
+    buildEmployeeCompanyIndex();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Initialize token bridge when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      googleDriveTokenBridge.initializeForUser(user.id);
+    }
+    
+    return () => {
+      googleDriveTokenBridge.cleanup();
+    };
+  }, [user?.id]);
+
+  // Load employees function
+  const loadEmployeesOnly = async () => {
+    try {
+      setLoading(true);
+      console.log('🚀 Iniciando carga de empleados...');
       
-      console.log(`✅ Total: ${employeesData.length} empleados, ${companiesData.length} empresas`);
+      // Load companies
+      const companyData = await organizedDatabaseService.getCompanies();
+      setCompanies(companyData);
       
-      // Transformar datos para compatibilidad con el resto del código
-      const transformedEmployees = employeesData.map(emp => ({
-        ...emp,
-        employeeName: emp.full_name || `${emp.first_name} ${emp.last_name}`.trim(),
-        employeeEmail: emp.email,
-        employeePosition: emp.position,
-        employeeDepartment: emp.department,
-        employeeLevel: emp.level,
-        employeeWorkMode: emp.work_mode,
-        employeeContractType: emp.contract_type,
-        employeePhone: emp.phone,
-        employeeRegion: emp.region
+      // Get employees with filters - avoid empty filter values
+      let employeesData = [];
+      const activeFilters = {};
+      
+      // Only add non-null filters
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== null && value !== '') {
+          activeFilters[key] = value;
+        }
+      });
+
+      if (companyId) {
+        employeesData = await organizedDatabaseService.getEmployees({ companyId });
+      } else {
+        employeesData = await organizedDatabaseService.getEmployees(activeFilters);
+      }
+
+      console.log(`📊 Cargados ${employeesData.length} empleados (${Object.keys(activeFilters).length} filtros aplicados)`);
+      
+      const normalizedEmployees = (employeesData || []).map(e => ({
+        ...e,
+        company: e.companies || e.company || null,
+        employeeName: e.first_name && e.last_name ? `${e.first_name} ${e.last_name}` : e.first_name || e.last_name || 'Sin nombre',
+        employeeEmail: e.email,
+        employeeDepartment: e.department,
+        employeePosition: e.position,
+        employeePhone: e.phone,
+        employeeLevel: e.level,
+        employeeWorkMode: e.work_mode,
+        employeeContractType: e.contract_type,
+        companyName: e.companies?.name || e.company?.name || ''
       }));
       
-      setEmployees(transformedEmployees);
-      setCompanies(companiesData);
-
-      // Extraer valores únicos para filtros
-      if (transformedEmployees && transformedEmployees.length > 0) {
-        const departments = [...new Set(transformedEmployees.map(emp => emp.department).filter(Boolean))];
-        const levels = [...new Set(transformedEmployees.map(emp => emp.level).filter(Boolean))];
-        const workModes = [...new Set(transformedEmployees.map(emp => emp.work_mode).filter(Boolean))];
-        const contractTypes = [...new Set(transformedEmployees.map(emp => emp.contract_type).filter(Boolean))];
-        
-        setUniqueDepartments(departments.sort());
-        setUniqueLevels(levels.sort());
-        setUniqueWorkModes(workModes.sort());
-        setUniqueContractTypes(contractTypes.sort());
-      }
-
-      // Mostrar mensaje informativo si estamos usando datos de prueba
-      if (usingFallback) {
-        MySwal.fire({
-          title: 'ℹ️ Modo Demo',
-          text: 'Mostrando datos de prueba. Configure la base de datos para datos reales.',
-          icon: 'info',
-          confirmButtonText: 'Entendido',
-          confirmButtonColor: '#0693e3',
-          timer: 3000,
-          timerProgressBar: true
-        });
-      }
-
+      setEmployees(normalizedEmployees);
+      setTotalItems(normalizedEmployees.filter(emp => emp.email).length);
+      extractUniqueFilters(employeesData);
+      
     } catch (error) {
-      console.error('❌ Error crítico en loadEmployeesOnly:', error);
-      
-      // Fallback extremo: datos mínimos
-      const fallbackEmployees = [
-        {
-          id: 'demo-1',
-          first_name: 'Usuario',
-          last_name: 'Demo',
-          full_name: 'Usuario Demo',
-          email: 'demo@empresa.com',
-          position: 'Empleado Demo',
-          department: 'General',
-          company_id: '1',
-          status: 'active',
-          phone: '+56 9 0000 0000',
-          region: 'Demo',
-          level: 'Demo',
-          work_mode: 'Demo',
-          contract_type: 'Demo',
-          created_at: new Date().toISOString(),
-          employeeName: 'Usuario Demo',
-          employeeEmail: 'demo@empresa.com',
-          employeePosition: 'Empleado Demo',
-          employeeDepartment: 'General',
-          employeeLevel: 'Demo',
-          employeeWorkMode: 'Demo',
-          employeeContractType: 'Demo',
-          employeePhone: '+56 9 0000 0000',
-          employeeRegion: 'Demo'
-        }
-      ];
-      
-      setEmployees(fallbackEmployees);
-      setCompanies([{ id: '1', name: 'Empresa Demo', status: 'active' }]);
-      setUniqueDepartments(['General']);
-      setUniqueLevels(['Demo']);
-      setUniqueWorkModes(['Demo']);
-      setUniqueContractTypes(['Demo']);
-      
-      console.log('🆘 Usando datos de fallback extremo');
-      
+      console.error('❌ Error cargando empleados:', error);
+      MySwal.fire({
+        title: 'Error',
+        text: 'Hubo un problema al cargar los empleados',
+        icon: 'error',
+        confirmButtonText: 'Aceptar',
+        confirmButtonColor: '#0693e3'
+      });
     } finally {
       setLoading(false);
       console.log('🏁 Carga de empleados completada');
     }
-  }, []);
+  };
 
-  const loadFoldersForCurrentPage = useCallback(async () => {
-    // Prevenir múltiples cargas simultáneas
+  // Load folders for current page
+  const loadFoldersForCurrentPage = async () => {
     if (loadingFolders) {
       console.log('⏳ Ya se están cargando carpetas, ignorando solicitud duplicada...');
       return;
@@ -302,7 +170,7 @@ const EmployeeFolders = () => {
       setLoadingFolders(true);
       console.log(`📁 Cargando carpetas reales desde la base de datos...`);
       
-      // Primero intentar cargar carpetas reales desde la base de datos SIN relaciones problemáticas
+      // Load folders directly from Supabase
       let realFolders = [];
       try {
         const { data: employeeFolders, error } = await supabase
@@ -312,111 +180,134 @@ const EmployeeFolders = () => {
 
         if (!error && employeeFolders) {
           console.log(`✅ Encontradas ${employeeFolders.length} carpetas reales en la base de datos`);
-          console.log('📊 Muestra de carpetas reales:', employeeFolders.slice(0, 3).map(f => ({
-            email: f.employee_email,
-            name: f.employee_name,
-            company: f.company_name
-          })));
-          realFolders = employeeFolders;
+          
+          // Load documents and FAQs separately
+          const [documentsResult, faqsResult] = await Promise.all([
+            supabase.from('employee_documents').select('*'),
+            supabase.from('employee_faqs').select('*')
+          ]);
+          
+          const documents = documentsResult.data || [];
+          const faqs = faqsResult.data || [];
+          
+          // Combine data in frontend
+          realFolders = employeeFolders.map(folder => {
+            const folderDocuments = documents.filter(doc => doc.employee_folder_id === folder.id);
+            const folderFaqs = faqs.filter(faq => faq.employee_folder_id === folder.id);
+            
+            return {
+              ...folder,
+              employee_documents: folderDocuments,
+              employee_faqs: folderFaqs
+            };
+          });
+          
         } else if (error) {
-          console.warn('⚠️ No se pudieron cargar carpetas reales:', error.message);
+          console.warn('⚠️ Error cargando carpetas:', error.message);
+          realFolders = [];
         }
       } catch (dbError) {
-        console.warn('⚠️ Error consultando carpetas reales:', dbError.message);
+        console.warn('⚠️ Error consultando carpetas:', dbError.message);
+        realFolders = [];
       }
 
-      // Si no hay carpetas reales, generar carpetas virtuales desde los empleados
+      // If no real folders, create virtual folders from employees
       let foldersToShow = [];
       if (realFolders.length > 0) {
-        // Usar carpetas reales y enriquecerlas con datos de empleados
         foldersToShow = realFolders.map(folder => {
           const employee = employees.find(emp => emp.email === folder.employee_email);
           
-          // Construir knowledgeBase básico (sin relaciones problemáticas)
           const knowledgeBase = {
-            faqs: [],
-            documents: [],
-            policies: [],
-            procedures: []
+            faqs: (folder.employee_faqs || [])
+              .filter(faq => faq.status === 'active')
+              .map(faq => ({
+                id: faq.id,
+                question: faq.question,
+                answer: faq.answer,
+                category: faq.category,
+                type: 'faq'
+              })),
+            documents: (folder.employee_documents || [])
+              .filter(doc => doc.status === 'active')
+              .map(doc => ({
+                id: doc.id,
+                name: doc.document_name,
+                description: doc.description,
+                type: doc.document_type,
+                fileType: doc.document_type,
+                category: doc.document_type
+              })),
+            policies: (folder.employee_documents || [])
+              .filter(doc => doc.status === 'active' && doc.document_type === 'policy')
+              .map(doc => ({
+                id: doc.id,
+                name: doc.document_name,
+                description: doc.description,
+                type: 'policy'
+              })),
+            procedures: (folder.employee_documents || [])
+              .filter(doc => doc.status === 'active' && doc.document_type === 'procedure')
+              .map(doc => ({
+                id: doc.id,
+                name: doc.document_name,
+                description: doc.description,
+                type: 'procedure'
+              }))
           };
-          
-          console.log(`📊 Carpeta real ${folder.employee_email}:`, {
-            name: folder.employee_name,
-            company: folder.company_name,
-            hasKnowledgeBase: true,
-            knowledgeBaseReady: 'Preparado para contenido futuro'
-          });
           
           return {
             id: folder.id,
             email: folder.employee_email,
             employeeEmail: folder.employee_email,
-            employeeName: folder.employee_name || employee?.employeeName || employee?.full_name || 'Sin nombre',
+            employeeName: folder.employee_name || employee?.employeeName || 'Sin nombre',
             companyName: folder.company_name || employee?.companyName || 'Sin empresa',
             companyIdResolved: folder.company_id || employee?.company_id,
-            employeeDepartment: folder.employee_department || employee?.employeeDepartment || employee?.department,
-            employeePosition: folder.employee_position || employee?.employeePosition || employee?.position,
-            employeePhone: folder.employee_phone || employee?.employeePhone || employee?.phone,
-            employeeLevel: folder.employee_level || employee?.employeeLevel || employee?.level,
-            employeeWorkMode: folder.employee_work_mode || employee?.employeeWorkMode || employee?.work_mode,
-            employeeContractType: folder.employee_contract_type || employee?.employeeContractType || employee?.contract_type,
+            employeeDepartment: folder.employee_department || employee?.employeeDepartment,
+            employeePosition: folder.employee_position || employee?.employeePosition,
+            employeePhone: folder.employee_phone || employee?.employeePhone,
+            employeeLevel: folder.employee_level || employee?.employeeLevel,
+            employeeWorkMode: folder.employee_work_mode || employee?.employeeWorkMode,
+            employeeContractType: folder.employee_contract_type || employee?.employeeContractType,
             lastUpdated: folder.updated_at || new Date().toISOString(),
             driveFolderId: folder.drive_folder_id,
             driveFolderUrl: folder.drive_folder_url,
-            // Usar datos reales de la base de datos
             knowledgeBase: knowledgeBase
           };
         });
       } else {
-        // Si no hay carpetas reales, generar carpetas virtuales desde los empleados
-        console.log(`📂 No hay carpetas reales, generando carpetas virtuales desde empleados...`);
-        foldersToShow = employees.map(employee => {
-          // Crear knowledgeBase vacío para carpetas virtuales
-          const knowledgeBase = {
+        // Create virtual folders from employees
+        console.log(`📂 No hay carpetas reales en la base de datos, creando carpetas virtuales desde empleados`);
+        foldersToShow = employees.map(employee => ({
+          id: `virtual-${employee.email}`,
+          email: employee.email,
+          employeeEmail: employee.email,
+          employeeName: employee.employeeName || 'Sin nombre',
+          companyName: employee.companyName || 'Sin empresa',
+          companyIdResolved: employee.company_id,
+          employeeDepartment: employee.employeeDepartment,
+          employeePosition: employee.employeePosition,
+          employeePhone: employee.employeePhone,
+          employeeLevel: employee.employeeLevel,
+          employeeWorkMode: employee.employeeWorkMode,
+          employeeContractType: employee.employeeContractType,
+          lastUpdated: new Date().toISOString(),
+          driveFolderId: null,
+          driveFolderUrl: null,
+          knowledgeBase: {
             faqs: [],
             documents: [],
             policies: [],
             procedures: []
-          };
-          
-          return {
-            id: `virtual-${employee.id}`,
-            email: employee.email,
-            employeeEmail: employee.email,
-            employeeName: employee.employeeName || employee.full_name || `${employee.first_name} ${employee.last_name}`.trim(),
-            companyName: companies.find(c => c.id === employee.company_id)?.name || 'Sin empresa',
-            companyIdResolved: employee.company_id,
-            employeeDepartment: employee.employeeDepartment || employee.department,
-            employeePosition: employee.employeePosition || employee.position,
-            employeePhone: employee.employeePhone || employee.phone,
-            employeeLevel: employee.employeeLevel || employee.level,
-            employeeWorkMode: employee.employeeWorkMode || employee.work_mode,
-            employeeContractType: employee.employeeContractType || employee.contract_type,
-            lastUpdated: new Date().toISOString(),
-            driveFolderId: null,
-            driveFolderUrl: null,
-            // Usar knowledgeBase vacío para carpetas virtuales
-            knowledgeBase: knowledgeBase,
-            isVirtual: true // Marcar como carpeta virtual
-          };
-        });
-        
-        console.log(`✅ Generadas ${foldersToShow.length} carpetas virtuales desde empleados`);
+          }
+        }));
       }
 
       console.log(`✅ Total de carpetas a mostrar: ${foldersToShow.length}`);
 
-      // Si no hay filtros, mostrar todas las carpetas
-      if (!searchTerm && !Object.values(filters).some(Boolean)) {
-        setFolders(foldersToShow);
-        setTotalItems(foldersToShow.length);
-        return;
-      }
-
-      // Aplicar filtros a las carpetas
+      // Apply filters
       let filteredFolders = foldersToShow || [];
-
       const term = (searchTerm || '').toLowerCase();
+      
       if (term) {
         filteredFolders = filteredFolders.filter(folder =>
           (folder.employeeName || '').toLowerCase().includes(term) ||
@@ -427,7 +318,6 @@ const EmployeeFolders = () => {
       }
 
       if (filters.companyId) {
-        // Usar company_id directamente como en EmployeeSelector
         filteredFolders = filteredFolders.filter(
           (folder) => folder.companyIdResolved === filters.companyId
         );
@@ -450,9 +340,6 @@ const EmployeeFolders = () => {
       }
 
       console.log(`📊 ${filteredFolders.length} carpetas después de aplicar filtros`);
-      console.log('🏢 Empresas disponibles (desde companies):', (companies || []).map(c => [c.id, c.name]));
-      console.log('🧭 Filtro de empresa aplicado:', filters.companyId);
-      
       setFolders(filteredFolders);
       setTotalItems(filteredFolders.length);
       
@@ -469,10 +356,60 @@ const EmployeeFolders = () => {
       setLoadingFolders(false);
       console.log('🏁 Carga de carpetas completada');
     }
-  }, [searchTerm, filters, loadingFolders, companies, employees]);
+  };
 
-  // Función de compatibilidad eliminada - ya no necesaria
-  // const loadEmployeesAndFolders = loadEmployeesOnly;
+  // Effects
+  useEffect(() => {
+    loadEmployeesOnly();
+  }, [companyId, filters]);
+
+  useEffect(() => {
+    if (companyId && filters.companyId !== companyId) {
+      setFilters(prev => ({ ...prev, companyId }));
+    }
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!loading && employees.length > 0) {
+      loadFoldersForCurrentPage();
+    }
+  }, [currentPage, searchTerm, filters, loading, companies.length, employees.length]);
+
+  useEffect(() => {
+    const filteredEmployees = employees.filter(employee => {
+      if (!employee?.email) return false;
+
+      const companyName = (employee.company && employee.company.name) || (employee.companies && employee.companies.name) || '';
+      const term = (searchTerm || '').toLowerCase();
+
+      const matchesSearch =
+        !term ||
+        (employee.name && employee.name.toLowerCase().includes(term)) ||
+        (employee.email && employee.email.toLowerCase().includes(term)) ||
+        (companyName && companyName.toLowerCase().includes(term)) ||
+        (employee.department && employee.department.toLowerCase().includes(term));
+
+      return matchesSearch;
+    });
+
+    setTotalItems(filteredEmployees.length);
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, filters, employees.length]);
+
+  // Utility functions
+  const extractUniqueFilters = (employeesData) => {
+    const departments = [...new Set(employeesData.map(emp => emp.department))];
+    const levels = [...new Set(employeesData.map(emp => emp.level))];
+    const workModes = [...new Set(employeesData.map(emp => emp.work_mode))];
+    const contractTypes = [...new Set(employeesData.map(emp => emp.contract_type))];
+    
+    setUniqueDepartments(departments.sort());
+    setUniqueLevels(levels.sort());
+    setUniqueWorkModes(workModes.sort());
+    setUniqueContractTypes(contractTypes.sort());
+  };
 
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({
@@ -481,14 +418,11 @@ const EmployeeFolders = () => {
     }));
   };
 
-
   const handleSearch = (term) => {
     setSearchTerm(term);
   };
 
   const getFilteredFolders = () => {
-    // Las carpetas ya vienen filtradas por búsqueda y filtros activos
-    // Agregar deduplicación por email como última capa de seguridad
     const uniqueFolders = [];
     const seenEmails = new Set();
     
@@ -502,13 +436,6 @@ const EmployeeFolders = () => {
       }
     });
     
-    console.log('📁 [PAGINATION DEBUG] getFilteredFolders():', {
-      totalFolders: folders.length,
-      filteredFolders: uniqueFolders.length,
-      searchTerm: searchTerm || 'none',
-      activeFilters: Object.values(filters).filter(Boolean).length
-    });
-    
     return uniqueFolders;
   };
 
@@ -520,25 +447,13 @@ const EmployeeFolders = () => {
   };
 
   const getTotalPages = () => {
-    const foldersCount = getFilteredFolders().length;
-    const pages = Math.ceil(foldersCount / itemsPerPage || 1);
-    console.log('📊 [PAGINATION DEBUG] getTotalPages():', {
-      foldersCount,
-      itemsPerPage,
-      totalPages: pages,
-      currentPage
-    });
-    return pages;
+    return Math.ceil(getFilteredFolders().length / itemsPerPage || 1);
   };
 
   const handlePageChange = (page) => {
-    console.log('🔘 [PAGINATION DEBUG] handlePageChange called:', { page, currentPage });
     if (page !== currentPage) {
-      console.log(`📄 [PAGINATION DEBUG] Changing from page ${currentPage} to page ${page}`);
+      console.log(`📄 Cambiando a página ${page}`);
       setCurrentPage(page);
-      // No limpiar carpetas, el useEffect se encargará de cargar los datos correctos
-    } else {
-      console.log('⚠️ [PAGINATION DEBUG] Page change ignored - same page:', page);
     }
   };
 
@@ -554,15 +469,12 @@ const EmployeeFolders = () => {
 
   const handleSelectAll = () => {
     if (selectedFolders.size === getFilteredFolders().length) {
-      // Deseleccionar todos
       setSelectedFolders(new Set());
     } else {
-      // Seleccionar todos los filtrados
       const allEmails = new Set(getFilteredFolders().map(folder => folder.email));
       setSelectedFolders(allEmails);
     }
   };
-
 
   const handleFileUpload = async (employeeEmails, files) => {
     try {
@@ -570,7 +482,6 @@ const EmployeeFolders = () => {
       const totalFolders = employeeEmails.length;
       let uploadedCount = 0;
       
-      // Función auxiliar para leer archivo de forma segura
       const readFileContent = (file) => {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -580,14 +491,11 @@ const EmployeeFolders = () => {
         });
       };
       
-      // Procesar cada archivo para cada empleado
       for (const employeeEmail of employeeEmails) {
         for (const file of files) {
           try {
             const content = await readFileContent(file);
             
-            // Crear un documento con el contenido del archivo
-            // Simular adición de documento (sin depender de servicio externo)
             console.log(`📄 Simulando adición de documento para ${employeeEmail}:`, {
               name: file.name,
               description: `Archivo subido: ${file.name}`,
@@ -600,12 +508,10 @@ const EmployeeFolders = () => {
             
           } catch (fileError) {
             console.error(`Error procesando archivo ${file.name} para ${employeeEmail}:`, fileError);
-            // Continuar con el siguiente archivo en caso de error
           }
         }
       }
       
-      // Recargar los datos después de procesar todos los archivos
       await loadEmployeesOnly();
       
       MySwal.fire({
@@ -651,7 +557,6 @@ const EmployeeFolders = () => {
     e.preventDefault();
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      // Subir a una sola carpeta
       handleFileUpload([employeeEmail], files);
     }
   };
@@ -668,10 +573,8 @@ const EmployeeFolders = () => {
     const files = e.target.files;
     if (files.length > 0) {
       if (employeeEmail) {
-        // Subir a una sola carpeta
         handleFileUpload([employeeEmail], files);
       } else {
-        // Subir a múltiples carpetas seleccionadas
         handleBulkFileUpload(files);
       }
     }
@@ -679,7 +582,6 @@ const EmployeeFolders = () => {
 
   const handleViewFolder = async (employeeEmail) => {
     try {
-      // Buscar carpeta real en la base de datos
       const { data: folder, error } = await supabase
         .from('employee_folders')
         .select('*')
@@ -687,7 +589,6 @@ const EmployeeFolders = () => {
         .maybeSingle();
 
       if (error || !folder) {
-        // Si no existe, crearla
         console.log(`📁 Creando carpeta para ${employeeEmail}...`);
         const employee = employees.find(emp => emp.email === employeeEmail);
         if (employee) {
@@ -698,7 +599,6 @@ const EmployeeFolders = () => {
         setSelectedFolder(folder);
       }
       
-      // Limpiar selección cuando se abre una carpeta individual
       setSelectedFolders(new Set());
     } catch (error) {
       console.error('Error cargando carpeta:', error);
@@ -712,7 +612,6 @@ const EmployeeFolders = () => {
     }
   };
 
-  // Función para crear todas las carpetas de empleados
   const createAllEmployeeFolders = async () => {
     try {
       setLoadingFolders(true);
@@ -724,8 +623,6 @@ const EmployeeFolders = () => {
         allowOutsideClick: false
       });
 
-      // UNIFICADO: Usar solo googleDriveSyncService para evitar duplicaciones
-      console.log('🔄 Usando googleDriveSyncService unificado para evitar duplicaciones...');
       let createdCount = 0;
       let updatedCount = 0;
       let errorCount = 0;
@@ -757,7 +654,6 @@ const EmployeeFolders = () => {
             console.log(`✅ Procesado ${employee.email}: ${result.syncStatus}`);
           }
 
-          // Log de progreso cada 10 empleados
           if ((createdCount + updatedCount) % 10 === 0) {
             console.log(`📊 Progreso: ${createdCount + updatedCount} carpetas procesadas...`);
           }
@@ -769,47 +665,34 @@ const EmployeeFolders = () => {
         }
       }
 
-      const result = { createdCount, updatedCount, errorCount, sampleErrors: errors.slice(0, 10) };
-      
       MySwal.fire({
         title: '¡Proceso completado!',
         html: `
           <div class="text-left">
-            <p><strong>Carpetas creadas:</strong> ${result.createdCount}</p>
-            <p><strong>Carpetas actualizadas:</strong> ${result.updatedCount}</p>
-            <p><strong>Errores:</strong> ${result.errorCount}</p>
+            <p><strong>Carpetas creadas:</strong> ${createdCount}</p>
+            <p><strong>Carpetas actualizadas:</strong> ${updatedCount}</p>
+            <p><strong>Errores:</strong> ${errorCount}</p>
           </div>
         `,
-        icon: result.errorCount === 0 ? 'success' : 'warning',
+        icon: errorCount === 0 ? 'success' : 'warning',
         confirmButtonText: 'Aceptar',
         confirmButtonColor: '#0693e3'
       });
 
-      // Recargar carpetas
-      if (result && result.errorCount > 0) {
-        const errors = (result.sampleErrors || []).slice(0, 10);
+      if (errorCount > 0) {
         const errorsHtml = errors.length
-          ? `<ul class="list-disc pl-5 text-left">${errors.map(e => `<li class="mb-1 text-sm text-red-700">${e}</li>`).join('')}</ul>`
+          ? `<ul class="list-disc pl-5 text-left">${errors.slice(0, 10).map(e => `<li class="mb-1 text-sm text-red-700">${e}</li>`).join('')}</ul>`
           : '<p class="text-gray-600">No hay detalles adicionales de error</p>';
-        const schemaNote = result.schemaSuspect
-          ? `<div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-               <p class="text-yellow-800 text-sm">
-                 Se sospecha un problema de esquema en la base de datos. Verifica que las tablas estén creadas en Supabase ejecutando el SQL:
-                 <code class="bg-yellow-100 px-1 py-0.5 rounded">database/employee_folders_setup.sql</code>
-               </p>
-             </div>`
-          : '';
         await MySwal.fire({
           title: 'Se detectaron errores durante la sincronización',
           html: `
             <div class="text-left">
-              <p class="mb-2"><strong>Errores:</strong> ${result.errorCount}</p>
-              <p class="mb-2"><strong>Creadas:</strong> ${result.createdCount}    <strong>Actualizadas:</strong> ${result.updatedCount}</p>
+              <p class="mb-2"><strong>Errores:</strong> ${errorCount}</p>
+              <p class="mb-2"><strong>Creadas:</strong> ${createdCount}    <strong>Actualizadas:</strong> ${updatedCount}</p>
               <div class="mt-2">
                 <p class="mb-1 font-semibold">Muestras de error:</p>
                 ${errorsHtml}
               </div>
-              ${schemaNote}
             </div>
           `,
           icon: 'warning',
@@ -833,7 +716,6 @@ const EmployeeFolders = () => {
     }
   };
 
-  // Sincronizar manualmente con Google Drive (crea/actualiza carpetas)
   const handleSyncWithDrive = async () => {
     try {
       setLoadingFolders(true);
@@ -847,43 +729,40 @@ const EmployeeFolders = () => {
           MySwal.showLoading();
         }
       });
-        
-       // Verificar que Google Drive esté autenticado ANTES de intentar sincronizar
-       if (!googleDriveSyncService.isAuthenticated()) {
-         MySwal.fire({
-           title: '❌ Google Drive no autenticado',
-           html: `
-             <div class="text-left">
-               <p class="mb-4 text-gray-700">
-                 <strong>No se puede sincronizar:</strong> Google Drive no está conectado.
-               </p>
-               <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                 <p class="text-sm text-yellow-800 mb-2">
-                   <strong>¿Qué necesitas hacer?</strong>
-                 </p>
-                 <ol class="list-decimal list-inside text-sm text-yellow-800 space-y-1">
-                   <li>Ve a <strong>Integraciones</strong></li>
-                   <li>Haz clic en <strong>"Conectar Google Drive"</strong></li>
-                   <li>Autoriza el acceso a tu cuenta de Google</li>
-                   <li>Vuelve aquí e intenta sincronizar nuevamente</li>
-                 </ol>
-               </div>
-               <p class="text-xs text-gray-600">
-                 Sin autenticación, las carpetas no se pueden crear en Google Drive real.
-               </p>
-             </div>
-           `,
-           icon: 'warning',
-           confirmButtonText: 'Entendido',
-           confirmButtonColor: '#0693e3',
-           width: '600px'
-         });
-         setLoadingFolders(false);
-         return;
-       }
+         
+      if (!googleDriveSyncService.isAuthenticated()) {
+        MySwal.fire({
+          title: '❌ Google Drive no autenticado',
+          html: `
+            <div class="text-left">
+              <p class="mb-4 text-gray-700">
+                <strong>No se puede sincronizar:</strong> Google Drive no está conectado.
+              </p>
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <p class="text-sm text-yellow-800 mb-2">
+                  <strong>¿Qué necesitas hacer?</strong>
+                </p>
+                <ol class="list-decimal list-inside text-sm text-yellow-800 space-y-1">
+                  <li>Ve a <strong>Integraciones</strong></li>
+                  <li>Haz clic en <strong>"Conectar Google Drive"</strong></li>
+                  <li>Autoriza el acceso a tu cuenta de Google</li>
+                  <li>Vuelve aquí e intenta sincronizar nuevamente</li>
+                </ol>
+              </div>
+              <p class="text-xs text-gray-600">
+                Sin autenticación, las carpetas no se pueden crear en Google Drive real.
+              </p>
+            </div>
+          `,
+          icon: 'warning',
+          confirmButtonText: 'Entendido',
+          confirmButtonColor: '#0693e3',
+          width: '600px'
+        });
+        setLoadingFolders(false);
+        return;
+      }
 
-
-      // Inicializar el servicio de sincronización
       console.log('🔄 Inicializando servicio de sincronización...');
       const initResult = await googleDriveSyncService.initialize();
       if (!initResult) {
@@ -891,7 +770,6 @@ const EmployeeFolders = () => {
       }
       console.log('✅ Servicio de sincronización inicializado correctamente');
 
-      // Crear carpetas para todos los empleados en Google Drive Y Supabase simultáneamente
       let createdCount = 0;
       let errorCount = 0;
       const errors = [];
@@ -911,11 +789,10 @@ const EmployeeFolders = () => {
               createdCount++;
               console.log(`✅ Carpeta creada para ${employee.email}`);
               
-              // Iniciar sincronización periódica para este empleado
               googleDriveSyncService.startPeriodicSync(
                 employee.email,
                 result.driveFolder.id,
-                5 // cada 5 minutos
+                5
               );
             }
           }
@@ -977,16 +854,6 @@ const EmployeeFolders = () => {
     }
   };
 
-
-  // Calcular páginas totales
-  const totalPages = getTotalPages();
-  const hasMorePages = currentPage < totalPages;
-  console.log('📈 [PAGINATION DEBUG] hasMorePages calculated:', { 
-    currentPage, 
-    totalPages, 
-    hasMorePages 
-  });
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex items-center justify-center">
@@ -1001,7 +868,7 @@ const EmployeeFolders = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Moderno */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 rounded-3xl shadow-2xl p-8 mb-8 text-white relative overflow-hidden">
           <div className="absolute inset-0 bg-black/10"></div>
           <div className="relative z-10">
@@ -1030,12 +897,11 @@ const EmployeeFolders = () => {
               </div>
             </div>
           </div>
-          {/* Elementos decorativos */}
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full"></div>
           <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/10 rounded-full"></div>
         </div>
 
-        {/* Indicador de carga de carpetas */}
+        {/* Loading indicator for folders */}
         {loadingFolders && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
             <div className="flex items-center">
@@ -1045,11 +911,11 @@ const EmployeeFolders = () => {
           </div>
         )}
 
-        {/* Información de paginación */}
+        {/* Pagination info */}
         <div className="mb-6 p-4 bg-gray-50 rounded-xl">
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-600">
-              Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, getFilteredFolders().length)} a {Math.min(currentPage * itemsPerPage, getFilteredFolders().length)} de {getFilteredFolders().length} carpetas {getFilteredFolders().length > itemsPerPage && `(página ${currentPage} de ${totalPages})`}
+              Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, getFilteredFolders().length)} a {Math.min(currentPage * itemsPerPage, getFilteredFolders().length)} de {getFilteredFolders().length} carpetas {getFilteredFolders().length > itemsPerPage && `(página ${currentPage} de ${getTotalPages()})`}
             </p>
             <div className="flex space-x-2">
               <button
@@ -1067,11 +933,11 @@ const EmployeeFolders = () => {
                 Anterior
               </button>
               <span className="px-3 py-1 bg-gray-200 rounded">
-                {currentPage} / {totalPages}
+                {currentPage} / {getTotalPages()}
               </span>
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
-                disabled={!hasMorePages}
+                disabled={currentPage >= getTotalPages()}
                 className="px-3 py-1 bg-blue-600 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
               >
                 Siguiente
@@ -1080,7 +946,7 @@ const EmployeeFolders = () => {
           </div>
         </div>
 
-        {/* Filtros y búsqueda */}
+        {/* Filters and search */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8 border border-gray-100 relative overflow-hidden responsive-layout">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
@@ -1116,15 +982,15 @@ const EmployeeFolders = () => {
             </div>
           </div>
 
-          {/* Panel de filtros */}
+          {/* Filter panel */}
           {showFilters && (
             <div className="filters-grid mt-4 pt-4 border-t border-gray-200">
               <div className="min-w-0">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-engage-blue focus:border-engage-blue truncate"
-                  value={filters.companyId}
-                  onChange={(e) => handleFilterChange('companyId', e.target.value)}
+                  value={filters.companyId || ''}
+                  onChange={(e) => handleFilterChange('companyId', e.target.value || null)}
                 >
                   <option value="">Todas las empresas</option>
                   {companies.map(company => (
@@ -1137,8 +1003,8 @@ const EmployeeFolders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-engage-blue focus:border-engage-blue truncate"
-                  value={filters.department}
-                  onChange={(e) => handleFilterChange('department', e.target.value)}
+                  value={filters.department || ''}
+                  onChange={(e) => handleFilterChange('department', e.target.value || null)}
                 >
                   <option value="">Todos los departamentos</option>
                   {uniqueDepartments.map(dept => (
@@ -1151,8 +1017,8 @@ const EmployeeFolders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nivel</label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-engage-blue focus:border-engage-blue truncate"
-                  value={filters.level}
-                  onChange={(e) => handleFilterChange('level', e.target.value)}
+                  value={filters.level || ''}
+                  onChange={(e) => handleFilterChange('level', e.target.value || null)}
                 >
                   <option value="">Todos los niveles</option>
                   {uniqueLevels.map(level => (
@@ -1165,8 +1031,8 @@ const EmployeeFolders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Modalidad</label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-engage-blue focus:border-engage-blue truncate"
-                  value={filters.workMode}
-                  onChange={(e) => handleFilterChange('workMode', e.target.value)}
+                  value={filters.workMode || ''}
+                  onChange={(e) => handleFilterChange('workMode', e.target.value || null)}
                 >
                   <option value="">Todas las modalidades</option>
                   {uniqueWorkModes.map(mode => (
@@ -1179,8 +1045,8 @@ const EmployeeFolders = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Contrato</label>
                 <select
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-engage-blue focus:border-engage-blue truncate"
-                  value={filters.contractType}
-                  onChange={(e) => handleFilterChange('contractType', e.target.value)}
+                  value={filters.contractType || ''}
+                  onChange={(e) => handleFilterChange('contractType', e.target.value || null)}
                 >
                   <option value="">Todos los contratos</option>
                   {uniqueContractTypes.map(type => (
@@ -1191,7 +1057,7 @@ const EmployeeFolders = () => {
             </div>
           )}
 
-          {/* Botones de acción para selección múltiple */}
+          {/* Action buttons for multi-selection */}
           {selectedFolders.size > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex items-center justify-between">
@@ -1221,7 +1087,7 @@ const EmployeeFolders = () => {
           )}
         </div>
 
-        {/* Área de arrastrar y soltar para múltiples carpetas */}
+        {/* Drag and drop area for multiple folders */}
         {selectedFolders.size > 0 && (
           <div 
             className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-2xl p-8 mb-8 text-center cursor-pointer transition-colors hover:bg-blue-100"
@@ -1246,7 +1112,7 @@ const EmployeeFolders = () => {
           </div>
         )}
 
-        {/* Lista de carpetas */}
+        {/* Folders list */}
         <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden relative responsive-layout">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
           <div className="px-8 py-6 border-b border-gray-100">
@@ -1276,7 +1142,6 @@ const EmployeeFolders = () => {
             </div>
           </div>
 
-          {/* Indicador de scroll para móviles */}
           <div className="table-scroll-hint">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -1480,7 +1345,7 @@ const EmployeeFolders = () => {
             </div>
           </div>
 
-          {/* Controles de paginación */}
+          {/* Pagination controls */}
           {getTotalPages() > 1 && (
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
               <div className="pagination-controls">
@@ -1532,11 +1397,11 @@ const EmployeeFolders = () => {
           )}
         </div>
 
-        {/* Vista de carpeta individual */}
+        {/* Individual folder view */}
         {selectedFolder && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-100">
-              {/* Header Moderno */}
+              {/* Header */}
               <div className="bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 rounded-t-3xl p-8 text-white relative overflow-hidden">
                 <div className="absolute inset-0 bg-black/10"></div>
                 <div className="relative z-10">
@@ -1572,7 +1437,6 @@ const EmployeeFolders = () => {
                     </div>
                   </div>
                 </div>
-                {/* Elementos decorativos */}
                 <div className="absolute -top-6 -right-6 w-20 h-20 bg-white/10 rounded-full"></div>
                 <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-white/10 rounded-full"></div>
               </div>
@@ -1680,7 +1544,7 @@ const EmployeeFolders = () => {
                   </div>
                 </div>
                 
-                {/* Archivos en la carpeta */}
+                {/* Files in folder */}
                 <div className="border-t border-gray-200 pt-8">
                   <div className="flex items-center mb-6">
                     <div className="bg-gradient-to-r from-cyan-500 to-blue-600 p-3 rounded-xl mr-4">
@@ -1732,7 +1596,6 @@ const EmployeeFolders = () => {
                             <div className="flex items-center space-x-3">
                               <button
                                 onClick={() => {
-                                  // Mostrar contenido del archivo en un modal moderno
                                   MySwal.fire({
                                     title: `<div class="flex items-center"><div class="bg-gradient-to-r from-blue-500 to-cyan-600 p-2 rounded-lg mr-3"><svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>${doc.name}</div>`,
                                     html: `<div class="text-left max-h-96 overflow-y-auto bg-gray-50 p-4 rounded-lg"><pre class="whitespace-pre-wrap text-sm font-mono text-gray-800">${doc.content}</pre></div>`,
