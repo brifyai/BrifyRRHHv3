@@ -37,8 +37,8 @@ export const AIChat = lazy(() => import('../components/embeddings/AIChat'));
 export const SemanticSearch = lazy(() => import('../components/embeddings/SemanticSearch'));
 export const TokenUsage = lazy(() => import('../components/embeddings/TokenUsage'));
 
-// Settings Components
-export const Settings = lazy(() => import('../components/settings/Settings'));
+// Settings Components - ACTUALIZADO PARA USAR SISTEMA DINÁMICO
+export const Settings = lazy(() => import('../components/settings/SettingsDynamic'));
 export const CompanyForm = lazy(() => import('../components/settings/CompanyForm'));
 export const UserManagement = lazy(() => import('../components/settings/UserManagement'));
 export const DatabaseSettings = lazy(() => import('../components/settings/DatabaseSettings'));

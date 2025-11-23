@@ -7,7 +7,8 @@ import {
   ChatBubbleLeftRightIcon,
   BuildingStorefrontIcon,
   PuzzlePieceIcon,
-  ServerIcon
+  ServerIcon,
+  ArrowsRightLeftIcon
 } from '@heroicons/react/24/outline'
 
 const SettingsHeader = ({ activeTab }) => {
@@ -16,6 +17,7 @@ const SettingsHeader = ({ activeTab }) => {
     { id: 'companies', label: 'Empresas', icon: BuildingOfficeIcon, path: '/configuracion/empresas' },
     { id: 'users', label: 'Usuarios', icon: UserGroupIcon, path: '/configuracion/usuarios' },
     { id: 'general', label: 'General', icon: Cog6ToothIcon, path: '/configuracion/general' },
+    { id: 'sync', label: 'Sincronización', icon: ArrowsRightLeftIcon, path: '/configuracion/sincronizacion' },
     { id: 'notifications', label: 'Notificaciones', icon: ChatBubbleLeftRightIcon, path: '/configuracion/notificaciones' },
     { id: 'security', label: 'Seguridad', icon: BuildingStorefrontIcon, path: '/configuracion/seguridad' },
     { id: 'integrations', label: 'Integraciones', icon: PuzzlePieceIcon, path: '/configuracion/integraciones' },

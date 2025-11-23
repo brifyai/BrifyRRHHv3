@@ -314,33 +314,62 @@ class DriveWebhookService {
     // Limpiar intervalo anterior
     if (this.watchInterval) {
       clearInterval(this.watchInterval);
+      this.watchInterval = null;
     }
     
-    // Calcular tiempo hasta la renovación (1 hora antes de la expiración)
+    // Calcular tiempo hasta la renovación (2 horas antes de la expiración)
     const now = new Date();
     const expiration = new Date(this.webhookExpiration);
-    const timeUntilRenewal = expiration.getTime() - now.getTime() - (60 * 60 * 1000); // 1 hora antes
+    const timeUntilRenewal = expiration.getTime() - now.getTime() - (2 * 60 * 60 * 1000); // 2 horas antes
     
     // Si el tiempo es negativo, renovar inmediatamente
     const intervalTime = timeUntilRenewal > 0 ? timeUntilRenewal : 1000; // 1 segundo
     
-    logger.info('DriveWebhookService', `⏰ Renovación programada en ${intervalTime}ms`);
+    logger.info('DriveWebhookService', `⏰ Renovación programada en ${intervalTime}ms (expira: ${expiration.toISOString()})`);
     
     this.watchInterval = setInterval(async () => {
       try {
         logger.info('DriveWebhookService', '🔄 Renovando canal de notificación...');
         
+        // Verificar si el canal aún es válido antes de renovar
+        const currentExpiration = new Date(this.webhookExpiration);
+        const now = new Date();
+        
+        if (currentExpiration <= now) {
+          logger.info('DriveWebhookService', '⚠️ Canal ya expiró, renovando...');
+        } else {
+          logger.info('DriveWebhookService', 'ℹ️ Renovando canal antes de que expire');
+        }
+        
         // Detener la observación actual
         await this.stopWatching();
         
-        // Iniciar una nueva observación
-        await this.startWatching();
+        // Esperar un poco antes de crear el nuevo canal
+        await this.delay(2000);
         
-        logger.info('DriveWebhookService', '✅ Canal renovado exitosamente');
+        // Iniciar una nueva observación
+        const success = await this.startWatching();
+        
+        if (success) {
+          logger.info('DriveWebhookService', '✅ Canal renovado exitosamente');
+        } else {
+          logger.error('DriveWebhookService', '❌ Error renovando canal, reintentando en 5 minutos');
+          // Reintentar en 5 minutos si falla
+          setTimeout(() => this.scheduleChannelRenewal(), 5 * 60 * 1000);
+        }
       } catch (error) {
         logger.error('DriveWebhookService', `❌ Error renovando canal: ${error.message}`);
+        // Reintentar en 5 minutos si hay error
+        setTimeout(() => this.scheduleChannelRenewal(), 5 * 60 * 1000);
       }
     }, intervalTime);
+  }
+
+  /**
+   * Utilidad para delays
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**

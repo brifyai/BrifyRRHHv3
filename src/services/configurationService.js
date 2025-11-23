@@ -358,6 +358,8 @@ class ConfigurationService {
         this._migrateLocalStorageItem('backupSettings', 'backup', 'settings'),
 
         // Jerarquía de configuración
+// Jerarquía de configuración
+        this._migrateLocalStorageItem('hierarchyMode', 'general', 'hierarchy_mode'),
         this._migrateLocalStorageItem('hierarchyMode', 'system', 'hierarchy_mode'),
       ];
 
@@ -424,25 +426,37 @@ class ConfigurationService {
   }
 
   async _saveToDatabase(category, key, value, scope, companyId, description) {
-    const { data, error } = await supabase
-      .from('system_configurations')
-      .upsert({
-        user_id: supabase.auth.user()?.id,
-        scope,
-        company_id: companyId,
-        category,
-        config_key: key,
-        config_value: value,
-        description,
-        is_active: true,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,scope,company_id,category,config_key'
-      })
-      .select();
+    try {
+      // Obtener usuario actual usando la nueva API de Supabase
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.warn('Error obteniendo usuario:', authError);
+      }
 
-    if (error) throw error;
-    return data;
+      const { data, error } = await supabase
+        .from('system_configurations')
+        .upsert({
+          user_id: user?.id || null,
+          scope,
+          company_id: companyId,
+          category,
+          config_key: key,
+          config_value: value,
+          description,
+          is_active: true,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,scope,company_id,category,config_key'
+        })
+        .select();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error(`Error guardando en BD ${category}.${key}:`, error);
+      throw error;
+    }
   }
 
   async _deleteFromDatabase(category, key, scope, companyId) {

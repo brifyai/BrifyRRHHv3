@@ -1,9 +1,7 @@
 import React, { useState } from 'react'
 import {
-  CloudIcon,
   PuzzlePieceIcon,
   Cog6ToothIcon,
-  ChatBubbleLeftRightIcon,
   BuildingStorefrontIcon
 } from '@heroicons/react/24/outline'
 
@@ -28,8 +26,14 @@ const IntegrationsSection = ({
   onDisconnectGoogleDrive,
   onConfigureIntegration,
   onDisconnectIntegration,
-  getStatusBadge
+  getStatusBadge,
+  companyId,
+  companies
 }) => {
+  // Detectar si estamos en modo empresa específica
+  const currentCompany = companyId ? companies.find(c => c.id === companyId) : null
+  const isCompanySpecificMode = !!currentCompany
+
   // Estado para controlar qué componente de configuración se está mostrando
   const [showConfig, setShowConfig] = useState(null)
   
@@ -53,57 +57,8 @@ const IntegrationsSection = ({
     onConfigureIntegration(integrationId, config)
   }
   
-  const integrationCards = [
-    {
-      id: 'google',
-      name: 'Google Drive',
-      description: 'Almacenamiento en la nube',
-      icon: CloudIcon,
-      gradient: 'from-green-500 to-green-600',
-      connected: isGoogleDriveConnected,
-      action: onConnectGoogleDrive,
-      disconnect: onDisconnectGoogleDrive
-    },
-    {
-      id: 'googlemeet',
-      name: 'Google Meet',
-      description: 'Videoconferencias',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-green-500 to-green-600',
-      action: () => handleShowConfig('googlemeet')
-    },
-    {
-      id: 'slack',
-      name: 'Slack',
-      description: 'Notificaciones colaborativas',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-purple-500 to-purple-600',
-      action: () => handleShowConfig('slack')
-    },
-    {
-      id: 'teams',
-      name: 'Microsoft Teams',
-      description: 'Notificaciones empresariales',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-indigo-500 to-indigo-600',
-      action: () => handleShowConfig('teams')
-    },
-    {
-      id: 'hubspot',
-      name: 'HubSpot',
-      description: 'CRM y marketing',
-      icon: BuildingStorefrontIcon,
-      gradient: 'from-orange-500 to-orange-600',
-      action: () => handleShowConfig('hubspot')
-    },
-    {
-      id: 'brevo',
-      name: 'Brevo',
-      description: 'SMS y Email Masivo',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-blue-500 to-blue-600',
-      action: () => handleShowConfig('brevo')
-    },
+  // Integraciones globales (solo para el sistema, no por empresa)
+  const globalIntegrationCards = [
     {
       id: 'groq',
       name: 'Groq AI',
@@ -111,44 +66,11 @@ const IntegrationsSection = ({
       icon: PuzzlePieceIcon,
       gradient: 'from-teal-500 to-teal-600',
       action: () => handleShowConfig('groq')
-    },
-    {
-      id: 'whatsapp',
-      name: 'WhatsApp Business',
-      description: 'Mensajería empresarial',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-green-500 to-green-600',
-      action: () => handleShowConfig('whatsapp')
-    },
-    {
-      id: 'whatsappOfficial',
-      name: 'WhatsApp Official API',
-      description: 'API oficial de WhatsApp',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-green-500 to-green-600',
-      action: () => handleShowConfig('whatsappOfficial')
-    },
-    {
-      id: 'whatsappWaha',
-      name: 'WhatsApp WAHA API',
-      description: 'API alternativa de WhatsApp',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-purple-500 to-purple-600',
-      action: () => handleShowConfig('whatsappWaha')
-    },
-    {
-      id: 'telegram',
-      name: 'Telegram Bot',
-      description: 'Mensajería segura',
-      icon: ChatBubbleLeftRightIcon,
-      gradient: 'from-blue-500 to-blue-600',
-      action: () => handleShowConfig('telegram')
     }
   ]
 
-  const handleHierarchyModeChange = (newMode) => {
-    onConfigureIntegration('hierarchy', newMode)
-  }
+  // Determinar qué integraciones mostrar según el contexto
+  const integrationCards = isCompanySpecificMode ? [] : globalIntegrationCards
   
   // Renderizar el componente de configuración correspondiente
   const renderConfigComponent = () => {
@@ -202,11 +124,22 @@ const IntegrationsSection = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Integraciones Globales</h2>
-          <p className="text-gray-600 mt-1">Configuraciones por defecto para todas las empresas</p>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {isCompanySpecificMode ? `Integraciones - ${currentCompany.name}` : 'Integraciones Globales'}
+          </h2>
+          <p className="text-gray-600 mt-1">
+            {isCompanySpecificMode 
+              ? `Configuraciones específicas para ${currentCompany.name}` 
+              : 'Configuraciones por defecto para todas las empresas'
+            }
+          </p>
         </div>
-        <span className="px-3 py-1 bg-purple-100 text-purple-700 text-sm font-medium rounded-full">
-          Configuración global
+        <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+          isCompanySpecificMode 
+            ? 'bg-blue-100 text-blue-700' 
+            : 'bg-purple-100 text-purple-700'
+        }`}>
+          {isCompanySpecificMode ? 'Configuración por empresa' : 'Configuración global'}
         </span>
       </div>
 
@@ -219,20 +152,22 @@ const IntegrationsSection = ({
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Sistema de Configuración Jerárquico</h3>
             <p className="text-gray-600 mb-4">
-              Las configuraciones aquí establecidas sirven como valores por defecto para todas las empresas.
-              Cada empresa puede tener sus propias credenciales específicas que sobreescriben estas configuraciones globales.
+              {isCompanySpecificMode
+                ? `Las integraciones aquí mostradas son específicas para ${currentCompany.name}. Cada empresa gestiona sus propias credenciales y configuraciones de servicios externos.`
+                : 'Las configuraciones aquí establecidas sirven como valores por defecto para todas las empresas. Cada empresa puede tener sus propias credenciales específicas que sobreescriben estas configuraciones globales.'
+              }
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h4 className="font-medium text-gray-900 mb-2">🌐 Configuración Global</h4>
                 <p className="text-sm text-gray-600">
-                  Se usa cuando una empresa no tiene configuración específica. Ideal para startups y empresas pequeñas.
+                  Solo para servicios base del sistema (como Groq AI). Se usa cuando una empresa no tiene configuración específica.
                 </p>
               </div>
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <h4 className="font-medium text-gray-900 mb-2">🏢 Configuración por Empresa</h4>
                 <p className="text-sm text-gray-600">
-                  Sobreescribe la configuración global. Perfecta para empresas con múltiples marcas o requisitos específicos.
+                  Cada empresa gestiona sus propias integraciones (Google Drive, WhatsApp, Slack, etc.) con credenciales independientes.
                 </p>
               </div>
             </div>
@@ -240,101 +175,74 @@ const IntegrationsSection = ({
         </div>
       </div>
 
-      {/* Control de Modo de Jerarquía */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-3xl p-6 border border-purple-100">
-        <div className="flex items-start">
-          <div className="p-2 rounded-lg bg-purple-100 mr-4">
-            <Cog6ToothIcon className="h-5 w-5 text-purple-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Control de Configuración Jerárquico</h3>
-            <p className="text-gray-600 mb-4">
-              Selecciona cómo el sistema debe priorizar las configuraciones globales vs. las específicas de cada empresa.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <button
-                onClick={() => handleHierarchyModeChange('global_only')}
-                className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                  hierarchyMode === 'global_only'
-                    ? 'border-purple-500 bg-purple-100 shadow-lg'
-                    : 'border-gray-200 bg-white hover:border-purple-300'
-                }`}
-              >
-                <div className="text-center">
-                  <div className={`text-2xl mb-2 ${hierarchyMode === 'global_only' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    🌐
-                  </div>
-                  <h4 className={`font-semibold mb-1 ${hierarchyMode === 'global_only' ? 'text-purple-900' : 'text-gray-700'}`}>
-                    Solo Global
-                  </h4>
-                  <p className={`text-xs ${hierarchyMode === 'global_only' ? 'text-purple-700' : 'text-gray-500'}`}>
-                    Usa solo configuraciones globales
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleHierarchyModeChange('company_first')}
-                className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                  hierarchyMode === 'company_first'
-                    ? 'border-purple-500 bg-purple-100 shadow-lg'
-                    : 'border-gray-200 bg-white hover:border-purple-300'
-                }`}
-              >
-                <div className="text-center">
-                  <div className={`text-2xl mb-2 ${hierarchyMode === 'company_first' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    🏢➡️🌐
-                  </div>
-                  <h4 className={`font-semibold mb-1 ${hierarchyMode === 'company_first' ? 'text-purple-900' : 'text-gray-700'}`}>
-                    Empresa Primero
-                  </h4>
-                  <p className={`text-xs ${hierarchyMode === 'company_first' ? 'text-purple-700' : 'text-gray-500'}`}>
-                    Prioriza config. por empresa
-                  </p>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleHierarchyModeChange('both')}
-                className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                  hierarchyMode === 'both'
-                    ? 'border-purple-500 bg-purple-100 shadow-lg'
-                    : 'border-gray-200 bg-white hover:border-purple-300'
-                }`}
-              >
-                <div className="text-center">
-                  <div className={`text-2xl mb-2 ${hierarchyMode === 'both' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    🔄
-                  </div>
-                  <h4 className={`font-semibold mb-1 ${hierarchyMode === 'both' ? 'text-purple-900' : 'text-gray-700'}`}>
-                    Ambas
-                  </h4>
-                  <p className={`text-xs ${hierarchyMode === 'both' ? 'text-purple-700' : 'text-gray-500'}`}>
-                    Combina ambas configuraciones
-                  </p>
-                </div>
-              </button>
+      {/* Configuración Global del Sistema - Solo mostrar en modo global */}
+      {!isCompanySpecificMode && (
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-3xl p-6 border border-green-100">
+          <div className="flex items-start">
+            <div className="p-2 rounded-lg bg-green-100 mr-4">
+              <Cog6ToothIcon className="h-5 w-5 text-green-600" />
             </div>
-
-            <div className="bg-white rounded-lg p-4 border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-gray-900">Modo Actual:</h4>
-                  <p className="text-sm text-gray-600">
-                    {hierarchyMode === 'global_only' && 'Solo se usarán configuraciones globales. Las configuraciones por empresa serán ignoradas.'}
-                    {hierarchyMode === 'company_first' && 'Se priorizarán configuraciones por empresa. Si no existen, se usarán las globales.'}
-                    {hierarchyMode === 'both' && 'Se combinarán ambas configuraciones. Las específicas de empresa sobreescribirán las globales.'}
-                  </p>
-                </div>
-                <div className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
-                  {hierarchyMode.replace('_', ' ').toUpperCase()}
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Configuración Global del Sistema</h3>
+              <p className="text-gray-600 mb-4">
+                Estas son las únicas configuraciones globales del sistema. Todas las demás integraciones son específicas por empresa.
+              </p>
+              
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Estado Actual:</h4>
+                    <p className="text-sm text-gray-600">
+                      Solo se muestran configuraciones globales del sistema. Las integraciones externas se configuran por empresa.
+                    </p>
+                  </div>
+                  <div className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                    GLOBAL ONLY
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Banner de modo empresa específica */}
+      {isCompanySpecificMode && (
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-3xl p-6 border border-blue-100">
+          <div className="flex items-start">
+            <div className="p-2 rounded-lg bg-blue-100 mr-4">
+              <BuildingStorefrontIcon className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Configuración Específica de Empresa</h3>
+              <p className="text-gray-600 mb-4">
+                Estás configurando integraciones específicamente para <strong>{currentCompany.name}</strong>. 
+                Estas configuraciones tendrán prioridad sobre las configuraciones globales.
+              </p>
+              <div className="bg-white rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Empresa Actual:</h4>
+                    <p className="text-sm text-gray-600">{currentCompany.name}</p>
+                    {currentCompany.status && (
+                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full mt-1 ${
+                        currentCompany.status === 'active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {currentCompany.status === 'active' ? 'Activa' : 'Inactiva'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                    EMPRESA ESPECÍFICA
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {integrationCards.map((integration) => {

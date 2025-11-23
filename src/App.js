@@ -33,7 +33,7 @@ const CompanyEmployeeTest = safeLazy(() => import('./components/dashboard/Compan
 const CompanySyncTest = safeLazy(() => import('./components/test/CompanySyncTest.js'), 'CompanySyncTest')
 const WhatsAppAPITest = safeLazy(() => import('./components/test/WhatsAppAPITest.js'), 'WhatsAppAPITest')
 const WebrifyCommunicationDashboard = safeLazy(() => import('./components/communication/WebrifyCommunicationDashboard.js'), 'WebrifyCommunicationDashboard')
-const Settings = safeLazy(() => import('./components/settings/Settings.js'), 'Settings')
+const Settings = safeLazy(() => import('./components/settings/SettingsDynamic.js'), 'Settings')
 const BrevoStatisticsDashboard = safeLazy(() => import('./components/communication/BrevoStatisticsDashboard.js'), 'BrevoStatisticsDashboard')
 const BrevoTemplatesManager = safeLazy(() => import('./components/communication/BrevoTemplatesManager.js'), 'BrevoTemplatesManager')
 const WhatsAppOnboarding = safeLazy(() => import('./components/whatsapp/WhatsAppOnboarding.js'), 'WhatsAppOnboarding')
@@ -269,6 +269,30 @@ function App() {
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }
+/>
+            <Route
+              path="/configuracion/empresas/:companyId/sincronizacion"
+              element={
+                <ProtectedRoute>
+                  <AuthenticatedLayout>
+                    <SuspenseWrapper message="Cargando configuración de sincronización...">
+                      <Settings activeTab="company-sync" />
+                    </SuspenseWrapper>
+                  </AuthenticatedLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/configuracion/empresas/:companyId/integraciones"
+              element={
+                <ProtectedRoute>
+                  <AuthenticatedLayout>
+                    <SuspenseWrapper message="Cargando integraciones de empresa...">
+                      <Settings activeTab="integrations" companyId={true} />
+                    </SuspenseWrapper>
+                  </AuthenticatedLayout>
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/configuracion/usuarios"
@@ -337,6 +361,18 @@ function App() {
                   <AuthenticatedLayout>
                     <SuspenseWrapper message="Cargando base de datos...">
                       <Settings activeTab="database" />
+                    </SuspenseWrapper>
+                  </AuthenticatedLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/configuracion/sincronizacion"
+              element={
+                <ProtectedRoute>
+                  <AuthenticatedLayout>
+                    <SuspenseWrapper message="Cargando configuración de sincronización...">
+                      <Settings activeTab="sync" />
                     </SuspenseWrapper>
                   </AuthenticatedLayout>
                 </ProtectedRoute>

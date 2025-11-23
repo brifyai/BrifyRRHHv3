@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.js'
-import googleDriveService from '../../lib/unifiedGoogleDriveService.js'
+import googleDriveAuthServiceDynamic from '../../lib/googleDriveAuthServiceDynamic.js'
 import googleDrivePersistenceService from '../../services/googleDrivePersistenceService.js'
-import googleDriveCallbackHandler from '../../lib/googleDriveCallbackHandler.js'
 import brevoService from '../../services/brevoService.js'
 import companySyncService from '../../services/companySyncService.js'
 import organizedDatabaseService from '../../services/organizedDatabaseService.js'
@@ -103,9 +102,11 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     backupSize: null
   })
 
-  // Estados para Google Drive
+  // Estados para Google Drive - NUEVO SISTEMA DINÁMICO
   const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState(false)
   const [connectingGoogleDrive, setConnectingGoogleDrive] = useState(false)
+  const [availableGoogleDriveCredentials, setAvailableGoogleDriveCredentials] = useState([])
+  const [selectedGoogleDriveCredential, setSelectedGoogleDriveCredential] = useState(null)
 
   // Funciones de carga - movidas antes del useEffect para evitar use-before-define
   const loadCompanies = useCallback(async () => {
@@ -246,28 +247,68 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     }
   }, [])
 
-  const checkGoogleDriveConnection = useCallback(async () => {
+  // NUEVA FUNCIÓN: Cargar credenciales de Google Drive por empresa
+  const loadGoogleDriveCredentials = useCallback(async (companyId) => {
     try {
-      const isConnected = await googleDrivePersistenceService.isConnected(user?.id)
-      setIsGoogleDriveConnected(isConnected)
+      if (!companyId) {
+        setAvailableGoogleDriveCredentials([])
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        return
+      }
+
+      console.log('🔍 Cargando credenciales de Google Drive para empresa:', companyId)
       
-      if (isConnected) {
-        const status = await googleDrivePersistenceService.getConnectionStatus(user?.id)
+      // Cargar credenciales usando el servicio dinámico
+      await googleDriveAuthServiceDynamic.initialize(null, companyId)
+      const credentials = googleDriveAuthServiceDynamic.getAvailableCredentials()
+      
+      setAvailableGoogleDriveCredentials(credentials)
+      
+      // Si hay credenciales disponibles, seleccionar la primera activa
+      const activeCredential = credentials.find(cred => cred.status === 'active')
+      if (activeCredential) {
+        setSelectedGoogleDriveCredential(activeCredential.id)
+        setIsGoogleDriveConnected(true)
+        
+        // Actualizar estado de integraciones
         setIntegrations(prev => ({
           ...prev,
           google: {
-            connected: status.connected,
-            status: status.connected ? 'connected' : 'disconnected',
-            lastSync: status.lastSync || new Date().toISOString(),
-            email: status.email
+            connected: true,
+            status: 'connected',
+            lastSync: new Date().toISOString(),
+            email: activeCredential.accountEmail,
+            accountName: activeCredential.accountName
           }
         }))
+      } else {
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        setIntegrations(prev => ({
+          ...prev,
+          google: { connected: false, status: 'disconnected', lastSync: null }
+        }))
       }
+      
+      console.log(`✅ ${credentials.length} credenciales de Google Drive cargadas`)
+    } catch (error) {
+      console.error('Error loading Google Drive credentials:', error)
+      setAvailableGoogleDriveCredentials([])
+      setSelectedGoogleDriveCredential(null)
+      setIsGoogleDriveConnected(false)
+    }
+  }, [])
+
+  const checkGoogleDriveConnection = useCallback(async () => {
+    try {
+      // Usar el nuevo sistema dinámico
+      await loadGoogleDriveCredentials(selectedCompanyId)
     } catch (error) {
       console.error('Error verificando conexión de Google Drive:', error)
       setIsGoogleDriveConnected(false)
     }
-  }, [user?.id])
+  }, [selectedCompanyId, loadGoogleDriveCredentials])
 
   const checkBrevoConfiguration = useCallback(() => {
     const config = brevoService.loadConfiguration()
@@ -381,6 +422,10 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     const empresasIndex = pathParts.indexOf('empresas')
     
     let detectedCompanyId = null
+// También verificar si viene como prop
+    if (!detectedCompanyId && propCompanyId) {
+      detectedCompanyId = propCompanyId
+    }
     
     if (configuracionIndex !== -1 && empresasIndex !== -1 && empresasIndex < pathParts.length - 1) {
       // Verificar si hay un ID después de 'empresas'
@@ -638,35 +683,93 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
     }
   }
 
-  // Handlers para Integraciones
+  // NUEVOS HANDLERS para Google Drive con APIs Dinámicas
   const handleConnectGoogleDrive = async () => {
     try {
-      setConnectingGoogleDrive(true)
-      
-      if (!googleDriveService.hasValidCredentials()) {
-        setConnectingGoogleDrive(false)
-        Swal.fire({
-          title: '🔧 Configuración de Google OAuth Requerida',
-          html: `
-            <div style="text-align: left; max-width: 500px;">
-              <div style="background-color: #fff3cd; padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #ffeaa7;">
-                <h4 style="margin: 0 0 8px 0; color: #856404;">⚠️ Credenciales Faltantes</h4>
-                <p style="margin: 0; font-size: 14px; line-height: 1.5;">
-                  Para conectar con Google Drive, necesitas configurar las credenciales de OAuth 2.0 en Google Cloud Console.
-                </p>
-              </div>
-            </div>
-          `,
-          icon: 'warning',
-          confirmButtonText: 'Entendido',
-          confirmButtonColor: '#856404',
-          width: '600px'
-        })
+      if (!selectedCompanyId) {
+        toast.error('Selecciona una empresa primero')
         return
       }
+
+      setConnectingGoogleDrive(true)
       
-      const authUrl = googleDriveCallbackHandler.generateAuthorizationUrl()
+      // Solicitar credenciales de cliente al usuario
+      const { value: clientConfig } = await Swal.fire({
+        title: '🔧 Configurar Credenciales de Google Drive',
+        html: `
+          <div style="text-align: left; max-width: 500px;">
+            <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+              <h4 style="margin: 0 0 8px 0; color: #495057;">Configuración OAuth 2.0</h4>
+              <p style="margin: 0; font-size: 14px; line-height: 1.5;">
+                Ingresa las credenciales de tu proyecto de Google Cloud Console para esta empresa.
+              </p>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client ID:</label>
+              <input type="text" id="clientId" class="swal2-input" placeholder="tu_client_id.apps.googleusercontent.com" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 16px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client Secret:</label>
+              <input type="password" id="clientSecret" class="swal2-input" placeholder="tu_client_secret" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 16px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nombre de la Cuenta:</label>
+              <input type="text" id="accountName" class="swal2-input" placeholder="Cuenta Principal" style="width: 100%;">
+            </div>
+          </div>
+        `,
+        confirmButtonText: 'Continuar',
+        confirmButtonColor: '#3085d6',
+        cancelButtonText: 'Cancelar',
+        cancelButtonColor: '#6c757d',
+        showCancelButton: true,
+        preConfirm: () => {
+          const clientId = document.getElementById('clientId').value
+          const clientSecret = document.getElementById('clientSecret').value
+          const accountName = document.getElementById('accountName').value || 'Cuenta Principal'
+          
+          if (!clientId || !clientSecret) {
+            Swal.showValidationMessage('Por favor completa todos los campos')
+            return false
+          }
+          
+          return { clientId, clientSecret, accountName }
+        }
+      })
+
+      if (!clientConfig) {
+        setConnectingGoogleDrive(false)
+        return
+      }
+
+      // Generar URL de autorización
+      const redirectUri = window.location.origin + '/auth/google/callback'
+      const authUrl = googleDriveAuthServiceDynamic.generateAuthUrl({
+        clientId: clientConfig.clientId,
+        clientSecret: clientConfig.clientSecret,
+        redirectUri: redirectUri
+      }, JSON.stringify({
+        companyId: selectedCompanyId,
+        accountName: clientConfig.accountName,
+        clientConfig: {
+          clientId: clientConfig.clientId,
+          clientSecret: clientConfig.clientSecret,
+          redirectUri: redirectUri
+        }
+      }))
+
       if (authUrl) {
+        // Guardar configuración temporal para el callback
+        sessionStorage.setItem('google_drive_temp_config', JSON.stringify({
+          companyId: selectedCompanyId,
+          accountName: clientConfig.accountName,
+          clientConfig: {
+            clientId: clientConfig.clientId,
+            clientSecret: clientConfig.clientSecret,
+            redirectUri: redirectUri
+          }
+        }))
+        
         window.location.href = authUrl
       } else {
         setConnectingGoogleDrive(false)
@@ -699,23 +802,47 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
         return
       }
       
-      const disconnectResult = await googleDrivePersistenceService.disconnect(user?.id)
-      
-      if (disconnectResult.success) {
-        setIsGoogleDriveConnected(false)
-        setIntegrations(prev => ({
-          ...prev,
-          google: { connected: false, status: 'disconnected', lastSync: null }
-        }))
-        toast.success('Google Drive desconectado exitosamente')
-      } else {
-        throw new Error(disconnectResult.error?.message || 'Error al desconectar')
+      if (selectedGoogleDriveCredential) {
+        // Desactivar credencial en lugar de eliminar
+        await googleDriveAuthServiceDynamic.deactivateCredential(selectedGoogleDriveCredential)
       }
+      
+      setIsGoogleDriveConnected(false)
+      setSelectedGoogleDriveCredential(null)
+      setAvailableGoogleDriveCredentials([])
+      setIntegrations(prev => ({
+        ...prev,
+        google: { connected: false, status: 'disconnected', lastSync: null }
+      }))
+      
+      toast.success('Google Drive desconectado exitosamente')
     } catch (error) {
       console.error('Error disconnecting Google Drive:', error)
       toast.error('Error al desconectar Google Drive')
     } finally {
       setConnectingGoogleDrive(false)
+    }
+  }
+
+  const handleSelectGoogleDriveCredential = async (credentialId) => {
+    try {
+      setSelectedGoogleDriveCredential(credentialId)
+      
+      if (credentialId) {
+        const success = await googleDriveAuthServiceDynamic.selectCredential(credentialId)
+        if (success) {
+          setIsGoogleDriveConnected(true)
+          toast.success('Credencial de Google Drive seleccionada')
+        } else {
+          toast.error('Error al seleccionar la credencial')
+        }
+      } else {
+        setIsGoogleDriveConnected(false)
+        googleDriveAuthServiceDynamic.clearCurrentSession()
+      }
+    } catch (error) {
+      console.error('Error selecting Google Drive credential:', error)
+      toast.error('Error al seleccionar la credencial')
     }
   }
 
@@ -878,10 +1005,22 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
           getStatusBadge={getStatusBadge}
           companyId={selectedCompanyId}
           companies={companies}
+          availableGoogleDriveCredentials={availableGoogleDriveCredentials}
+          selectedGoogleDriveCredential={selectedGoogleDriveCredential}
+          onSelectGoogleDriveCredential={handleSelectGoogleDriveCredential}
         />
       )}
 
       {activeTab === 'sync' && <SyncSettingsSection />}
+
+      {activeTab === 'company-sync' && (
+        <CompanySyncSettingsSection
+          selectedCompanyId={selectedCompanyId}
+          companies={companies}
+          hierarchyMode={hierarchyMode}
+          onHierarchyModeChange={setHierarchyMode}
+        />
+      )}
 
       {activeTab === 'database' && <DatabaseSettings />}
     </div>

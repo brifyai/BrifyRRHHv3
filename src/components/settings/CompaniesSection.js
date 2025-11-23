@@ -166,9 +166,9 @@ const CompaniesSection = ({
 
             <div className="flex justify-end space-x-2">
               <button
-                onClick={() => navigate(`/configuracion/empresas/${company.id}`)}
-                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                title="Configurar canales de comunicación"
+                onClick={() => navigate(`/configuracion/empresas/${company.id}/sincronizacion`)}
+                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Configurar sincronización"
               >
                 <Cog6ToothIcon className="h-4 w-4" />
               </button>

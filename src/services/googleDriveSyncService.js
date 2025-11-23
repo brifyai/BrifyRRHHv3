@@ -1,13 +1,14 @@
 /**
  * Google Drive Sync Service - Refactorizado
  * Sincronización bidireccional Drive ↔ Supabase con logging detallado
- * NUEVA FUNCIONALIDAD: Gestión de permisos y detección de emails no-Gmail
+ * NUEVA FUNCIONALIDAD: Gestión de permisos y detección de emails no-Gmail + Webhooks automáticos
  */
 
 import { supabase } from '../lib/supabaseClient.js'
 import googleDriveConsolidatedService from '../lib/googleDriveConsolidated.js'
 import googleDriveAuthService from '../lib/googleDriveAuthService.js'
 import distributedLockService from '../lib/distributedLockService.js'
+import DriveWatchService from '../lib/driveWatchService.js'
 import logger from '../lib/logger.js'
 
 class GoogleDriveSyncService {
@@ -15,6 +16,9 @@ class GoogleDriveSyncService {
     this.syncIntervals = new Map()
     this.isInitialized = false
     this.syncErrors = []
+    this.webhookInitialized = false
+    this.companyConfigs = new Map() // Cache de configuraciones por empresa
+    this.customGmailDomains = null // Dominios Gmail personalizados por empresa
   }
 
   /**
@@ -42,6 +46,159 @@ class GoogleDriveSyncService {
       logger.error('GoogleDriveSyncService', `❌ Error inicializando: ${error.message}`)
       this.recordError(error.message)
       return false
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Inicializa webhooks automáticamente para todas las carpetas
+   */
+  async initializeWebhooks() {
+    try {
+      logger.info('GoogleDriveSyncService', '🔗 Inicializando webhooks automáticamente...')
+      
+      // Verificar autenticación
+      if (!googleDriveAuthService.isAuthenticated()) {
+        const error = '❌ No se pueden inicializar webhooks: Google Drive no está autenticado'
+        logger.error('GoogleDriveSyncService', error)
+        this.recordError(error)
+        throw new Error(error)
+      }
+
+      if (this.webhookInitialized) {
+        logger.info('GoogleDriveSyncService', 'ℹ️ Webhooks ya inicializados')
+        return true
+      }
+
+      // Inicializar webhooks para todas las carpetas existentes
+      const result = await this.initializeAllEmployeeWebhooks()
+      
+      this.webhookInitialized = true
+      logger.info('GoogleDriveSyncService', '✅ Webhooks inicializados automáticamente')
+      
+      return result
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error inicializando webhooks: ${error.message}`)
+      this.recordError(error.message)
+      throw error
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Configura webhook para una carpeta específica
+   */
+  async setupWebhookForFolder(folderId, userId) {
+    try {
+      logger.info('GoogleDriveSyncService', `🔗 Configurando webhook para carpeta ${folderId}`)
+      
+      const accessToken = googleDriveAuthService.getAccessToken()
+      if (!accessToken) {
+        throw new Error('No se pudo obtener token de acceso')
+      }
+
+      const result = await DriveWatchService.createWatchChannel(userId, folderId, accessToken)
+      
+      if (result.success) {
+        logger.info('GoogleDriveSyncService', `✅ Webhook configurado para carpeta ${folderId}`)
+      } else {
+        logger.warn('GoogleDriveSyncService', `⚠️ Error configurando webhook para ${folderId}: ${result.error}`)
+      }
+      
+      return result
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error configurando webhook para ${folderId}: ${error.message}`)
+      this.recordError(error.message)
+      throw error
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Inicializa webhooks para todas las carpetas de empleados existentes
+   */
+  async initializeAllEmployeeWebhooks() {
+    try {
+      logger.info('GoogleDriveSyncService', '🔗 Inicializando webhooks para todas las carpetas de empleados...')
+      
+      // Obtener todas las carpetas activas
+      const { data: folders, error } = await supabase
+        .from('employee_folders')
+        .select('*')
+        .eq('folder_status', 'active')
+        .not('drive_folder_id', 'is', null)
+
+      if (error) {
+        logger.error('GoogleDriveSyncService', `❌ Error obteniendo carpetas: ${error.message}`)
+        throw error
+      }
+
+      if (!folders || folders.length === 0) {
+        logger.info('GoogleDriveSyncService', 'ℹ️ No hay carpetas de empleados para configurar webhooks')
+        return { success: true, configured: 0, errors: 0 }
+      }
+
+      logger.info('GoogleDriveSyncService', `📊 Encontradas ${folders.length} carpetas para configurar webhooks`)
+
+      let configured = 0
+      let errors = 0
+      const results = []
+
+      // Configurar webhook para cada carpeta
+      for (const folder of folders) {
+        try {
+          const result = await this.setupWebhookForFolder(folder.drive_folder_id, folder.user_id || 'system')
+          
+          if (result.success) {
+            configured++
+            results.push({
+              folderId: folder.drive_folder_id,
+              employeeEmail: folder.employee_email,
+              success: true
+            })
+          } else {
+            errors++
+            results.push({
+              folderId: folder.drive_folder_id,
+              employeeEmail: folder.employee_email,
+              success: false,
+              error: result.error
+            })
+          }
+        } catch (folderError) {
+          errors++
+          results.push({
+            folderId: folder.drive_folder_id,
+            employeeEmail: folder.employee_email,
+            success: false,
+            error: folderError.message
+          })
+          logger.error('GoogleDriveSyncService', `❌ Error configurando webhook para ${folder.employee_email}: ${folderError.message}`)
+        }
+      }
+
+      logger.info('GoogleDriveSyncService', `📊 Webhooks configurados: ${configured} exitosos, ${errors} errores`)
+      
+      return {
+        success: true,
+        configured,
+        errors,
+        total: folders.length,
+        results
+      }
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error inicializando webhooks de empleados: ${error.message}`)
+      this.recordError(error.message)
+      throw error
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Obtiene el estado de los webhooks
+   */
+  getWebhookStatus() {
+    return {
+      initialized: this.webhookInitialized,
+      authenticated: googleDriveAuthService.isAuthenticated(),
+      watchChannels: this.watchChannels || [],
+      lastInitialization: this.lastWebhookInitialization || null
     }
   }
 
@@ -94,8 +251,97 @@ class GoogleDriveSyncService {
   }
 
   /**
-   * NUEVA FUNCIONALIDAD: Verifica si un email es de Gmail
-   * Esto es crítico para determinar si se puede compartir la carpeta
+   * NUEVA FUNCIONALIDAD: Obtiene la configuración específica de una empresa
+   */
+  async getCompanyConfig(companyId) {
+    try {
+      // Verificar cache primero
+      if (this.companyConfigs.has(companyId)) {
+        return this.companyConfigs.get(companyId)
+      }
+
+      // Si no está en cache, cargar desde configurationService
+      const configurationService = (await import('../services/configurationService.js')).default
+      const config = await configurationService.getConfig(
+        'sync',
+        'google_drive',
+        'company',
+        companyId,
+        null
+      )
+
+      // Guardar en cache
+      this.companyConfigs.set(companyId, config)
+      
+      logger.info('GoogleDriveSyncService', `📋 Configuración cargada para empresa ${companyId}`)
+      return config
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error obteniendo configuración de empresa ${companyId}: ${error.message}`)
+      return null
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Guarda la configuración específica de una empresa
+   */
+  async setCompanyConfig(companyId, config) {
+    try {
+      const configurationService = (await import('../services/configurationService.js')).default
+      
+      await configurationService.setConfig(
+        'sync',
+        'google_drive',
+        config,
+        'company',
+        companyId,
+        `Configuración de sincronización para empresa ${companyId}`
+      )
+
+      // Actualizar cache
+      this.companyConfigs.set(companyId, config)
+      
+      logger.info('GoogleDriveSyncService', `💾 Configuración guardada para empresa ${companyId}`)
+      return true
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error guardando configuración de empresa ${companyId}: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Crea carpeta de empleado usando configuración específica de empresa
+   */
+  async createEmployeeFolderForCompany(employeeEmail, employeeName, companyName, employeeData = {}, companyId = null) {
+    try {
+      // Si se proporciona companyId, usar configuración específica
+      let companyConfig = null
+      if (companyId) {
+        companyConfig = await this.getCompanyConfig(companyId)
+        if (companyConfig && companyConfig.googleDrive) {
+          logger.info('GoogleDriveSyncService', `📋 Usando configuración específica para empresa ${companyId}`)
+          
+          // Usar nombre de carpeta personalizado de la empresa
+          if (companyConfig.googleDrive.companyFolderName) {
+            companyName = companyConfig.googleDrive.companyFolderName
+          }
+          
+          // Usar dominios Gmail específicos de la empresa
+          if (companyConfig.googleDrive.allowedGmailDomains) {
+            this.customGmailDomains = companyConfig.googleDrive.allowedGmailDomains
+          }
+        }
+      }
+
+      // Llamar al método original con la configuración actualizada
+      return await this.createEmployeeFolderInDrive(employeeEmail, employeeName, companyName, employeeData)
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error creando carpeta para empresa ${companyId}: ${error.message}`)
+      throw error
+    }
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Verifica si un email es Gmail usando dominios personalizados
    */
   isGmailEmail(email) {
     if (!email || typeof email !== 'string') {
@@ -111,8 +357,8 @@ class GoogleDriveSyncService {
     // Extraer el dominio
     const domain = email.split('@')[1]?.toLowerCase()
     
-    // Gmail domains válidos
-    const gmailDomains = [
+    // Usar dominios personalizados si están disponibles, sino usar los por defecto
+    const gmailDomains = this.customGmailDomains || [
       'gmail.com',
       'googlemail.com', // Gmail para algunos países
       'gmail.cl', // Gmail Chile
@@ -124,6 +370,94 @@ class GoogleDriveSyncService {
     
     logger.info('GoogleDriveSyncService', `📧 Email ${email}: ${isGmail ? '✅ Gmail' : '❌ No Gmail'} (dominio: ${domain})`)
     return isGmail
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Inicializa webhooks para una empresa específica
+   */
+  async initializeCompanyWebhooks(companyId) {
+    try {
+      logger.info('GoogleDriveSyncService', `🔗 Inicializando webhooks para empresa ${companyId}...`)
+      
+      // Verificar autenticación
+      if (!googleDriveAuthService.isAuthenticated()) {
+        const error = '❌ No se pueden inicializar webhooks: Google Drive no está autenticado'
+        logger.error('GoogleDriveSyncService', error)
+        this.recordError(error)
+        throw new Error(error)
+      }
+
+      // Obtener carpetas de la empresa específica
+      const { data: folders, error } = await supabase
+        .from('employee_folders')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('folder_status', 'active')
+        .not('drive_folder_id', 'is', null)
+
+      if (error) {
+        logger.error('GoogleDriveSyncService', `❌ Error obteniendo carpetas de empresa ${companyId}: ${error.message}`)
+        throw error
+      }
+
+      if (!folders || folders.length === 0) {
+        logger.info('GoogleDriveSyncService', `ℹ️ No hay carpetas de empleados para empresa ${companyId}`)
+        return { success: true, configured: 0, errors: 0 }
+      }
+
+      logger.info('GoogleDriveSyncService', `📊 Encontradas ${folders.length} carpetas para empresa ${companyId}`)
+
+      let configured = 0
+      let errors = 0
+      const results = []
+
+      // Configurar webhook para cada carpeta
+      for (const folder of folders) {
+        try {
+          const result = await this.setupWebhookForFolder(folder.drive_folder_id, folder.user_id || 'system')
+          
+          if (result.success) {
+            configured++
+            results.push({
+              folderId: folder.drive_folder_id,
+              employeeEmail: folder.employee_email,
+              success: true
+            })
+          } else {
+            errors++
+            results.push({
+              folderId: folder.drive_folder_id,
+              employeeEmail: folder.employee_email,
+              success: false,
+              error: result.error
+            })
+          }
+        } catch (folderError) {
+          errors++
+          results.push({
+            folderId: folder.drive_folder_id,
+            employeeEmail: folder.employee_email,
+            success: false,
+            error: folderError.message
+          })
+          logger.error('GoogleDriveSyncService', `❌ Error configurando webhook para ${folder.employee_email}: ${folderError.message}`)
+        }
+      }
+
+      logger.info('GoogleDriveSyncService', `📊 Webhooks para empresa ${companyId}: ${configured} exitosos, ${errors} errores`)
+      
+      return {
+        success: true,
+        configured,
+        errors,
+        total: folders.length,
+        results
+      }
+    } catch (error) {
+      logger.error('GoogleDriveSyncService', `❌ Error inicializando webhooks de empresa ${companyId}: ${error.message}`)
+      this.recordError(error.message)
+      throw error
+    }
   }
 
   /**
@@ -361,6 +695,14 @@ class GoogleDriveSyncService {
           employeeEmail, employeeName, companyName, employeeData, employeeFolder.id
         )
 
+        // NUEVA FUNCIONALIDAD: Configurar webhook automáticamente
+        try {
+          await this.setupWebhookForFolder(employeeFolder.id, employeeData.user_id || 'system')
+        } catch (webhookError) {
+          logger.warn('GoogleDriveSyncService', `⚠️ Error configurando webhook para ${employeeEmail}: ${webhookError.message}`)
+          // No fallar la creación de carpeta por error de webhook
+        }
+
         return {
           driveFolder: employeeFolder,
           supabaseFolder: supabaseFolder,
@@ -567,37 +909,38 @@ class GoogleDriveSyncService {
       throw error;
     }
   }
-/**
+
+  /**
    * NUEVA FUNCIONALIDAD: Crea la estructura de carpetas para una empresa
    * Estructura: [Empresa] > [Gmail] y [No Gmail]
    */
   async createCompanyFolderStructure(companyName) {
     try {
-      logger.info('GoogleDriveSyncService', `🔍 Creando estructura de carpetas para ${companyName}`);
+      logger.info('GoogleDriveSyncService', `🔍 Creando estructura de carpetas para ${companyName}`)
       
       // 1. Crear o encontrar la carpeta principal de la empresa
-      const companyFolderName = `${companyName}`;
-      const companyFolder = await this.findOrCreateParentFolder(companyFolderName);
+      const companyFolderName = `${companyName}`
+      const companyFolder = await this.findOrCreateParentFolder(companyFolderName)
       
       // 2. Crear o encontrar la subcarpeta de Gmail
-      const gmailFolderName = 'Gmail';
-      const gmailFolder = await this.findOrCreateSubFolder(companyFolder.id, gmailFolderName);
+      const gmailFolderName = 'Gmail'
+      const gmailFolder = await this.findOrCreateSubFolder(companyFolder.id, gmailFolderName)
       
       // 3. Crear o encontrar la subcarpeta de No Gmail
-      const nonGmailFolderName = 'No Gmail';
-      const nonGmailFolder = await this.findOrCreateSubFolder(companyFolder.id, nonGmailFolderName);
+      const nonGmailFolderName = 'No Gmail'
+      const nonGmailFolder = await this.findOrCreateSubFolder(companyFolder.id, nonGmailFolderName)
       
-      logger.info('GoogleDriveSyncService', `✅ Estructura de carpetas creada para ${companyName}`);
+      logger.info('GoogleDriveSyncService', `✅ Estructura de carpetas creada para ${companyName}`)
       
       return {
         companyFolder,
         gmailFolder,
         nonGmailFolder
-      };
+      }
     } catch (error) {
-      logger.error('GoogleDriveSyncService', `❌ Error creando estructura de carpetas para ${companyName}: ${error.message}`);
-      this.recordError(error.message);
-      throw error;
+      logger.error('GoogleDriveSyncService', `❌ Error creando estructura de carpetas para ${companyName}: ${error.message}`)
+      this.recordError(error.message)
+      throw error
     }
   }
 
@@ -606,25 +949,25 @@ class GoogleDriveSyncService {
    */
   async findOrCreateSubFolder(parentFolderId, subFolderName) {
     try {
-      logger.info('GoogleDriveSyncService', `🔍 Buscando subcarpeta: ${subFolderName}`);
+      logger.info('GoogleDriveSyncService', `🔍 Buscando subcarpeta: ${subFolderName}`)
       
-      const subFolders = await googleDriveConsolidatedService.listFiles(parentFolderId);
+      const subFolders = await googleDriveConsolidatedService.listFiles(parentFolderId)
       const subFolder = subFolders.find(folder =>
         folder.name === subFolderName &&
         folder.mimeType === 'application/vnd.google-apps.folder'
-      );
+      )
 
       if (subFolder) {
-        logger.info('GoogleDriveSyncService', `✅ Subcarpeta encontrada: ${subFolder.id}`);
-        return subFolder;
+        logger.info('GoogleDriveSyncService', `✅ Subcarpeta encontrada: ${subFolder.id}`)
+        return subFolder
       }
 
-      logger.info('GoogleDriveSyncService', `📁 Creando nueva subcarpeta: ${subFolderName}`);
-      return await googleDriveConsolidatedService.createFolder(subFolderName, parentFolderId);
+      logger.info('GoogleDriveSyncService', `📁 Creando nueva subcarpeta: ${subFolderName}`)
+      return await googleDriveConsolidatedService.createFolder(subFolderName, parentFolderId)
     } catch (error) {
-      logger.error('GoogleDriveSyncService', `❌ Error buscando/creando subcarpeta ${subFolderName}: ${error.message}`);
-      this.recordError(error.message);
-      throw error;
+      logger.error('GoogleDriveSyncService', `❌ Error buscando/creando subcarpeta ${subFolderName}: ${error.message}`)
+      this.recordError(error.message)
+      throw error
     }
   }
 
@@ -717,19 +1060,20 @@ class GoogleDriveSyncService {
       throw error
     }
   }
-/**
+
+  /**
    * Sincroniza archivos de Supabase a Google Drive
    */
   async syncFilesToDrive(employeeEmail, folderId) {
     try {
-      logger.info('GoogleDriveSyncService', `🔄 Sincronizando archivos de Supabase a Drive para ${employeeEmail}...`);
+      logger.info('GoogleDriveSyncService', `🔄 Sincronizando archivos de Supabase a Drive para ${employeeEmail}...`)
       
       // Verificar autenticación
       if (!googleDriveAuthService.isAuthenticated()) {
-        const error = `❌ No se puede sincronizar archivos para ${employeeEmail}: Google Drive no está autenticado`;
-        logger.error('GoogleDriveSyncService', error);
-        this.recordError(error);
-        throw new Error(error);
+        const error = `❌ No se puede sincronizar archivos para ${employeeEmail}: Google Drive no está autenticado`
+        logger.error('GoogleDriveSyncService', error)
+        this.recordError(error)
+        throw new Error(error)
       }
 
       // Obtener documentos de Supabase que no están en Google Drive
@@ -737,28 +1081,28 @@ class GoogleDriveSyncService {
         .from('employee_documents')
         .select('*')
         .eq('folder_id', folderId)
-        .is('google_file_id', null);
+        .is('google_file_id', null)
 
       if (error) {
-        logger.error('GoogleDriveSyncService', `❌ Error obteniendo documentos de Supabase: ${error.message}`);
-        this.recordError(error.message);
-        throw error;
+        logger.error('GoogleDriveSyncService', `❌ Error obteniendo documentos de Supabase: ${error.message}`)
+        this.recordError(error.message)
+        throw error
       }
 
       if (!documents || documents.length === 0) {
-        logger.info('GoogleDriveSyncService', `ℹ️ No hay documentos para sincronizar en Supabase para ${employeeEmail}`);
-        return { synced: 0, errors: 0 };
+        logger.info('GoogleDriveSyncService', `ℹ️ No hay documentos para sincronizar en Supabase para ${employeeEmail}`)
+        return { synced: 0, errors: 0 }
       }
 
-      logger.info('GoogleDriveSyncService', `📊 ${documents.length} documentos encontrados en Supabase`);
+      logger.info('GoogleDriveSyncService', `📊 ${documents.length} documentos encontrados en Supabase`)
 
-      let synced = 0;
-      let errors = 0;
+      let synced = 0
+      let errors = 0
 
       // Sincronizar cada documento
       for (const document of documents) {
         try {
-          logger.info('GoogleDriveSyncService', `📄 Procesando documento: ${document.document_name}`);
+          logger.info('GoogleDriveSyncService', `📄 Procesando documento: ${document.document_name}`)
           
           // Crear archivo en Google Drive
           const driveFile = await googleDriveConsolidatedService.createFile(
@@ -766,39 +1110,39 @@ class GoogleDriveSyncService {
             document.document_type,
             folderId,
             document.file_url
-          );
+          )
 
           if (driveFile && driveFile.id) {
             // Actualizar documento en Supabase con el ID del archivo de Google Drive
             const { error: updateError } = await supabase
               .from('employee_documents')
               .update({ google_file_id: driveFile.id })
-              .eq('id', document.id);
+              .eq('id', document.id)
 
             if (updateError) {
-              logger.warn('GoogleDriveSyncService', `⚠️ Error actualizando documento ${document.document_name}: ${updateError.message}`);
-              errors++;
+              logger.warn('GoogleDriveSyncService', `⚠️ Error actualizando documento ${document.document_name}: ${updateError.message}`)
+              errors++
             } else {
-              synced++;
-              logger.info('GoogleDriveSyncService', `✅ Documento sincronizado: ${document.document_name}`);
+              synced++
+              logger.info('GoogleDriveSyncService', `✅ Documento sincronizado: ${document.document_name}`)
             }
           } else {
-            logger.warn('GoogleDriveSyncService', `⚠️ No se pudo crear archivo en Google Drive: ${document.document_name}`);
-            errors++;
+            logger.warn('GoogleDriveSyncService', `⚠️ No se pudo crear archivo en Google Drive: ${document.document_name}`)
+            errors++
           }
         } catch (error) {
-          logger.error('GoogleDriveSyncService', `❌ Error procesando documento ${document.document_name}: ${error.message}`);
-          this.recordError(error.message);
-          errors++;
+          logger.error('GoogleDriveSyncService', `❌ Error procesando documento ${document.document_name}: ${error.message}`)
+          this.recordError(error.message)
+          errors++
         }
       }
 
-      logger.info('GoogleDriveSyncService', `📊 Sincronización completada: ${synced} sincronizados, ${errors} errores`);
-      return { synced, errors };
+      logger.info('GoogleDriveSyncService', `📊 Sincronización completada: ${synced} sincronizados, ${errors} errores`)
+      return { synced, errors }
     } catch (error) {
-      logger.error('GoogleDriveSyncService', `❌ Error sincronizando documentos para ${employeeEmail}: ${error.message}`);
-      this.recordError(error.message);
-      throw error;
+      logger.error('GoogleDriveSyncService', `❌ Error sincronizando documentos para ${employeeEmail}: ${error.message}`)
+      this.recordError(error.message)
+      throw error
     }
   }
 
@@ -807,32 +1151,32 @@ class GoogleDriveSyncService {
    */
   async syncDriveFromSupabase(employeeEmail, folderId) {
     try {
-      logger.info('GoogleDriveSyncService', `🔄 Iniciando sincronización completa para ${employeeEmail}...`);
+      logger.info('GoogleDriveSyncService', `🔄 Iniciando sincronización completa para ${employeeEmail}...`)
       
       // Paso 1: Sincronizar desde Google Drive a Supabase
-      logger.info('GoogleDriveSyncService', `📥 Paso 1: Sincronizando desde Google Drive a Supabase...`);
-      const driveToSupabaseResult = await this.syncFilesFromDrive(folderId, employeeEmail);
+      logger.info('GoogleDriveSyncService', `📥 Paso 1: Sincronizando desde Google Drive a Supabase...`)
+      const driveToSupabaseResult = await this.syncFilesFromDrive(folderId, employeeEmail)
       
       // Paso 2: Sincronizar desde Supabase a Google Drive
-      logger.info('GoogleDriveSyncService', `📤 Paso 2: Sincronizando desde Supabase a Google Drive...`);
-      const supabaseToDriveResult = await this.syncFilesToDrive(employeeEmail, folderId);
+      logger.info('GoogleDriveSyncService', `📤 Paso 2: Sincronizando desde Supabase a Google Drive...`)
+      const supabaseToDriveResult = await this.syncFilesToDrive(employeeEmail, folderId)
       
       // Resultado combinado
-      const totalSynced = driveToSupabaseResult.synced + supabaseToDriveResult.synced;
-      const totalErrors = driveToSupabaseResult.errors + supabaseToDriveResult.errors;
+      const totalSynced = driveToSupabaseResult.synced + supabaseToDriveResult.synced
+      const totalErrors = driveToSupabaseResult.errors + supabaseToDriveResult.errors
       
-      logger.info('GoogleDriveSyncService', `✅ Sincronización completa finalizada: ${totalSynced} sincronizados, ${totalErrors} errores`);
+      logger.info('GoogleDriveSyncService', `✅ Sincronización completa finalizada: ${totalSynced} sincronizados, ${totalErrors} errores`)
       
       return {
         driveToSupabase: driveToSupabaseResult,
         supabaseToDrive: supabaseToDriveResult,
         totalSynced,
         totalErrors
-      };
+      }
     } catch (error) {
-      logger.error('GoogleDriveSyncService', `❌ Error en sincronización completa para ${employeeEmail}: ${error.message}`);
-      this.recordError(error.message);
-      throw error;
+      logger.error('GoogleDriveSyncService', `❌ Error en sincronización completa para ${employeeEmail}: ${error.message}`)
+      this.recordError(error.message)
+      throw error
     }
   }
 
