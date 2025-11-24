@@ -785,19 +785,21 @@ class DriveBidirectionalSyncActivator {
 
   /**
    * Obtiene el estado actual de la sincronización
+   * @param {string} companyId - ID de la empresa (opcional)
    * @returns {object} - Estado de la sincronización
    */
-  getSyncStatus() {
+  getSyncStatus(companyId = null) {
     try {
-      // Obtener estadísticas del servicio
-      const stats = driveBidirectionalSyncService.getStats();
+      // Obtener estadísticas del servicio para la empresa específica
+      const stats = driveBidirectionalSyncService.getStats(companyId);
       
       return {
         isActivated: this.isActivated,
         isRunning: stats.isRunning,
         isInitialized: stats.isInitialized,
         stats: stats.stats,
-        config: this.config
+        config: this.config,
+        companyId: companyId
       };
     } catch (error) {
       logger.error('DriveBidirectionalSyncActivator', `❌ Error obteniendo estado: ${error.message}`);
@@ -805,7 +807,8 @@ class DriveBidirectionalSyncActivator {
         isActivated: false,
         isRunning: false,
         isInitialized: false,
-        error: error.message
+        error: error.message,
+        companyId: companyId
       };
     }
   }

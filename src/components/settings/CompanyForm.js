@@ -942,22 +942,23 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
           </div>
         </div>
 
-        {/* Configuración de Canales de Comunicación */}
-        <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-              <Cog6ToothIcon className="h-6 w-6 mr-3 text-indigo-600" />
-              🔧 Configuración de Canales de Comunicación
-            </h2>
-            <div className="text-sm text-gray-500">
-              Configura las credenciales específicas para cada canal
+        {/* Configuración de Canales de Comunicación - Solo mostrar si existe empresa o modo específico */}
+        {(company || isCompanySpecificMode) && (
+          <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <Cog6ToothIcon className="h-6 w-6 mr-3 text-indigo-600" />
+                🔧 Configuración de Canales de Comunicación
+              </h2>
+              <div className="text-sm text-gray-500">
+                Configura las credenciales específicas para cada canal
+              </div>
             </div>
-          </div>
 
-          <p className="text-gray-600 mb-6">
-            Aquí puedes configurar las credenciales específicas para cada canal de comunicación que esta empresa utilizará.
-            Estas configuraciones sobrescribirán las configuraciones globales cuando se envíen mensajes para esta empresa.
-          </p>
+            <p className="text-gray-600 mb-6">
+              Aquí puedes configurar las credenciales específicas para cada canal de comunicación que esta empresa utilizará.
+              Estas configuraciones sobrescribirán las configuraciones globales cuando se envíen mensajes para esta empresa.
+            </p>
 
           {/* Pestañas de Canales - Rediseñadas en Grupos */}
           <div className="mb-6">
@@ -1768,6 +1769,7 @@ const CompanyForm = ({ company, onSuccess, onCancel, companyId, isCompanySpecifi
             )}
           </div>
         </div>
+        )}
 
         {/* Empleados - Solo mostrar si no está en modo específico */}
         {!isCompanySpecificMode && (

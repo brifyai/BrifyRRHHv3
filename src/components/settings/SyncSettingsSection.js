@@ -7,7 +7,7 @@ import logger from '../../lib/logger.js';
 /**
  * Componente para gestionar la sincronización bidireccional de Google Drive
  */
-const SyncSettingsSection = () => {
+const SyncSettingsSection = ({ selectedCompanyId }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isActivated, setIsActivated] = useState(false);
@@ -16,6 +16,7 @@ const SyncSettingsSection = () => {
   const [syncStats, setSyncStats] = useState(null);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [authStatus, setAuthStatus] = useState({ isAuthenticated: false, hasValidToken: false });
   
   // Configuración
   const [config, setConfig] = useState({
@@ -59,14 +60,17 @@ const SyncSettingsSection = () => {
       setError(null);
       
       // Verificar si Google Drive está autenticado
-      if (!googleDriveConsolidatedService.authService.isAuthenticated()) {
+      const authStatus = await googleDriveConsolidatedService.authService.getAuthStatus(user.id);
+      setAuthStatus(authStatus);
+      
+      if (!authStatus.isAuthenticated) {
         setError('Google Drive no está autenticado. Por favor, conecta tu cuenta de Google Drive primero.');
         setIsLoading(false);
         return;
       }
       
-      // Obtener estado del servicio
-      const status = driveBidirectionalSyncActivator.getSyncStatus();
+      // Obtener estado del servicio para la empresa específica
+      const status = driveBidirectionalSyncActivator.getSyncStatus(selectedCompanyId);
       
       setIsActivated(status.isActivated);
       setIsRunning(status.isRunning);
@@ -218,7 +222,7 @@ const SyncSettingsSection = () => {
               <div>
                 <p className="text-sm text-gray-600">Autenticación:</p>
                 <p className="font-medium">
-                  {googleDriveConsolidatedService.authService.isAuthenticated() ? 'Conectado' : 'Desconectado'}
+                  {authStatus.isAuthenticated ? 'Conectado' : 'Desconectado'}
                 </p>
               </div>
             </div>
@@ -479,7 +483,7 @@ const SyncSettingsSection = () => {
             {!isActivated ? (
               <button
                 onClick={handleActivate}
-                disabled={isLoading || !googleDriveConsolidatedService.authService.isAuthenticated()}
+                disabled={isLoading || !authStatus.isAuthenticated}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Activando...' : 'Activar Sincronización'}

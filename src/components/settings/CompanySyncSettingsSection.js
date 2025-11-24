@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext.js'
 import googleDriveSyncService from '../../services/googleDriveSyncService.js'
 import companySyncService from '../../services/companySyncService.js'
 import configurationService from '../../services/configurationService.js'
+import integrationService from '../../services/integrationService.js'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 
@@ -15,6 +16,8 @@ const CompanySyncSettingsSection = ({
 }) => {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [integrationStatus, setIntegrationStatus] = useState({})
+  const [connectingIntegration, setConnectingIntegration] = useState(null)
   
   // Encontrar la empresa seleccionada
   const company = companies.find(c => c.id === selectedCompanyId)
@@ -128,6 +131,9 @@ const CompanySyncSettingsSection = ({
           }
         }))
       }
+
+      // Cargar estado de las integraciones
+      await loadIntegrationStatus()
     } catch (error) {
       console.error('Error loading company sync settings:', error)
       toast.error('Error al cargar la configuración de sincronización')
@@ -135,6 +141,18 @@ const CompanySyncSettingsSection = ({
       setLoading(false)
     }
   }, [company?.id, company?.name])
+
+  // Cargar estado de las integraciones
+  const loadIntegrationStatus = useCallback(async () => {
+    if (!company?.id) return
+
+    try {
+      const status = await integrationService.getCompanyIntegrationsStatus(company.id)
+      setIntegrationStatus(status)
+    } catch (error) {
+      console.error('Error loading integration status:', error)
+    }
+  }, [company?.id])
 
   useEffect(() => {
     loadCompanySyncSettings()
@@ -306,6 +324,56 @@ const CompanySyncSettingsSection = ({
     }
   }
 
+  // Conectar integración
+  const connectIntegration = async (integrationType) => {
+    try {
+      setConnectingIntegration(integrationType)
+      
+      const result = await integrationService.initiateOAuth(integrationType, company.id)
+      
+      if (result.success) {
+        toast.success(result.message)
+        
+        // Monitorear el estado de la ventana de autorización
+        const checkClosed = setInterval(() => {
+          if (result.authWindow && result.authWindow.closed) {
+            clearInterval(checkClosed)
+            setConnectingIntegration(null)
+            // Recargar estado después de que se cierre la ventana
+            setTimeout(() => {
+              loadIntegrationStatus()
+            }, 1000)
+          }
+        }, 1000)
+        
+      } else {
+        toast.error(result.error)
+      }
+    } catch (error) {
+      console.error('Error connecting integration:', error)
+      toast.error(`Error conectando integración: ${error.message}`)
+    } finally {
+      setConnectingIntegration(null)
+    }
+  }
+
+  // Desconectar integración
+  const disconnectIntegration = async (integrationType) => {
+    try {
+      const result = await integrationService.disconnectIntegration(company.id, integrationType)
+      
+      if (result.success) {
+        toast.success(result.message)
+        await loadIntegrationStatus()
+      } else {
+        toast.error(result.error)
+      }
+    } catch (error) {
+      console.error('Error disconnecting integration:', error)
+      toast.error(`Error desconectando integración: ${error.message}`)
+    }
+  }
+
   // Inicializar webhooks para la empresa
   const initializeWebhooks = async () => {
     try {
@@ -381,7 +449,7 @@ const CompanySyncSettingsSection = ({
               Configuración específica para: <span className="font-semibold">{company.name}</span>
             </p>
           </div>
-<div className="flex space-x-3">
+          <div className="flex space-x-3">
             <button
               onClick={testSyncConnection}
               disabled={isTestingConnection || loading}
@@ -399,14 +467,6 @@ const CompanySyncSettingsSection = ({
           </div>
         </div>
       </div>
-
-
-
-
-
-
-
-
 
       {/* Explicación clara de qué se está configurando */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -476,151 +536,360 @@ const CompanySyncSettingsSection = ({
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Google Drive</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.googleDrive?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.googleDrive?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">Almacenamiento en la nube específico para esta empresa</p>
-            <button
-              onClick={testSyncConnection}
-              disabled={isTestingConnection || loading}
-              className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-            >
-              {isTestingConnection ? 'Conectando...' : 'Conectar Google Drive'}
-            </button>
+            {integrationStatus.googleDrive?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('googleDrive')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.googleDrive.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('googleDrive')}
+                disabled={connectingIntegration === 'googleDrive'}
+                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'googleDrive' ? 'Conectando...' : 'Conectar Google Drive'}
+              </button>
+            )}
           </div>
 
           {/* Google Meet */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Google Meet</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.googleMeet?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.googleMeet?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">Videoconferencias específicas para esta empresa</p>
-            <button
-              onClick={() => console.log('Configurar Google Meet para', company.name)}
-              className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-            >
-              Configurar Meet
-            </button>
+            {integrationStatus.googleMeet?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('googleMeet')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.googleMeet.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('googleMeet')}
+                disabled={connectingIntegration === 'googleMeet'}
+                className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'googleMeet' ? 'Conectando...' : 'Conectar Google Meet'}
+              </button>
+            )}
           </div>
 
           {/* Slack */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Slack</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.slack?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.slack?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">Notificaciones colaborativas específicas</p>
-            <button
-              onClick={() => console.log('Configurar Slack para', company.name)}
-              className="w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
-            >
-              Configurar Slack
-            </button>
+            {integrationStatus.slack?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('slack')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.slack.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('slack')}
+                disabled={connectingIntegration === 'slack'}
+                className="w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'slack' ? 'Conectando...' : 'Conectar Slack'}
+              </button>
+            )}
           </div>
 
           {/* Microsoft Teams */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Microsoft Teams</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.teams?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.teams?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">Notificaciones empresariales específicas</p>
-            <button
-              onClick={() => console.log('Configurar Teams para', company.name)}
-              className="w-full px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
-            >
-              Configurar Teams
-            </button>
+            {integrationStatus.teams?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('teams')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.teams.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('teams')}
+                disabled={connectingIntegration === 'teams'}
+                className="w-full px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'teams' ? 'Conectando...' : 'Conectar Teams'}
+              </button>
+            )}
           </div>
 
           {/* HubSpot */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">HubSpot</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.hubspot?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.hubspot?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">CRM y marketing específico para esta empresa</p>
-            <button
-              onClick={() => console.log('Configurar HubSpot para', company.name)}
-              className="w-full px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700"
-            >
-              Configurar HubSpot
-            </button>
+            {integrationStatus.hubspot?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('hubspot')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.hubspot.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('hubspot')}
+                disabled={connectingIntegration === 'hubspot'}
+                className="w-full px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'hubspot' ? 'Conectando...' : 'Conectar HubSpot'}
+              </button>
+            )}
           </div>
 
           {/* Brevo */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Brevo</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.brevo?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.brevo?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">SMS y Email Masivo específico</p>
-            <button
-              onClick={() => console.log('Configurar Brevo para', company.name)}
-              className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-            >
-              Configurar Brevo
-            </button>
+            {integrationStatus.brevo?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('brevo')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.brevo.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('brevo')}
+                disabled={connectingIntegration === 'brevo'}
+                className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'brevo' ? 'Conectando...' : 'Conectar Brevo'}
+              </button>
+            )}
           </div>
 
           {/* WhatsApp Business */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">WhatsApp Business</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.whatsappBusiness?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.whatsappBusiness?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">Mensajería empresarial específica</p>
-            <button
-              onClick={() => console.log('Configurar WhatsApp Business para', company.name)}
-              className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-            >
-              Configurar WhatsApp
-            </button>
+            {integrationStatus.whatsappBusiness?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('whatsappBusiness')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.whatsappBusiness.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('whatsappBusiness')}
+                disabled={connectingIntegration === 'whatsappBusiness'}
+                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'whatsappBusiness' ? 'Conectando...' : 'Conectar WhatsApp'}
+              </button>
+            )}
           </div>
 
           {/* WhatsApp Official API */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">WhatsApp Official API</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.whatsappOfficial?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.whatsappOfficial?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">API oficial de WhatsApp específica</p>
-            <button
-              onClick={() => console.log('Configurar WhatsApp Official para', company.name)}
-              className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
-            >
-              Configurar API Oficial
-            </button>
+            {integrationStatus.whatsappOfficial?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('whatsappOfficial')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.whatsappOfficial.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('whatsappOfficial')}
+                disabled={connectingIntegration === 'whatsappOfficial'}
+                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'whatsappOfficial' ? 'Conectando...' : 'Conectar API Oficial'}
+              </button>
+            )}
           </div>
 
           {/* WhatsApp WAHA API */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">WhatsApp WAHA API</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.whatsappWAHA?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.whatsappWAHA?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">API alternativa de WhatsApp específica</p>
-            <button
-              onClick={() => console.log('Configurar WhatsApp WAHA para', company.name)}
-              className="w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
-            >
-              Configurar WAHA API
-            </button>
+            {integrationStatus.whatsappWAHA?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('whatsappWAHA')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.whatsappWAHA.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('whatsappWAHA')}
+                disabled={connectingIntegration === 'whatsappWAHA'}
+                className="w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'whatsappWAHA' ? 'Conectando...' : 'Conectar WAHA API'}
+              </button>
+            )}
           </div>
 
           {/* Telegram Bot */}
           <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Telegram Bot</h4>
-              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Empresa</span>
+              <span className={`text-xs px-2 py-1 rounded ${
+                integrationStatus.telegram?.connected 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-gray-100 text-gray-800'
+              }`}>
+                {integrationStatus.telegram?.connected ? 'Conectado' : 'Empresa'}
+              </span>
             </div>
             <p className="text-sm text-gray-600 mb-3">Mensajería segura específica</p>
-            <button
-              onClick={() => console.log('Configurar Telegram para', company.name)}
-              className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-            >
-              Configurar Telegram
-            </button>
+            {integrationStatus.telegram?.connected ? (
+              <div className="space-y-2">
+                <button
+                  onClick={() => disconnectIntegration('telegram')}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+                >
+                  Desconectar
+                </button>
+                <p className="text-xs text-green-600">
+                  Conectado el {new Date(integrationStatus.telegram.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => connectIntegration('telegram')}
+                disabled={connectingIntegration === 'telegram'}
+                className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {connectingIntegration === 'telegram' ? 'Conectando...' : 'Conectar Telegram'}
+              </button>
+            )}
           </div>
         </div>
 

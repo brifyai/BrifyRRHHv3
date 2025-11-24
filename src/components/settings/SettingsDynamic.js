@@ -13,6 +13,7 @@ import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 import CompanyForm from './CompanyForm.js'
 import UserManagement from './UserManagement.js'
+import GeneralSettings from './GeneralSettings.js'
 import DatabaseSettings from './DatabaseSettings.js'
 import SettingsHeader from './SettingsHeader.js'
 import CompaniesSection from './CompaniesSection.js'
@@ -961,7 +962,7 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
 
       {activeTab === 'users' && <UserManagement />}
 
-      {activeTab === 'general' && <DatabaseSettings />}
+      {activeTab === 'general' && <GeneralSettings />}
 
       {activeTab === 'notifications' && (
         <NotificationsSection
@@ -1011,7 +1012,9 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
         />
       )}
 
-      {activeTab === 'sync' && <SyncSettingsSection />}
+      {activeTab === 'sync' && (
+        <SyncSettingsSection selectedCompanyId={selectedCompanyId} />
+      )}
 
       {activeTab === 'company-sync' && (
         <CompanySyncSettingsSection

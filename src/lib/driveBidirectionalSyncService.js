@@ -693,9 +693,10 @@ class DriveBidirectionalSyncService {
 
   /**
    * Obtiene estadísticas del servicio
+   * @param {string} companyId - ID de la empresa para estadísticas específicas
    */
-  getStats() {
-    return {
+  getStats(companyId = null) {
+    const baseStats = {
       ...this.stats,
       isInitialized: this.isInitialized,
       isRunning: this.isRunning,
@@ -706,6 +707,17 @@ class DriveBidirectionalSyncService {
         deletion: this.services.deletion?.getStatus()
       }
     };
+
+    // Si se especifica una empresa, agregar estadísticas específicas
+    if (companyId) {
+      return {
+        ...baseStats,
+        companyId,
+        companySpecific: true
+      };
+    }
+
+    return baseStats;
   }
 }
 

@@ -7,6 +7,8 @@ import { ensureCorrectSupabaseConfig } from './utils/clearSupabaseCache.js'
 // Importar el interceptor forzado para asegurar el uso del proyecto correcto
 import './lib/forcedSupabaseClient.js'
 import { safeLazy } from './utils/chunkErrorHandler.js'
+// Inicializar el servicio de internacionalización
+import i18n from './lib/i18n.js'
 
 // Componentes pequeños (cargar directamente)
 import LoadingSpinner from './components/common/LoadingSpinner.js'
@@ -15,6 +17,9 @@ import GoogleAuthCallback from './components/auth/GoogleAuthCallback.js'
 import ReactErrorBoundary from './components/error/ReactErrorBoundary.js'
 import SuspenseWrapper from './components/common/SuspenseWrapper.js'
 import ResourceRecoveryMonitor from './components/monitoring/ResourceRecoveryMonitor.js'
+
+// Inicializar i18n al cargar la aplicación
+i18n.init().catch(console.error);
 
 // Componentes grandes - Lazy Loading con manejo de errores
 const ForgotPassword = safeLazy(() => import('./components/auth/ForgotPassword.js'), 'ForgotPassword')
