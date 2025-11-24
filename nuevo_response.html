@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#4F46E5" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta
+      name="description"
+      content="StaffHub - Plataforma de comunicación interna para empresas. Gestiona empleados, automatiza comunicaciones y mejora la productividad con IA avanzada. Carga masiva de documentos, WhatsApp, email, SMS."
+    />
+    <meta name="keywords" content="comunicación interna, gestión de empleados, automatización, plataforma empresarial, StaffHub, recursos humanos, comunicación corporativa, IA, WhatsApp, carga masiva, productividad" />
+    <meta name="author" content="StaffHub" />
+    <meta name="language" content="Spanish" />
+    <meta name="geo.region" content="CL" />
+    <meta name="geo.country" content="Chile" />
+    <meta name="distribution" content="global" />
+    <meta name="revisit-after" content="1 days" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://staffhub.cl/" />
+    <meta property="og:title" content="StaffHub - Plataforma de Comunicación Interna para Empresas" />
+    <meta property="og:description" content="Transforma la gestión de tus 800+ empleados con IA. Comunicación multicanal, carga masiva automatizada y asistente inteligente 24/7." />
+    <meta property="og:image" content="%PUBLIC_URL%/logo512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="StaffHub - Logo" />
+    <meta property="og:site_name" content="StaffHub" />
+    <meta property="og:locale" content="es_CL" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://staffhub.cl/" />
+    <meta name="twitter:title" content="StaffHub - Comunicación Interna con IA" />
+    <meta name="twitter:description" content="Automatiza la comunicación con tus empleados. Carga masiva, WhatsApp, email, SMS y asistente de IA." />
+    <meta name="twitter:image" content="%PUBLIC_URL%/logo512.png" />
+    <meta name="twitter:image:alt" content="StaffHub - Logo" />
+
+    <!-- Additional SEO -->
+    <meta name="googlebot" content="index, follow" />
+    <meta name="bingbot" content="index, follow" />
+    <meta name="slurp" content="index, follow" />
+    <meta name="application-name" content="StaffHub" />
+    <meta name="apple-mobile-web-app-title" content="StaffHub" />
+    <meta name="msapplication-TileColor" content="#4F46E5" />
+    <meta name="theme-color" content="#4F46E5" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://staffhub.cl/" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "StaffHub",
+      "description": "Plataforma de comunicación interna para empresas con IA avanzada",
+      "url": "https://staffhub.cl/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "CLP"
+      },
+      "creator": {
+        "@type": "Organization",
+        "name": "StaffHub"
+      },
+      "featureList": [
+        "Comunicación multicanal",
+        "Carga masiva automatizada",
+        "Asistente de IA",
+        "Base de conocimiento personalizada",
+        "Integración con WhatsApp, Email, SMS",
+        "Dashboard ejecutivo"
+      ]
+    }
+    </script>
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>StaffHub - Plataforma de Comunicación Interna para Empresas</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    
+    <!-- 🔥 SISTEMA DE DEBUGGING PARA BUCLE INFINITO -->
+    <script>
+      // 1. CONTADOR GLOBAL DE RENDERIZACIONES
+      let globalRenderCount = 0
+      let lastRenderTime = Date.now()
+      const renderHistory = []
+
+      // 2. TRACKER DE EFECTOS
+      const effectTracker = {
+        AuthContext: { count: 0, lastExecute: 0 },
+        Dashboard: { count: 0, lastExecute: 0 },
+        Polling: { count: 0, lastExecute: 0 },
+        ProfileLoad: { count: 0, lastExecute: 0 }
+      }
+
+      // 3. FUNCIÓN DE LOGGING DETALLADO
+      function logRender(source, details = {}) {
+        globalRenderCount++
+        const now = Date.now()
+        const timeSinceLast = now - lastRenderTime
+        
+        renderHistory.push({
+          count: globalRenderCount,
+          source,
+          timestamp: now,
+          timeSinceLast,
+          details
+        })
+        
+        // Mantener solo los últimos 100 registros
+        if (renderHistory.length > 100) {
+          renderHistory.shift()
+        }
+        
+        // Log cada 5 renderizaciones para detectar patrones
+        if (globalRenderCount % 5 === 0) {
+          console.log(`🔄 [${source}] Render #${globalRenderCount} - Tiempo desde último: ${timeSinceLast}ms`, details)
+          
+          // Detectar bucle si los renders son muy frecuentes
+          if (timeSinceLast < 100) {
+            console.error(`🚨 BUCLE DETECTADO en ${source}! Renders muy frecuentes: ${timeSinceLast}ms`)
+          }
+        }
+        
+        lastRenderTime = now
+      }
+
+      // 4. FUNCIÓN PARA DETECTAR PATRONES DE BUCLE
+      function analyzeLoopPattern() {
+        if (renderHistory.length < 10) return
+        
+        const recent = renderHistory.slice(-20) // Últimos 20 renders
+        const sources = recent.map(r => r.source)
+        const sourceCounts = sources.reduce((acc, source) => {
+          acc[source] = (acc[source] || 0) + 1
+          return acc
+        }, {})
+        
+        // Detectar si un solo source está dominando
+        const dominantSource = Object.keys(sourceCounts).reduce((a, b) =>
+          sourceCounts[a] > sourceCounts[b] ? a : b
+        )
+        
+        if (sourceCounts[dominantSource] > 15) {
+          console.error(`🚨 BUCLE DOMINANTE DETECTADO: ${dominantSource} está causando ${sourceCounts[dominantSource]} de los últimos 20 renders`)
+        }
+        
+        // Detectar renders muy frecuentes
+        const avgTimeBetween = recent.reduce((sum, r, i) => {
+          if (i === 0) return 0
+          return sum + (r.timeSinceLast || 0)
+        }, 0) / (recent.length - 1)
+        
+        if (avgTimeBetween < 200) {
+          console.error(`🚨 RENDERS MUY FRECUENTES: Promedio ${avgTimeBetween}ms entre renders`)
+        }
+      }
+
+      // 5. EXPORTAR FUNCIONES PARA USO EN COMPONENTES
+      window.infiniteLoopDebugger = {
+        logRender,
+        effectTracker,
+        analyzeLoopPattern,
+        getRenderHistory: () => renderHistory,
+        getGlobalCount: () => globalRenderCount
+      }
+
+      // 6. ANÁLISIS AUTOMÁTICO CADA 3 SEGUNDOS
+      setInterval(() => {
+        if (globalRenderCount > 0) {
+          analyzeLoopPattern()
+        }
+      }, 3000)
+
+      console.log('🔥 Sistema de debugging de bucle infinito inicializado')
+      console.log('📊 Usa window.infiniteLoopDebugger para análisis manual')
+    </script>
+  </body>
+</html>
