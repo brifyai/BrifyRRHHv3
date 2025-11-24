@@ -12,6 +12,7 @@ import whatsappWahaService from '../../services/whatsappWahaService.js'
 import configurationService from '../../services/configurationService.js'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
+import OrderedCompanyForm from './OrderedCompanyForm.js'
 import CompanyForm from './CompanyForm.js'
 import UserManagement from './UserManagement.js'
 import DatabaseSettings from './DatabaseSettings.js'
@@ -801,6 +802,25 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
   }
 
 
+if (showCompanyForm) {
+    // Usar OrderedCompanyForm para nuevas empresas (sin editingCompany)
+    // Usar CompanyForm para editar empresas existentes
+    const FormComponent = editingCompany ? CompanyForm : OrderedCompanyForm
+    
+    return (
+      <FormComponent
+        company={editingCompany}
+        onSuccess={handleFormSuccess}
+        onCancel={() => {
+          setShowCompanyForm(false)
+          setEditingCompany(null)
+          if (selectedCompanyId) navigate('/configuracion/empresas')
+        }}
+        companyId={selectedCompanyId}
+        isCompanySpecificMode={!!selectedCompanyId}
+      />
+    )
+  }
   if (showCompanyForm) {
     return (
       <CompanyForm
