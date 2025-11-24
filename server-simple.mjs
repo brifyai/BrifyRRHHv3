@@ -257,7 +257,7 @@ app.get('/auth/google/callback', async (req, res) => {
 // Servir archivos estáticos del build de React (para desarrollo, servir desde src)
 import path from 'path';
 
-// Servir archivos estáticos
+// Servir archivos estáticos del build de React
 app.use(express.static(path.join(__dirname, 'build')));
 
 // Ruta raíz - servir la aplicación React
