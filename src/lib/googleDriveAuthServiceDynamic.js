@@ -50,11 +50,73 @@ class GoogleDriveAuthServiceDynamic {
     try {
       logger.info('GoogleDriveAuthServiceDynamic', `📂 Cargando credenciales para empresa ${companyId}...`)
       
-      const { data, error } = await this.supabase
-        .rpc('get_company_credentials', {
-          p_company_id: companyId,
-          p_integration_type: 'google_drive'
-        })
+      // ✅ SOLUCIÓN: Validación robusta del cliente de Supabase
+      if (!this.supabase) {
+        logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ Cliente de Supabase es null, retornando array vacío')
+        this.availableCredentials = []
+        return []
+      }
+      
+      // Verificar que el cliente tenga las propiedades necesarias
+      if (typeof this.supabase !== 'object') {
+        logger.warn('GoogleDriveAuthServiceDynamic', `⚠️ Cliente de Supabase no es un objeto válido: ${typeof this.supabase}`)
+        this.availableCredentials = []
+        return []
+      }
+      
+      if (typeof this.supabase.rpc !== 'function') {
+        logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ Cliente de Supabase no tiene método rpc, intentando consulta directa...')
+        // ✅ SOLUCIÓN: Usar consulta directa en lugar de función RPC
+        try {
+          const result = await this.supabase
+            .from('company_credentials')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('integration_type', 'google_drive')
+            .eq('status', 'pending_verification')
+          
+          const data = result.data
+          const error = result.error
+          
+          if (error) {
+            logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta directa: ${error.message}`)
+            this.availableCredentials = []
+            return []
+          }
+          
+          this.availableCredentials = data || []
+          logger.info('GoogleDriveAuthServiceDynamic', `✅ ${this.availableCredentials.length} credenciales cargadas con consulta directa`)
+          return this.availableCredentials
+          
+        } catch (directError) {
+          logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta directa: ${directError.message}`)
+          this.availableCredentials = []
+          return []
+        }
+      }
+      
+      // ✅ SOLUCIÓN: Usar consulta directa en lugar de función RPC
+      // La función RPC get_company_credentials no funciona, pero la consulta directa sí
+      let data, error
+      try {
+        logger.info('GoogleDriveAuthServiceDynamic', '🔍 Usando consulta directa a company_credentials...')
+        
+        const result = await this.supabase
+          .from('company_credentials')
+          .select('*')
+          .eq('company_id', companyId)
+          .eq('integration_type', 'google_drive')
+          .eq('status', 'pending_verification')
+        
+        data = result.data
+        error = result.error
+        
+        logger.info('GoogleDriveAuthServiceDynamic', `📊 Consulta directa: ${data?.length || 0} registros encontrados`)
+      } catch (queryError) {
+        logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta directa: ${queryError.message}`)
+        this.availableCredentials = []
+        return []
+      }
 
       if (error) {
         logger.error('GoogleDriveAuthServiceDynamic', `❌ Error cargando credenciales: ${error.message}`)
@@ -63,11 +125,12 @@ class GoogleDriveAuthServiceDynamic {
       }
 
       this.availableCredentials = data || []
-      logger.info('GoogleDriveAuthServiceDynamic', `✅ ${this.availableCredentials.length} credenciales cargadas`)
+      logger.info('GoogleDriveAuthServiceDynamic', `✅ ${this.availableCredentials.length} credenciales cargadas con consulta directa`)
       
       return this.availableCredentials
     } catch (error) {
       logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en loadCompanyCredentials: ${error.message}`)
+      logger.error('GoogleDriveAuthServiceDynamic', `❌ Stack trace: ${error.stack}`)
       this.availableCredentials = []
       return []
     }
