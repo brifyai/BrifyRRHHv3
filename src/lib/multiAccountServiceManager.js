@@ -94,7 +94,29 @@ class MultiAccountServiceManager extends BaseMultiAccountManager {
   validateCredentials(credentials) {
     const errors = []
     
-    switch (this.serviceName) {
+    // Mapeo inverso para obtener el nombre corto del servicio
+    const serviceNameMap = {
+      'google_drive': 'googledrive',
+      'google_meet': 'googlemeet',
+      'slack': 'slack',
+      'microsoft_teams': 'teams',
+      'hubspot': 'hubspot',
+      'brevo': 'brevo',
+      'whatsapp_business': 'whatsapp',
+      'whatsapp_official': 'whatsappOfficial',
+      'whatsapp_waha': 'whatsappWaha',
+      'telegram': 'telegram'
+    }
+    
+    // Obtener el nombre corto del servicio para validación
+    const shortServiceName = serviceNameMap[this.serviceName] || this.serviceName
+    
+    switch (shortServiceName) {
+      case 'googledrive':
+        if (!credentials.clientId) errors.push('clientId requerido')
+        if (!credentials.clientSecret) errors.push('clientSecret requerido')
+        break
+        
       case 'googlemeet':
         if (!credentials.accessToken) errors.push('accessToken requerido')
         break
@@ -135,7 +157,7 @@ class MultiAccountServiceManager extends BaseMultiAccountManager {
         break
         
       default:
-        errors.push(`Servicio ${this.serviceName} no soportado`)
+        errors.push(`Servicio ${shortServiceName} no soportado`)
     }
 
     return {
