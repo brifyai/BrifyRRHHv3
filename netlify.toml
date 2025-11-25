@@ -7,6 +7,32 @@
   CI = "false"
   ESLINT_NO_DEV_ERRORS = "true"
 
+# ✅ REDIRECCIONES ESPECÍFICAS PARA RUTAS DE CONFIGURACIÓN
+# Estas redirecciones aseguran que las rutas anidadas funcionen correctamente
+
+[[redirects]]
+  from = "/configuracion/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/configuracion/empresas/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/configuracion/empresas/*/sincronizacion"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/configuracion/empresas/*/integraciones"
+  to = "/index.html"
+  status = 200
+
+# ✅ REDIRECCIÓN GENERAL PARA SPA (Single Page Application)
+# Esta debe estar al final para que las reglas específicas tengan prioridad
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
