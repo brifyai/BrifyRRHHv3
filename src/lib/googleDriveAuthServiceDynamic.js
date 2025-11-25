@@ -27,9 +27,27 @@ class GoogleDriveAuthServiceDynamic {
     try {
       logger.info('GoogleDriveAuthServiceDynamic', '🔄 Inicializando servicio dinámico...')
       
+      // Intentar obtener cliente de Supabase si no se proporciona
+      if (!supabaseClient) {
+        logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ No se proporcionó cliente Supabase, intentando importar...')
+        try {
+          // Intentar importar dinámicamente el cliente
+          const { supabase } = await import('../supabase.js')
+          supabaseClient = supabase
+          logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente Supabase importado dinámicamente')
+        } catch (importError) {
+          logger.error('GoogleDriveAuthServiceDynamic', `❌ Error importando cliente Supabase: ${importError.message}`)
+          this.availableCredentials = []
+          this.initialized = false
+          return false
+        }
+      }
+      
       // Validar que el cliente de Supabase sea válido
       if (!supabaseClient || typeof supabaseClient.rpc !== 'function') {
         logger.error('GoogleDriveAuthServiceDynamic', '❌ Cliente de Supabase inválido o no disponible')
+        logger.error('GoogleDriveAuthServiceDynamic', `❌ Tipo de supabaseClient: ${typeof supabaseClient}`)
+        logger.error('GoogleDriveAuthServiceDynamic', `❌ ¿Tiene rpc?: ${typeof supabaseClient?.rpc}`)
         this.availableCredentials = []
         this.initialized = false
         return false
@@ -60,18 +78,41 @@ class GoogleDriveAuthServiceDynamic {
     try {
       logger.info('GoogleDriveAuthServiceDynamic', `📂 Cargando credenciales para empresa ${companyId}...`)
       
-      // Validar que el cliente de Supabase esté disponible
-      if (!this.supabase || typeof this.supabase.rpc !== 'function') {
-        logger.error('GoogleDriveAuthServiceDynamic', '❌ Cliente de Supabase no disponible en loadCompanyCredentials')
+      // Validación robusta del cliente de Supabase
+      if (!this.supabase) {
+        logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ Cliente de Supabase es null, retornando array vacío')
         this.availableCredentials = []
         return []
       }
       
-      const { data, error } = await this.supabase
-        .rpc('get_company_credentials', {
+      // Verificar que el cliente tenga las propiedades necesarias
+      if (typeof this.supabase !== 'object') {
+        logger.warn('GoogleDriveAuthServiceDynamic', `⚠️ Cliente de Supabase no es un objeto válido: ${typeof this.supabase}`)
+        this.availableCredentials = []
+        return []
+      }
+      
+      if (typeof this.supabase.rpc !== 'function') {
+        logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ Cliente de Supabase no tiene método rpc, retornando array vacío')
+        this.availableCredentials = []
+        return []
+      }
+      
+      // Intentar la llamada RPC con manejo de errores
+      let data, error
+      try {
+        const result = await this.supabase.rpc('get_company_credentials', {
           p_company_id: companyId,
           p_integration_type: 'google_drive'
         })
+        
+        data = result.data
+        error = result.error
+      } catch (rpcError) {
+        logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en llamada RPC: ${rpcError.message}`)
+        this.availableCredentials = []
+        return []
+      }
 
       if (error) {
         logger.error('GoogleDriveAuthServiceDynamic', `❌ Error cargando credenciales: ${error.message}`)
@@ -85,6 +126,7 @@ class GoogleDriveAuthServiceDynamic {
       return this.availableCredentials
     } catch (error) {
       logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en loadCompanyCredentials: ${error.message}`)
+      logger.error('GoogleDriveAuthServiceDynamic', `❌ Stack trace: ${error.stack}`)
       this.availableCredentials = []
       return []
     }

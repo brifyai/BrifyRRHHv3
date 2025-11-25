@@ -260,9 +260,34 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       }
 
       console.log('🔍 Cargando credenciales de Google Drive para empresa:', companyId)
+      console.log('🔍 Cliente Supabase disponible:', !!supabase)
+      console.log('🔍 Tipo de supabase:', typeof supabase)
+      console.log('🔍 ¿Supabase tiene rpc?:', typeof supabase?.rpc)
+      
+      // Validar que el cliente de Supabase esté disponible
+      if (!supabase || typeof supabase.rpc !== 'function') {
+        console.warn('⚠️ Cliente de Supabase no disponible, saltando carga de credenciales')
+        setAvailableGoogleDriveCredentials([])
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        setIntegrations(prev => ({
+          ...prev,
+          google: { connected: false, status: 'disconnected', lastSync: null }
+        }))
+        return
+      }
       
       // Cargar credenciales usando el servicio dinámico
-      await googleDriveAuthServiceDynamic.initialize(supabase, companyId)
+      const initialized = await googleDriveAuthServiceDynamic.initialize(supabase, companyId)
+      
+      if (!initialized) {
+        console.warn('⚠️ No se pudo inicializar el servicio de Google Drive')
+        setAvailableGoogleDriveCredentials([])
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        return
+      }
+      
       const credentials = googleDriveAuthServiceDynamic.getAvailableCredentials()
       
       setAvailableGoogleDriveCredentials(credentials)
@@ -299,8 +324,12 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       setAvailableGoogleDriveCredentials([])
       setSelectedGoogleDriveCredential(null)
       setIsGoogleDriveConnected(false)
+      setIntegrations(prev => ({
+        ...prev,
+        google: { connected: false, status: 'disconnected', lastSync: null }
+      }))
     }
-  }, [])
+  }, [supabase])
 
   const checkGoogleDriveConnection = useCallback(async () => {
     try {
