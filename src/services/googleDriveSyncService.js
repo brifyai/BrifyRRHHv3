@@ -541,7 +541,10 @@ class GoogleDriveSyncService {
 
       const { data, error } = await supabase
         .from('non_gmail_employees')
-        .insert(nonGmailData)
+        .upsert(nonGmailData, {
+          onConflict: 'employee_email',
+          ignoreDuplicates: false
+        })
         .select()
         .single()
 
