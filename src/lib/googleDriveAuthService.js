@@ -349,6 +349,80 @@ class GoogleDriveAuthService {
       };
     }
   }
+
+  /**
+   * Set tokens manually (for bridge compatibility)
+   * @param {Object} tokens - Tokens to set
+   */
+  setTokens(tokens) {
+    try {
+      // This method is for compatibility with the token bridge
+      // In this implementation, tokens are stored in Supabase, not localStorage
+      console.log('GoogleDriveAuthService: setTokens llamado (compatibilidad con bridge)', {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        expires_at: tokens.expires_at
+      });
+      
+      // Store in memory temporarily (bridge will handle persistence)
+      this._tempTokens = tokens;
+      return true;
+    } catch (error) {
+      console.error('❌ GoogleDriveAuthService: Error en setTokens:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Clear tokens (for bridge compatibility)
+   */
+  clearTokens() {
+    try {
+      // This method is for compatibility with the token bridge
+      console.log('GoogleDriveAuthService: clearTokens llamado (compatibilidad con bridge)');
+      
+      // Clear any temporary tokens
+      this._tempTokens = null;
+      return true;
+    } catch (error) {
+      console.error('❌ GoogleDriveAuthService: Error en clearTokens:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get access token (for bridge compatibility)
+   */
+  getAccessToken() {
+    try {
+      // This method is for compatibility with the token bridge
+      if (this._tempTokens && this._tempTokens.access_token) {
+        console.log('GoogleDriveAuthService: getAccessToken llamado (usando tokens temporales)');
+        return this._tempTokens.access_token;
+      }
+      
+      console.warn('GoogleDriveAuthService: getAccessToken llamado pero no hay tokens temporales');
+      return null;
+    } catch (error) {
+      console.error('❌ GoogleDriveAuthService: Error en getAccessToken:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if authenticated (for bridge compatibility)
+   */
+  isAuthenticated() {
+    try {
+      // This method is for compatibility with the token bridge
+      const hasTokens = !!(this._tempTokens && this._tempTokens.access_token);
+      console.log('GoogleDriveAuthService: isAuthenticated llamado:', hasTokens);
+      return hasTokens;
+    } catch (error) {
+      console.error('❌ GoogleDriveAuthService: Error en isAuthenticated:', error);
+      return false;
+    }
+  }
 }
 
 // Crear y exportar instancia única
