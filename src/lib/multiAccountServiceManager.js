@@ -26,7 +26,7 @@ class MultiAccountServiceManager extends BaseMultiAccountManager {
         throw new Error(`Credenciales inválidas: ${validation.errors.join(', ')}`)
       }
 
-      // Guardar credenciales
+      // Guardar credenciales usando el manager base
       const savedCredential = await this.saveCredentials(companyId, credentials, accountName)
       
       if (!savedCredential) {
@@ -231,7 +231,27 @@ class MultiAccountServiceManager extends BaseMultiAccountManager {
    * Obtener instancia específica del servicio
    */
   static getInstance(serviceName) {
+    // Mapeo de nombres de servicio para la tabla company_credentials
+    const serviceNameMap = {
+      'googledrive': 'google_drive',
+      'googlemeet': 'google_meet',
+      'slack': 'slack',
+      'teams': 'microsoft_teams',
+      'hubspot': 'hubspot',
+      'brevo': 'brevo',
+      'whatsapp': 'whatsapp_business',
+      'whatsappOfficial': 'whatsapp_official',
+      'whatsappWaha': 'whatsapp_waha',
+      'telegram': 'telegram'
+    }
+
     const config = {
+      googledrive: {
+        name: 'Google Drive',
+        oauth: {
+          scope: 'https://www.googleapis.com/auth/drive'
+        }
+      },
       googlemeet: {
         name: 'Google Meet',
         oauth: {
@@ -278,11 +298,18 @@ class MultiAccountServiceManager extends BaseMultiAccountManager {
       }
     }
 
+    // Usar el nombre mapeado para la base de datos
+    const dbServiceName = serviceNameMap[serviceName] || serviceName
+    
     if (!config[serviceName]) {
       throw new Error(`Servicio ${serviceName} no soportado`)
     }
 
-    return new MultiAccountServiceManager(serviceName, config[serviceName])
+    const manager = new MultiAccountServiceManager(serviceName, config[serviceName])
+    // Sobrescribir el serviceName con el nombre de la base de datos
+    manager.serviceName = dbServiceName
+    
+    return manager
   }
 }
 

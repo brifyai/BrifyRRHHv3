@@ -53,7 +53,7 @@ export class BaseMultiAccountManager {
         .from('company_credentials')
         .select('*')
         .eq('company_id', companyId)
-        .eq('service_name', this.serviceName)
+        .eq('integration_type', this.serviceName)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
 
@@ -87,7 +87,7 @@ export class BaseMultiAccountManager {
 
       const credentialData = {
         company_id: companyId,
-        service_name: this.serviceName,
+        integration_type: this.serviceName,
         credentials: credentials,
         account_name: accountName,
         status: 'active',
