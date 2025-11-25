@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.js'
+import { supabase } from '../../lib/supabase.js'
 import googleDriveAuthServiceDynamic from '../../lib/googleDriveAuthServiceDynamic.js'
 import googleDrivePersistenceService from '../../services/googleDrivePersistenceService.js'
 import brevoService from '../../services/brevoService.js'
@@ -261,7 +262,7 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       console.log('🔍 Cargando credenciales de Google Drive para empresa:', companyId)
       
       // Cargar credenciales usando el servicio dinámico
-      await googleDriveAuthServiceDynamic.initialize(null, companyId)
+      await googleDriveAuthServiceDynamic.initialize(supabase, companyId)
       const credentials = googleDriveAuthServiceDynamic.getAvailableCredentials()
       
       setAvailableGoogleDriveCredentials(credentials)
