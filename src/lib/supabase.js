@@ -24,15 +24,8 @@ export { auth } from './supabaseAuth.js'
 // Exportar funciones de base de datos
 export { db } from './supabaseDatabase.js'
 
-// Crear objeto con nombre para exportación por defecto
-const supabaseModule = {
-  supabase,
-  auth,
-  db
-}
-
 // Re-exportar como objeto por defecto para mantener compatibilidad
-export default supabaseModule
+export default supabase
 
 /**
  * Guía de uso:
