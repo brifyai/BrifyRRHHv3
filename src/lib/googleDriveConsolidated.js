@@ -1,9 +1,10 @@
 /**
  * Google Drive Consolidated Service
  * SERVICIO ÚNICO Y OFICIAL para Google Drive Integration
- * 
+ *
  * Características:
- * - Autenticación centralizada via googleDriveAuthService
+ * - Autenticación centralizada via multiGoogleDriveManager
+ * - Soporte multi-cuenta por empresa
  * - Persistencia de tokens en Supabase via googleDrivePersistenceService
  * - Manejo automático de refresh tokens
  * - Compatible con entornos local y Netlify
@@ -12,54 +13,54 @@
  * - Retry automático en caso de token expirado
  */
 
-import googleDriveAuthService from './googleDriveAuthService.js'
+import multiGoogleDriveManager from './multiGoogleDriveManager.js'
 import googleDrivePersistenceService from '../services/googleDrivePersistenceService.js'
 import logger from './logger.js'
 
 class GoogleDriveConsolidatedService {
   constructor() {
-    this.authService = googleDriveAuthService
     this.persistenceService = googleDrivePersistenceService
     this.initialized = false
     this.currentUserId = null
+    this.currentCompanyId = null
   }
 
   /**
-   * Inicializa el servicio para un usuario específico
+   * Inicializa el servicio para un usuario y empresa específicos
    * @param {string} userId - ID del usuario de Supabase
+   * @param {string} companyId - ID de la empresa
    * @returns {Promise<boolean>} - Éxito de la inicialización
    */
-  async initialize(userId) {
+  async initialize(userId, companyId = null) {
     try {
       if (!userId) {
         throw new Error('userId es requerido para inicializar Google Drive')
       }
 
       this.currentUserId = userId
-      logger.info('GoogleDriveConsolidated', `🔄 Inicializando servicio para usuario ${userId}...`)
+      this.currentCompanyId = companyId
+      logger.info('GoogleDriveConsolidated', `🔄 Inicializando servicio para usuario ${userId}, empresa ${companyId}...`)
 
-      // 1. Inicializar servicio de autenticación
-      await this.authService.initialize()
-      
-      // 2. Conectar Supabase en auth service
-      const { supabase } = await import('./supabase.js')
-      this.authService.initializeSupabase(supabase, userId)
-
-      // 3. Verificar si hay credenciales guardadas en Supabase
-      const { data: savedCredentials, error: credentialsError } = await this.persistenceService.getCredentials(userId)
-      
-      if (credentialsError) {
-        logger.warn('GoogleDriveConsolidated', '⚠️ Error obteniendo credenciales guardadas:', credentialsError)
+      // 1. Inicializar servicio de autenticación multi-cuenta
+      if (companyId) {
+        const initResult = await multiGoogleDriveManager.initialize(companyId)
+        if (initResult) {
+          logger.info('GoogleDriveConsolidated', `✅ MultiGoogleDriveManager inicializado para empresa ${companyId}`)
+        } else {
+          logger.warn('GoogleDriveConsolidated', '⚠️ No se pudo inicializar MultiGoogleDriveManager completamente')
+        }
+      } else {
+        logger.warn('GoogleDriveConsolidated', '⚠️ No se proporcionó companyId, usando modo limitado')
       }
 
-      if (savedCredentials?.is_connected && !savedCredentials?.is_expired) {
-        logger.info('GoogleDriveConsolidated', '✅ Credenciales válidas encontradas en Supabase')
-        // Los tokens ya están en localStorage via googleDriveAuthService
+      // 2. Verificar autenticación
+      if (companyId && multiGoogleDriveManager.isAuthenticated(companyId)) {
+        logger.info('GoogleDriveConsolidated', '✅ Cuenta de Google Drive autenticada')
         this.initialized = true
         return true
       }
 
-      logger.info('GoogleDriveConsolidated', 'ℹ️ No hay credenciales válidas guardadas')
+      logger.info('GoogleDriveConsolidated', 'ℹ️ No hay cuenta de Google Drive autenticada')
       this.initialized = true
       return false
 
@@ -75,11 +76,11 @@ class GoogleDriveConsolidatedService {
    */
   validateService() {
     if (!this.initialized) {
-      throw new Error('Servicio no inicializado. Llama initialize(userId) primero.')
+      throw new Error('Servicio no inicializado. Llama initialize(userId, companyId) primero.')
     }
     
-    if (!this.authService.isAuthenticated()) {
-      throw new Error('Google Drive no está autenticado. Por favor, conecta tu cuenta de Google Drive.')
+    if (!this.currentCompanyId || !multiGoogleDriveManager.isAuthenticated(this.currentCompanyId)) {
+      throw new Error('Google Drive no está autenticado para esta empresa. Por favor, conecta tu cuenta de Google Drive.')
     }
 
     if (!this.currentUserId) {
@@ -156,7 +157,7 @@ class GoogleDriveConsolidatedService {
       const response = await fetch('https://www.googleapis.com/drive/v3/files?fields=id,name,parents', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.authService.getAccessToken()}`,
+          'Authorization': `Bearer ${multiGoogleDriveManager.getAccessToken(this.currentCompanyId)}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(fileMetadata)
@@ -211,7 +212,7 @@ class GoogleDriveConsolidatedService {
 
       const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${this.authService.getAccessToken()}`
+          'Authorization': `Bearer ${multiGoogleDriveManager.getAccessToken(this.currentCompanyId)}`
         }
       })
 
@@ -265,7 +266,7 @@ class GoogleDriveConsolidatedService {
       const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size,mimeType', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.authService.getAccessToken()}`
+          'Authorization': `Bearer ${multiGoogleDriveManager.getAccessToken(this.currentCompanyId)}`
         },
         body: formData
       })
@@ -306,7 +307,7 @@ class GoogleDriveConsolidatedService {
 
       const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
         headers: {
-          'Authorization': `Bearer ${this.authService.getAccessToken()}`
+          'Authorization': `Bearer ${multiGoogleDriveManager.getAccessToken(this.currentCompanyId)}`
         }
       })
 
@@ -345,7 +346,7 @@ class GoogleDriveConsolidatedService {
       const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${this.authService.getAccessToken()}`
+          'Authorization': `Bearer ${multiGoogleDriveManager.getAccessToken(this.currentCompanyId)}`
         }
       })
 
@@ -388,7 +389,7 @@ class GoogleDriveConsolidatedService {
 
       const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${this.authService.getAccessToken()}`
+          'Authorization': `Bearer ${multiGoogleDriveManager.getAccessToken(this.currentCompanyId)}`
         }
       })
 
