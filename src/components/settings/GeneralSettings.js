@@ -151,10 +151,13 @@ const GeneralSettings = () => {
       setSettings(newSettings);
       setHasChanges(true);
 
-      // Si es cambio de idioma, aplicar inmediatamente
+      // Si es cambio de idioma, aplicar inmediatamente Y guardar en Supabase
       if (key === 'language') {
+        // Cambiar idioma inmediatamente
         const success = await changeLanguage(value);
         if (success) {
+          // Guardar en Supabase para sincronización multi-dispositivo
+          await saveSetting('general', key, value);
           toast.success(t('status.settings.saved'));
         } else {
           throw new Error('Failed to change language');

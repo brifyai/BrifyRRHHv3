@@ -12,15 +12,33 @@ class I18nService {
   // Inicializar el servicio
   async init() {
     try {
-      // Cargar idioma guardado desde localStorage o usar español por defecto
-      const savedLanguage = localStorage.getItem('brify-language') || 'es';
+      // Importar configurationService dinámicamente para evitar dependencias circulares
+      const { default: configurationService } = await import('../services/configurationService.js');
+      
+      // Intentar cargar idioma desde Supabase primero
+      let savedLanguage = 'es'; // Default fallback
+      
+      try {
+        savedLanguage = await configurationService.getConfig('general', 'language', 'global', null, 'es');
+        console.log('🌐 I18nService: Idioma cargado desde Supabase:', savedLanguage);
+      } catch (supabaseError) {
+        console.warn('⚠️ I18nService: Error cargando desde Supabase, usando localStorage:', supabaseError.message);
+        // Fallback a localStorage
+        savedLanguage = localStorage.getItem('brify-language') || 'es';
+      }
+      
       await this.setLanguage(savedLanguage);
       this.initialized = true;
+      
+      // Configurar listener para cambios en tiempo real desde Supabase
+      this.setupSupabaseSync();
+      
       console.log('🌐 I18nService: Inicializado con idioma:', savedLanguage);
     } catch (error) {
       console.error('Error inicializando i18n:', error);
       // Fallback a español
       this.currentLanguage = 'es';
+      this.initialized = true;
     }
   }
 
@@ -269,6 +287,9 @@ class I18nService {
       // Actualizar atributo lang del documento
       document.documentElement.lang = language;
       
+      // Sincronizar con Supabase para multi-dispositivo
+      await this.syncLanguageWithSupabase(language);
+      
       // Notificar a los listeners
       this.notifyListeners();
       
@@ -369,6 +390,85 @@ class I18nService {
       style: 'currency',
       currency: currency
     }).format(amount);
+  }
+
+  // ========================================
+  // MÉTODOS DE SINCRONIZACIÓN CON SUPABASE
+  // ========================================
+
+  // Configurar sincronización en tiempo real con Supabase
+  async setupSupabaseSync() {
+    try {
+      const { supabase } = await import('./supabaseClient.js');
+      
+      // Escuchar cambios en tiempo real en system_configurations
+      const channel = supabase
+        .channel('language_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'system_configurations',
+            filter: 'category=eq.general&config_key=eq.language'
+          },
+          async (payload) => {
+            console.log('🔄 Cambio de idioma detectado en Supabase:', payload.new);
+            const newLanguage = payload.new.config_value;
+            if (newLanguage && newLanguage !== this.currentLanguage) {
+              await this.setLanguage(newLanguage);
+            }
+          }
+        )
+        .subscribe();
+
+      console.log('✅ Sincronización en tiempo real configurada para idioma');
+    } catch (error) {
+      console.warn('⚠️ No se pudo configurar sincronización en tiempo real:', error);
+    }
+  }
+
+  // Sincronizar idioma con Supabase
+  async syncLanguageWithSupabase(language) {
+    try {
+      const { default: configurationService } = await import('../services/configurationService.js');
+      await configurationService.setConfig(
+        'general',
+        'language',
+        language,
+        'global',
+        null,
+        'Idioma de la aplicación sincronizado'
+      );
+      console.log('✅ Idioma sincronizado con Supabase:', language);
+    } catch (error) {
+      console.warn('⚠️ Error sincronizando idioma con Supabase:', error);
+      // No lanzar error para no interrumpir el flujo
+    }
+  }
+
+  // Obtener idioma desde Supabase (para sincronización)
+  async getLanguageFromSupabase() {
+    try {
+      const { default: configurationService } = await import('../services/configurationService.js');
+      return await configurationService.getConfig('general', 'language', 'global', null, 'es');
+    } catch (error) {
+      console.warn('⚠️ Error obteniendo idioma desde Supabase:', error);
+      return this.currentLanguage; // Retornar idioma actual como fallback
+    }
+  }
+
+  // Forzar sincronización con Supabase
+  async forceSyncWithSupabase() {
+    try {
+      const supabaseLanguage = await this.getLanguageFromSupabase();
+      if (supabaseLanguage !== this.currentLanguage) {
+        console.log('🔄 Sincronizando idioma desde Supabase:', supabaseLanguage);
+        await this.setLanguage(supabaseLanguage);
+      }
+    } catch (error) {
+      console.warn('⚠️ Error en sincronización forzada:', error);
+    }
   }
 }
 
