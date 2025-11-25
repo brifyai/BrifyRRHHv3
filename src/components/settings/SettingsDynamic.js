@@ -22,7 +22,7 @@ import IntegrationsSection from './IntegrationsSection.js'
 import NotificationsSection from './NotificationsSection.js'
 import SecuritySection from './SecuritySection.js'
 import SyncSettingsSection from './SyncSettingsSection.js'
-import CompanySyncSettingsSection from './CompanySyncSettingsSection.js'
+import MultiGoogleDriveManager from './MultiGoogleDriveManager.js'
 
 const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
   const { user } = useAuth()
@@ -1018,11 +1018,9 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       )}
 
       {activeTab === 'company-sync' && (
-        <CompanySyncSettingsSection
-          selectedCompanyId={selectedCompanyId}
+        <MultiGoogleDriveManager
+          companyId={selectedCompanyId}
           companies={companies}
-          hierarchyMode={hierarchyMode}
-          onHierarchyModeChange={setHierarchyMode}
         />
       )}
 

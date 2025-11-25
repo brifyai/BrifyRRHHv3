@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
-import googleDriveSyncService from '../../services/googleDriveSyncService.js'
+import multiGoogleDriveManager from '../../lib/multiGoogleDriveManager.js'
 import companySyncService from '../../services/companySyncService.js'
 import configurationService from '../../services/configurationService.js'
 import integrationService from '../../services/integrationService.js'
@@ -281,20 +281,21 @@ const CompanySyncSettingsSection = ({
     try {
       setIsTestingConnection(true)
       
-      // Inicializar servicio de sincronización
-      const initResult = await googleDriveSyncService.initialize()
+      // Inicializar servicio de sincronización multi-cuenta
+      const initResult = await multiGoogleDriveManager.initialize(selectedCompanyId)
       if (!initResult) {
         throw new Error('No se pudo inicializar el servicio de sincronización')
       }
 
       // Probar autenticación
-      const isAuth = googleDriveSyncService.isAuthenticated()
+      const isAuth = multiGoogleDriveManager.isAuthenticated(selectedCompanyId)
       if (!isAuth) {
         throw new Error('Google Drive no está autenticado')
       }
 
       // Probar creación de estructura de carpetas
-      const folderStructure = await googleDriveSyncService.createCompanyFolderStructure(
+      const folderStructure = await multiGoogleDriveManager.createCompanyFolderStructure(
+        selectedCompanyId,
         syncSettings.googleDrive.companyFolderName
       )
 
@@ -379,7 +380,7 @@ const CompanySyncSettingsSection = ({
     try {
       setLoading(true)
       
-      const result = await googleDriveSyncService.initializeWebhooks()
+      const result = await multiGoogleDriveManager.initializeWebhooks(selectedCompanyId)
       
       if (result.success) {
         toast.success(`Webhooks inicializados: ${result.configured} configurados, ${result.errors} errores`)
@@ -399,7 +400,7 @@ const CompanySyncSettingsSection = ({
     try {
       setLoading(true)
       
-      const audit = await googleDriveSyncService.auditConsistency()
+      const audit = await multiGoogleDriveManager.auditConsistency(selectedCompanyId)
       
       const summary = audit.summary
       const message = `Auditoría completada: ${summary.totalInconsistencies} inconsistencias, ${summary.totalOrphanedInDrive} carpetas huérfanas`
