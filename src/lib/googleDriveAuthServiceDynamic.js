@@ -27,6 +27,14 @@ class GoogleDriveAuthServiceDynamic {
     try {
       logger.info('GoogleDriveAuthServiceDynamic', '🔄 Inicializando servicio dinámico...')
       
+      // Validar que el cliente de Supabase sea válido
+      if (!supabaseClient || typeof supabaseClient.rpc !== 'function') {
+        logger.error('GoogleDriveAuthServiceDynamic', '❌ Cliente de Supabase inválido o no disponible')
+        this.availableCredentials = []
+        this.initialized = false
+        return false
+      }
+      
       this.supabase = supabaseClient
       this.currentCompanyId = companyId
       
@@ -39,6 +47,8 @@ class GoogleDriveAuthServiceDynamic {
       return true
     } catch (error) {
       logger.error('GoogleDriveAuthServiceDynamic', `❌ Error inicializando: ${error.message}`)
+      this.availableCredentials = []
+      this.initialized = false
       return false
     }
   }
@@ -49,6 +59,13 @@ class GoogleDriveAuthServiceDynamic {
   async loadCompanyCredentials(companyId) {
     try {
       logger.info('GoogleDriveAuthServiceDynamic', `📂 Cargando credenciales para empresa ${companyId}...`)
+      
+      // Validar que el cliente de Supabase esté disponible
+      if (!this.supabase || typeof this.supabase.rpc !== 'function') {
+        logger.error('GoogleDriveAuthServiceDynamic', '❌ Cliente de Supabase no disponible en loadCompanyCredentials')
+        this.availableCredentials = []
+        return []
+      }
       
       const { data, error } = await this.supabase
         .rpc('get_company_credentials', {
