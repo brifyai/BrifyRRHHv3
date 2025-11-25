@@ -14,6 +14,7 @@ import i18n from './lib/i18n.js'
 import LoadingSpinner from './components/common/LoadingSpinner.js'
 import Navbar from './components/layout/Navbar.js'
 import GoogleAuthCallback from './components/auth/GoogleAuthCallback.js'
+import GoogleDriveCallback from './pages/GoogleDriveCallback.js'
 import ReactErrorBoundary from './components/error/ReactErrorBoundary.js'
 import SuspenseWrapper from './components/common/SuspenseWrapper.js'
 import ResourceRecoveryMonitor from './components/monitoring/ResourceRecoveryMonitor.js'
@@ -175,8 +176,8 @@ function App() {
               } 
             />
             
-            {/* Callback de Google Auth */}
-            <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
+            {/* Callback de Google Drive */}
+            <Route path="/auth/google/callback" element={<GoogleDriveCallback />} />
             
             {/* Rutas protegidas */}
             <Route
