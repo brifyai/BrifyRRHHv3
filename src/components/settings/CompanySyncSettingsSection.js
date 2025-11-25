@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import multiGoogleDriveManager from '../../lib/multiGoogleDriveManager.js'
+import MultiGoogleDriveManagerUI from './MultiGoogleDriveManager.js'
 import companySyncService from '../../services/companySyncService.js'
 import configurationService from '../../services/configurationService.js'
 import integrationService from '../../services/integrationService.js'
+import MultiAccountServiceUI from './MultiAccountServiceUI.js'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 
@@ -525,379 +527,168 @@ const CompanySyncSettingsSection = ({
         </div>
       )}
 
-      {/* Integraciones específicas por empresa */}
+      {/* Integraciones específicas por empresa con soporte multi-cuenta */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">🔗 Integraciones de {company.name}</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">🔗 Integraciones Multi-Cuenta de {company.name}</h3>
         <p className="text-gray-600 mb-6">
-          Configura las integraciones específicas para <strong>{company.name}</strong>. Cada empresa puede tener sus propias credenciales y configuraciones.
+          Configura múltiples cuentas para cada servicio. Cada empresa puede tener varias cuentas conectadas simultáneamente.
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Google Drive */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Google Drive</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.googleDrive?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.googleDrive?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">Almacenamiento en la nube específico para esta empresa</p>
-            {integrationStatus.googleDrive?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('googleDrive')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.googleDrive.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('googleDrive')}
-                disabled={connectingIntegration === 'googleDrive'}
-                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'googleDrive' ? 'Conectando...' : 'Conectar Google Drive'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="googledrive"
+            companyId={company.id}
+            companies={companies}
+            displayName="Google Drive"
+            icon="☁️"
+            color="#4285F4"
+            credentialFields={[
+              { id: 'clientId', label: 'Client ID', type: 'text', placeholder: 'client_id.apps.googleusercontent.com', required: true },
+              { id: 'clientSecret', label: 'Client Secret', type: 'password', placeholder: 'client_secret', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* Google Meet */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Google Meet</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.googleMeet?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.googleMeet?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">Videoconferencias específicas para esta empresa</p>
-            {integrationStatus.googleMeet?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('googleMeet')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.googleMeet.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('googleMeet')}
-                disabled={connectingIntegration === 'googleMeet'}
-                className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'googleMeet' ? 'Conectando...' : 'Conectar Google Meet'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="googlemeet"
+            companyId={company.id}
+            companies={companies}
+            displayName="Google Meet"
+            icon="📹"
+            color="#4285F4"
+            credentialFields={[
+              { id: 'accessToken', label: 'Access Token', type: 'password', placeholder: 'ya29.a0...', required: true },
+              { id: 'refreshToken', label: 'Refresh Token', type: 'password', placeholder: 'refresh_token', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* Slack */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Slack</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.slack?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.slack?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">Notificaciones colaborativas específicas</p>
-            {integrationStatus.slack?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('slack')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.slack.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('slack')}
-                disabled={connectingIntegration === 'slack'}
-                className="w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'slack' ? 'Conectando...' : 'Conectar Slack'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="slack"
+            companyId={company.id}
+            companies={companies}
+            displayName="Slack"
+            icon="💬"
+            color="#4A154B"
+            credentialFields={[
+              { id: 'botToken', label: 'Bot Token', type: 'password', placeholder: 'xoxb-...', required: true },
+              { id: 'signingSecret', label: 'Signing Secret', type: 'password', placeholder: 'signing_secret', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* Microsoft Teams */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Microsoft Teams</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.teams?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.teams?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">Notificaciones empresariales específicas</p>
-            {integrationStatus.teams?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('teams')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.teams.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('teams')}
-                disabled={connectingIntegration === 'teams'}
-                className="w-full px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'teams' ? 'Conectando...' : 'Conectar Teams'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="teams"
+            companyId={company.id}
+            companies={companies}
+            displayName="Microsoft Teams"
+            icon="👥"
+            color="#6264A7"
+            credentialFields={[
+              { id: 'tenantId', label: 'Tenant ID', type: 'text', placeholder: 'tenant_id', required: true },
+              { id: 'clientId', label: 'Client ID', type: 'text', placeholder: 'client_id', required: true },
+              { id: 'clientSecret', label: 'Client Secret', type: 'password', placeholder: 'client_secret', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* HubSpot */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">HubSpot</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.hubspot?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.hubspot?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">CRM y marketing específico para esta empresa</p>
-            {integrationStatus.hubspot?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('hubspot')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.hubspot.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('hubspot')}
-                disabled={connectingIntegration === 'hubspot'}
-                className="w-full px-3 py-2 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'hubspot' ? 'Conectando...' : 'Conectar HubSpot'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="hubspot"
+            companyId={company.id}
+            companies={companies}
+            displayName="HubSpot"
+            icon="🎯"
+            color="#FF7A59"
+            credentialFields={[
+              { id: 'accessToken', label: 'Access Token', type: 'password', placeholder: 'access_token', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* Brevo */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Brevo</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.brevo?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.brevo?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">SMS y Email Masivo específico</p>
-            {integrationStatus.brevo?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('brevo')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.brevo.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('brevo')}
-                disabled={connectingIntegration === 'brevo'}
-                className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'brevo' ? 'Conectando...' : 'Conectar Brevo'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="brevo"
+            companyId={company.id}
+            companies={companies}
+            displayName="Brevo"
+            icon="📧"
+            color="#0092FF"
+            credentialFields={[
+              { id: 'apiKey', label: 'API Key', type: 'password', placeholder: 'xkeysib-...', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* WhatsApp Business */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">WhatsApp Business</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.whatsappBusiness?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.whatsappBusiness?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">Mensajería empresarial específica</p>
-            {integrationStatus.whatsappBusiness?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('whatsappBusiness')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.whatsappBusiness.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('whatsappBusiness')}
-                disabled={connectingIntegration === 'whatsappBusiness'}
-                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'whatsappBusiness' ? 'Conectando...' : 'Conectar WhatsApp'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="whatsapp"
+            companyId={company.id}
+            companies={companies}
+            displayName="WhatsApp Business"
+            icon="📱"
+            color="#25D366"
+            credentialFields={[
+              { id: 'accessToken', label: 'Access Token', type: 'password', placeholder: 'EAA...', required: true },
+              { id: 'phoneNumberId', label: 'Phone Number ID', type: 'text', placeholder: 'phone_number_id', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* WhatsApp Official API */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">WhatsApp Official API</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.whatsappOfficial?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.whatsappOfficial?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">API oficial de WhatsApp específica</p>
-            {integrationStatus.whatsappOfficial?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('whatsappOfficial')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.whatsappOfficial.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('whatsappOfficial')}
-                disabled={connectingIntegration === 'whatsappOfficial'}
-                className="w-full px-3 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'whatsappOfficial' ? 'Conectando...' : 'Conectar API Oficial'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="whatsappOfficial"
+            companyId={company.id}
+            companies={companies}
+            displayName="WhatsApp Official API"
+            icon="✅"
+            color="#25D366"
+            credentialFields={[
+              { id: 'accessToken', label: 'Access Token', type: 'password', placeholder: 'EAA...', required: true },
+              { id: 'phoneNumberId', label: 'Phone Number ID', type: 'text', placeholder: 'phone_number_id', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* WhatsApp WAHA API */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">WhatsApp WAHA API</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.whatsappWAHA?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.whatsappWAHA?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">API alternativa de WhatsApp específica</p>
-            {integrationStatus.whatsappWAHA?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('whatsappWAHA')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.whatsappWAHA.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('whatsappWAHA')}
-                disabled={connectingIntegration === 'whatsappWAHA'}
-                className="w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'whatsappWAHA' ? 'Conectando...' : 'Conectar WAHA API'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="whatsappWaha"
+            companyId={company.id}
+            companies={companies}
+            displayName="WhatsApp WAHA API"
+            icon="🔄"
+            color="#7B68EE"
+            credentialFields={[
+              { id: 'apiKey', label: 'API Key', type: 'password', placeholder: 'api_key', required: true },
+              { id: 'sessionId', label: 'Session ID', type: 'text', placeholder: 'session_id', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
 
           {/* Telegram Bot */}
-          <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Telegram Bot</h4>
-              <span className={`text-xs px-2 py-1 rounded ${
-                integrationStatus.telegram?.connected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
-                {integrationStatus.telegram?.connected ? 'Conectado' : 'Empresa'}
-              </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-3">Mensajería segura específica</p>
-            {integrationStatus.telegram?.connected ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => disconnectIntegration('telegram')}
-                  className="w-full px-3 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
-                >
-                  Desconectar
-                </button>
-                <p className="text-xs text-green-600">
-                  Conectado el {new Date(integrationStatus.telegram.connectedAt).toLocaleDateString()}
-                </p>
-              </div>
-            ) : (
-              <button
-                onClick={() => connectIntegration('telegram')}
-                disabled={connectingIntegration === 'telegram'}
-                className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {connectingIntegration === 'telegram' ? 'Conectando...' : 'Conectar Telegram'}
-              </button>
-            )}
-          </div>
+          <MultiAccountServiceUI
+            serviceName="telegram"
+            companyId={company.id}
+            companies={companies}
+            displayName="Telegram Bot"
+            icon="✈️"
+            color="#0088CC"
+            credentialFields={[
+              { id: 'botToken', label: 'Bot Token', type: 'password', placeholder: '123456:ABC-DEF...', required: true },
+              { id: 'botUsername', label: 'Bot Username', type: 'text', placeholder: 'mi_bot', required: true },
+              { id: 'accountName', label: 'Nombre de Cuenta', type: 'text', placeholder: 'Cuenta Principal', required: false }
+            ]}
+          />
         </div>
 
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
-            <strong>💡 Nota:</strong> Cada integración se configura específicamente para <strong>{company.name}</strong>.
-            Las credenciales y configuraciones son independientes de otras empresas.
+            <strong>💡 Nuevo Sistema Multi-Cuenta:</strong> Ahora puedes conectar múltiples cuentas de cada servicio para <strong>{company.name}</strong>.
+            Cada cuenta se gestiona independientemente y puedes seleccionar cuál usar en cada momento.
           </p>
         </div>
       </div>
