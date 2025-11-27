@@ -2,6 +2,9 @@
  * Google Drive Authentication Service - Dinámico por Empresa
  * Sistema profesional que soporta múltiples cuentas de Google Drive por empresa
  * Elimina configuraciones globales y usa Supabase como fuente principal
+ *
+ * VERSIÓN: 2.0.1 - Forzar recarga de cache
+ * Última modificación: 2025-11-27 19:19:00
  */
 
 import logger from './logger.js'
@@ -27,76 +30,22 @@ class GoogleDriveAuthServiceDynamic {
     try {
       logger.info('GoogleDriveAuthServiceDynamic', '🔄 Inicializando servicio dinámico...')
       logger.info('GoogleDriveAuthServiceDynamic', `📥 Parámetros: supabaseClient=${!!supabaseClient}, companyId=${companyId}`)
-      logger.info('GoogleDriveAuthServiceDynamic', `📊 Estado actual: this.supabase=${!!this.supabase}, this.initialized=${this.initialized}`)
 
-      // ✅ SOLUCIÓN DEFINITIVA: Validar que supabaseClient sea el objeto correcto
-      let finalSupabaseClient = supabaseClient
-      
+      // ✅ SOLUCIÓN DEFINITIVA: Usar cliente proporcionado o recuperar automáticamente
       if (supabaseClient) {
+        this.supabase = supabaseClient
         logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente Supabase proporcionado directamente')
-        logger.info('GoogleDriveAuthServiceDynamic', `🔍 Tipo: ${typeof supabaseClient}`)
-        logger.info('GoogleDriveAuthServiceDynamic', `🔍 Tiene from: ${typeof supabaseClient.from}`)
-        logger.info('GoogleDriveAuthServiceDynamic', `🔍 Tiene rpc: ${typeof supabaseClient.rpc}`)
-        
-        // ✅ VALIDACIÓN CRÍTICA: Verificar que sea el cliente real de Supabase
-        if (typeof supabaseClient.rpc !== 'function') {
-          logger.error('GoogleDriveAuthServiceDynamic', '❌ Cliente proporcionado no tiene método rpc (no es un cliente Supabase válido)')
-          // Intentar extraer supabase del módulo si es necesario
-          if (supabaseClient.supabase && typeof supabaseClient.supabase.rpc === 'function') {
-            finalSupabaseClient = supabaseClient.supabase
-            logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente extraído de supabaseModule.supabase')
-          } else {
-            throw new Error('Cliente Supabase proporcionado no es válido: falta método rpc')
-          }
-        }
-        
-        this.supabase = finalSupabaseClient
-        logger.info('GoogleDriveAuthServiceDynamic', '✅ this.supabase asignado correctamente')
-      } else {
-        // ✅ SOLUCIÓN: Importar dinámicamente si no se proporciona
-        logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ No se proporcionó cliente Supabase, intentando importar...')
-        try {
-          // ✅ SOLUCIÓN CORREGIDA: Importar directamente desde supabaseClient.js
-          const supabaseModule = await import('./supabaseClient.js')
-          logger.info('GoogleDriveAuthServiceDynamic', `📦 Módulo importado: ${Object.keys(supabaseModule)}`)
-          
-          const importedSupabase = supabaseModule.supabase
-          
-          if (!importedSupabase) {
-            throw new Error('No se pudo encontrar el cliente Supabase en el módulo importado')
-          }
-          
-          logger.info('GoogleDriveAuthServiceDynamic', `🔍 Tipo de supabase importado: ${typeof importedSupabase}`)
-          logger.info('GoogleDriveAuthServiceDynamic', `🔍 Tiene método rpc: ${typeof importedSupabase.rpc}`)
-          
-          this.supabase = importedSupabase
-          logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente Supabase importado dinámicamente')
-        } catch (importError) {
-          logger.error('GoogleDriveAuthServiceDynamic', `❌ Error importando cliente Supabase: ${importError.message}`)
-          logger.error('GoogleDriveAuthServiceDynamic', `❌ Stack trace: ${importError.stack}`)
-          this.supabase = null
-          this.availableCredentials = []
-          return false
-        }
       }
 
-      // ✅ SOLUCIÓN: Validar que this.supabase se inicializó correctamente
-      if (!this.supabase) {
-        logger.error('GoogleDriveAuthServiceDynamic', '❌ No se pudo inicializar cliente Supabase')
+      // ✅ SOLUCIÓN DEFINITIVA: Asegurar que tenemos un cliente válido
+      const clientReady = await this._ensureSupabaseClient()
+      if (!clientReady) {
+        logger.error('GoogleDriveAuthServiceDynamic', '❌ No se pudo obtener cliente Supabase válido')
         this.availableCredentials = []
         return false
       }
 
-      // ✅ VALIDACIÓN FINAL: Verificar que this.supabase tenga rpc
-      if (typeof this.supabase.rpc !== 'function') {
-        logger.error('GoogleDriveAuthServiceDynamic', `❌ this.supabase no tiene método rpc: ${typeof this.supabase.rpc}`)
-        logger.error('GoogleDriveAuthServiceDynamic', `📊 this.supabase es: ${JSON.stringify(this.supabase)}`)
-        this.supabase = null
-        this.availableCredentials = []
-        return false
-      }
-
-      logger.info('GoogleDriveAuthServiceDynamic', `✅ this.supabase validado: tipo=${typeof this.supabase}, tiene_rpc=${typeof this.supabase.rpc}`)
+      logger.info('GoogleDriveAuthServiceDynamic', `✅ Cliente validado: tipo=${typeof this.supabase}, tiene_rpc=${typeof this.supabase.rpc}`)
 
       this.currentCompanyId = companyId
 
@@ -121,100 +70,92 @@ class GoogleDriveAuthServiceDynamic {
   /**
    * Carga las credenciales de Google Drive para una empresa
    */
+  // ✅ SOLUCIÓN DEFINITIVA: Método privado para asegurar cliente válido
+  async _ensureSupabaseClient() {
+    logger.info('GoogleDriveAuthServiceDynamic', `🔍 _ensureSupabaseClient() - Estado inicial: this.supabase=${!!this.supabase}`)
+    
+    if (this.supabase && typeof this.supabase.rpc === 'function') {
+      logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente ya existe y es válido')
+      return true
+    }
+    
+    logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ Cliente Supabase no disponible o inválido, intentando recuperar...')
+    
+    try {
+      // ✅ SOLUCIÓN: Importar directamente desde supabaseClient.js (más confiable)
+      logger.info('GoogleDriveAuthServiceDynamic', '📦 Intentando importar desde supabaseClient.js...')
+      const supabaseModule = await import('./supabaseClient.js')
+      
+      logger.info('GoogleDriveAuthServiceDynamic', `📦 Módulo importado: ${Object.keys(supabaseModule)}`)
+      logger.info('GoogleDriveAuthServiceDynamic', `📦 supabaseModule.supabase: ${!!supabaseModule.supabase}`)
+      logger.info('GoogleDriveAuthServiceDynamic', `📦 Tiene rpc: ${typeof supabaseModule.supabase?.rpc}`)
+      
+      if (supabaseModule.supabase && typeof supabaseModule.supabase.rpc === 'function') {
+        this.supabase = supabaseModule.supabase
+        logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente Supabase recuperado desde supabaseClient.js')
+        return true
+      }
+      
+      logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ supabaseClient.js no funcionó, intentando supabase.js...')
+      
+      // ✅ SOLUCIÓN: Fallback a supabase.js si el primero falla
+      const supabaseModule2 = await import('./supabase.js')
+      const importedSupabase = supabaseModule2.supabase || supabaseModule2.default?.supabase
+      
+      logger.info('GoogleDriveAuthServiceDynamic', `📦 supabaseModule2.supabase: ${!!supabaseModule2.supabase}`)
+      logger.info('GoogleDriveAuthServiceDynamic', `📦 supabaseModule2.default?.supabase: ${!!supabaseModule2.default?.supabase}`)
+      logger.info('GoogleDriveAuthServiceDynamic', `📦 importedSupabase: ${!!importedSupabase}`)
+      logger.info('GoogleDriveAuthServiceDynamic', `📦 Tiene rpc: ${typeof importedSupabase?.rpc}`)
+      
+      if (importedSupabase && typeof importedSupabase.rpc === 'function') {
+        this.supabase = importedSupabase
+        logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente Supabase recuperado desde supabase.js')
+        return true
+      }
+      
+      logger.error('GoogleDriveAuthServiceDynamic', '❌ No se pudo recuperar cliente Supabase válido de ninguna fuente')
+      return false
+      
+    } catch (error) {
+      logger.error('GoogleDriveAuthServiceDynamic', `❌ Error recuperando cliente: ${error.message}`)
+      logger.error('GoogleDriveAuthServiceDynamic', `❌ Stack: ${error.stack}`)
+      return false
+    }
+  }
+
   async loadCompanyCredentials(companyId) {
     try {
       logger.info('GoogleDriveAuthServiceDynamic', `📂 Cargando credenciales para empresa ${companyId}...`)
       
-      // ✅ SOLUCIÓN ULTRA-DEFENSIVA: Validación múltiple con re-intentos
-      if (!this.supabase) {
-        logger.error('GoogleDriveAuthServiceDynamic', '❌ ERROR CRÍTICO: this.supabase es null')
-        logger.error('GoogleDriveAuthServiceDynamic', `📊 Estado del servicio: initialized=${this.initialized}, currentCompanyId=${this.currentCompanyId}`)
-        
-        // Intentar recuperar el cliente de Supabase una última vez
-        try {
-          logger.warn('GoogleDriveAuthServiceDynamic', '⚠️ Intentando recuperar cliente Supabase...')
-          const { supabase } = await import('./supabase.js')
-          logger.info('GoogleDriveAuthServiceDynamic', `📦 Supabase importado: tipo=${typeof supabase}, tiene_rpc=${typeof supabase?.rpc}`)
-          this.supabase = supabase
-          logger.info('GoogleDriveAuthServiceDynamic', '✅ Cliente Supabase recuperado en tiempo de ejecución')
-        } catch (recoveryError) {
-          logger.error('GoogleDriveAuthServiceDynamic', `❌ No se pudo recuperar cliente: ${recoveryError.message}`)
-          logger.error('GoogleDriveAuthServiceDynamic', `❌ Stack: ${recoveryError.stack}`)
-          this.availableCredentials = []
-          return []
-        }
-        
-        if (!this.supabase) {
-          logger.error('GoogleDriveAuthServiceDynamic', '❌ Recuperación fallida: this.supabase sigue siendo null')
-          this.availableCredentials = []
-          return []
-        }
-      }
-      
-      // ✅ SOLUCIÓN: Validación de tipo con manejo de errores
-      if (!this.supabase || typeof this.supabase !== 'object') {
-        logger.error('GoogleDriveAuthServiceDynamic', `❌ Cliente Supabase inválido: ${typeof this.supabase}`)
-        logger.error('GoogleDriveAuthServiceDynamic', `📊 Detalles: ${JSON.stringify(Object.keys(this.supabase || {}))}`)
+      // ✅ SOLUCIÓN DEFINITIVA: Asegurar cliente antes de usarlo
+      const clientReady = await this._ensureSupabaseClient()
+      if (!clientReady) {
+        logger.error('GoogleDriveAuthServiceDynamic', '❌ Cliente Supabase no disponible después de todos los intentos')
         this.availableCredentials = []
         return []
       }
       
-      // ✅ SOLUCIÓN: Verificar método from existe
-      if (typeof this.supabase.from !== 'function') {
-        logger.error('GoogleDriveAuthServiceDynamic', `❌ Cliente Supabase no tiene método from: ${typeof this.supabase.from}`)
-        logger.error('GoogleDriveAuthServiceDynamic', `📊 Métodos disponibles: ${JSON.stringify(Object.keys(this.supabase))}`)
+      // ✅ VALIDACIÓN FINAL: Verificar que el cliente está listo
+      logger.info('GoogleDriveAuthServiceDynamic', `✅ Cliente validado: tipo=${typeof this.supabase}, tiene_rpc=${typeof this.supabase.rpc}`)
+      
+      // ✅ AHORA sí podemos ejecutar la consulta con seguridad
+      const result = await this.supabase
+        .from('company_credentials')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('integration_type', 'google_drive')
+        .eq('status', 'pending_verification')
+      
+      if (result.error) {
+        logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta: ${result.error.message}`)
         this.availableCredentials = []
         return []
       }
       
-      // ✅ SOLUCIÓN: Verificar método rpc existe (esto es lo que está fallando)
-      if (typeof this.supabase.rpc !== 'function') {
-        logger.error('GoogleDriveAuthServiceDynamic', `❌ Cliente Supabase no tiene método rpc: ${typeof this.supabase.rpc}`)
-        logger.error('GoogleDriveAuthServiceDynamic', `📊 Métodos disponibles: ${JSON.stringify(Object.keys(this.supabase))}`)
-        this.availableCredentials = []
-        return []
-      }
+      this.availableCredentials = result.data || []
+      logger.info('GoogleDriveAuthServiceDynamic', `✅ ${this.availableCredentials.length} credenciales cargadas`)
+      return this.availableCredentials
       
-      // ✅ SOLUCIÓN: Consulta directa con validación de respuesta
-      try {
-        logger.info('GoogleDriveAuthServiceDynamic', '🔍 Ejecutando consulta directa a company_credentials...')
-        logger.info('GoogleDriveAuthServiceDynamic', `🔍 Usando this.supabase: ${typeof this.supabase}`)
-        logger.info('GoogleDriveAuthServiceDynamic', `🔍 Usando this.supabase.from: ${typeof this.supabase.from}`)
-        
-        const result = await this.supabase
-          .from('company_credentials')
-          .select('*')
-          .eq('company_id', companyId)
-          .eq('integration_type', 'google_drive')
-          .eq('status', 'pending_verification')
-        
-        // ✅ VALIDACIÓN: Verificar que result sea un objeto válido
-        if (!result || typeof result !== 'object') {
-          logger.error('GoogleDriveAuthServiceDynamic', `❌ Resultado inválido de Supabase: ${typeof result}`)
-          this.availableCredentials = []
-          return []
-        }
-        
-        const data = result.data
-        const error = result.error
-        
-        if (error) {
-          logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta: ${error.message}`)
-          logger.error('GoogleDriveAuthServiceDynamic', `❌ Error completo: ${JSON.stringify(error)}`)
-          this.availableCredentials = []
-          return []
-        }
-        
-        this.availableCredentials = data || []
-        logger.info('GoogleDriveAuthServiceDynamic', `✅ ${this.availableCredentials.length} credenciales cargadas`)
-        return this.availableCredentials
-        
-      } catch (queryError) {
-        logger.error('GoogleDriveAuthServiceDynamic', `❌ Error crítico en consulta: ${queryError.message}`)
-        logger.error('GoogleDriveAuthServiceDynamic', `❌ Stack: ${queryError.stack}`)
-        this.availableCredentials = []
-        return []
-      }
     } catch (error) {
       logger.error('GoogleDriveAuthServiceDynamic', `❌ Error fatal en loadCompanyCredentials: ${error.message}`)
       logger.error('GoogleDriveAuthServiceDynamic', `❌ Stack: ${error.stack}`)

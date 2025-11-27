@@ -62,15 +62,21 @@ const MultiAccountServiceUI = ({
   // Manejar conexión de nueva cuenta
   const handleConnectAccount = useCallback(async () => {
     try {
+      console.log('🔍 [MultiAccountServiceUI] Iniciando conexión para:', serviceName)
+      
       if (!manager || !companyId) {
+        console.error('❌ [MultiAccountServiceUI] Manager no inicializado o empresa no seleccionada')
         toast.error('Manager no inicializado o empresa no seleccionada')
         return
       }
 
       setConnecting(true)
+      console.log('✅ [MultiAccountServiceUI] Connecting set to true')
 
       // ✅ SOLUCIÓN ESPECIAL PARA GOOGLE DRIVE: Usar OAuth en lugar de guardar credenciales directamente
       if (serviceName === 'googledrive') {
+        console.log('🔍 [MultiAccountServiceUI] Detectado Google Drive, usando flujo OAuth')
+        
         // Solicitar credenciales de cliente
         const { value: clientConfig } = await Swal.fire({
           title: `🔧 Configurar ${displayName}`,
@@ -116,12 +122,16 @@ const MultiAccountServiceUI = ({
         })
 
         if (!clientConfig) {
+          console.log('⚠️ [MultiAccountServiceUI] Usuario canceló el formulario')
           setConnecting(false)
           return
         }
 
+        console.log('✅ [MultiAccountServiceUI] Formulario completado:', clientConfig)
+
         // ✅ USAR googleDriveAuthServiceDynamic para generar URL correcta
         const redirectUri = window.location.origin + '/auth/google/callback'
+        console.log('🔍 [MultiAccountServiceUI] Redirect URI:', redirectUri)
         
         const stateData = {
           companyId: companyId,
@@ -135,16 +145,24 @@ const MultiAccountServiceUI = ({
           nonce: Math.random().toString(36).substring(7)
         }
 
+        console.log('🔍 [MultiAccountServiceUI] State data preparado:', stateData)
+
         // Inicializar el servicio dinámico
-        await googleDriveAuthServiceDynamic.initialize(null, companyId)
+        console.log('🔍 [MultiAccountServiceUI] Inicializando googleDriveAuthServiceDynamic...')
+        const initResult = await googleDriveAuthServiceDynamic.initialize(null, companyId)
+        console.log('✅ [MultiAccountServiceUI] Servicio inicializado:', initResult)
         
+        console.log('🔍 [MultiAccountServiceUI] Generando auth URL...')
         const authUrl = googleDriveAuthServiceDynamic.generateAuthUrl({
           clientId: clientConfig.clientId,
           clientSecret: clientConfig.clientSecret,
           redirectUri: redirectUri
         }, JSON.stringify(stateData))
 
+        console.log('✅ [MultiAccountServiceUI] Auth URL generada:', authUrl)
+
         if (authUrl) {
+          console.log('✅ [MultiAccountServiceUI] URL válida, guardando configuración temporal...')
           // Guardar configuración temporal
           sessionStorage.setItem('google_drive_temp_config', JSON.stringify({
             companyId: companyId,
@@ -156,13 +174,19 @@ const MultiAccountServiceUI = ({
             }
           }))
           
+          console.log('✅ [MultiAccountServiceUI] Configuración guardada en sessionStorage')
+          console.log('🚀 [MultiAccountServiceUI] REDIRIGIENDO A:', authUrl)
+          
           // ✅ REDIRIGIR A LA URL CORRECTA DE GOOGLE
           window.location.href = authUrl
+          console.log('✅ [MultiAccountServiceUI] Redirección ejecutada')
         } else {
+          console.error('❌ [MultiAccountServiceUI] Auth URL es null o inválida')
           toast.error('Error al generar URL de autorización')
         }
         
         setConnecting(false)
+        console.log('✅ [MultiAccountServiceUI] Connecting set to false')
         return
       }
 
