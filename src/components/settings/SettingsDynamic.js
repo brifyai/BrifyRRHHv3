@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.js'
-import googleDriveAuthServiceDynamic from '../../lib/googleDriveAuthServiceDynamic.js'
+import googleDriveAuthServiceDynamic from '../../lib/googleDriveAuthServiceDynamic_v2.js'
 import googleDrivePersistenceService from '../../services/googleDrivePersistenceService.js'
 import brevoService from '../../services/brevoService.js'
 import companySyncService from '../../services/companySyncService.js'
