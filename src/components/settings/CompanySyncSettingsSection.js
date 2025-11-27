@@ -327,9 +327,15 @@ const CompanySyncSettingsSection = ({
     }
   }
 
-  // Conectar integración
+  // Conectar integración - REDIRIGIR A MULTIACCOUNT SERVICE UI
   const connectIntegration = async (integrationType) => {
     try {
+      // ✅ SOLUCIÓN: Para Google Drive, usar MultiAccountServiceUI en lugar de integrationService
+      if (integrationType === 'google_drive' || integrationType === 'googledrive') {
+        toast.info('Usa el panel de "Integraciones Multi-Cuenta" de Google Drive arriba para conectar')
+        return
+      }
+      
       setConnectingIntegration(integrationType)
       
       const result = await integrationService.initiateOAuth(integrationType, company.id)

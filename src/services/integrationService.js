@@ -517,6 +517,23 @@ class IntegrationService {
   }
 
   buildAuthUrl(integration, state) {
+    // ✅ SOLUCIÓN: Para Google Drive, usar la URL de autorización de Google directamente
+    if (integration.authUrl === '/auth/google-drive') {
+      // ✅ CORRECTO: URL de autorización de Google OAuth
+      const params = new URLSearchParams({
+        client_id: integration.client_id || process.env.REACT_APP_GOOGLE_CLIENT_ID || 'default',
+        redirect_uri: `${window.location.origin}/auth/google/callback`,
+        scope: integration.scopes.join(' '),
+        response_type: 'code',
+        state: state,
+        access_type: 'offline',
+        prompt: 'consent'
+      });
+      
+      return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    }
+    
+    // Para otras integraciones, usar el método anterior
     const baseUrl = window.location.origin;
     const params = new URLSearchParams({
       client_id: integration.client_id || 'default',

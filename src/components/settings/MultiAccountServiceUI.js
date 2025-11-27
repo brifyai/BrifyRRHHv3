@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import MultiAccountServiceManager from '../../lib/multiAccountServiceManager.js'
+import googleDriveAuthServiceDynamic from '../../lib/googleDriveAuthServiceDynamic.js'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 
@@ -68,6 +69,104 @@ const MultiAccountServiceUI = ({
 
       setConnecting(true)
 
+      // ✅ SOLUCIÓN ESPECIAL PARA GOOGLE DRIVE: Usar OAuth en lugar de guardar credenciales directamente
+      if (serviceName === 'googledrive') {
+        // Solicitar credenciales de cliente
+        const { value: clientConfig } = await Swal.fire({
+          title: `🔧 Configurar ${displayName}`,
+          html: `
+            <div style="text-align: left; max-width: 500px;">
+              <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                <h4 style="margin: 0 0 8px 0; color: #495057;">Credenciales OAuth 2.0</h4>
+                <p style="margin: 0; font-size: 14px; line-height: 1.5;">
+                  Ingresa las credenciales de tu proyecto de Google Cloud Console.
+                </p>
+              </div>
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client ID:</label>
+                <input type="text" id="clientId" class="swal2-input" placeholder="client_id.apps.googleusercontent.com" style="width: 100%;">
+              </div>
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client Secret:</label>
+                <input type="password" id="clientSecret" class="swal2-input" placeholder="client_secret" style="width: 100%;">
+              </div>
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nombre de la Cuenta:</label>
+                <input type="text" id="accountName" class="swal2-input" placeholder="Cuenta Principal" style="width: 100%;">
+              </div>
+            </div>
+          `,
+          confirmButtonText: 'Conectar',
+          confirmButtonColor: color,
+          cancelButtonText: 'Cancelar',
+          cancelButtonColor: '#6c757d',
+          showCancelButton: true,
+          preConfirm: () => {
+            const clientId = document.getElementById('clientId').value
+            const clientSecret = document.getElementById('clientSecret').value
+            const accountName = document.getElementById('accountName').value || 'Cuenta Principal'
+            
+            if (!clientId || !clientSecret) {
+              Swal.showValidationMessage('Por favor completa Client ID y Client Secret')
+              return false
+            }
+            
+            return { clientId, clientSecret, accountName }
+          }
+        })
+
+        if (!clientConfig) {
+          setConnecting(false)
+          return
+        }
+
+        // ✅ USAR googleDriveAuthServiceDynamic para generar URL correcta
+        const redirectUri = window.location.origin + '/auth/google/callback'
+        
+        const stateData = {
+          companyId: companyId,
+          accountName: clientConfig.accountName,
+          clientConfig: {
+            clientId: clientConfig.clientId,
+            clientSecret: clientConfig.clientSecret,
+            redirectUri: redirectUri
+          },
+          timestamp: Date.now(),
+          nonce: Math.random().toString(36).substring(7)
+        }
+
+        // Inicializar el servicio dinámico
+        await googleDriveAuthServiceDynamic.initialize(null, companyId)
+        
+        const authUrl = googleDriveAuthServiceDynamic.generateAuthUrl({
+          clientId: clientConfig.clientId,
+          clientSecret: clientConfig.clientSecret,
+          redirectUri: redirectUri
+        }, JSON.stringify(stateData))
+
+        if (authUrl) {
+          // Guardar configuración temporal
+          sessionStorage.setItem('google_drive_temp_config', JSON.stringify({
+            companyId: companyId,
+            accountName: clientConfig.accountName,
+            clientConfig: {
+              clientId: clientConfig.clientId,
+              clientSecret: clientConfig.clientSecret,
+              redirectUri: redirectUri
+            }
+          }))
+          
+          // ✅ REDIRIGIR A LA URL CORRECTA DE GOOGLE
+          window.location.href = authUrl
+        } else {
+          toast.error('Error al generar URL de autorización')
+        }
+        
+        setConnecting(false)
+        return
+      }
+
+      // Para otros servicios, usar el flujo normal
       // Mostrar formulario para credenciales
       const formHtml = credentialFields.map(field => `
         <div style="margin-bottom: 16px;">

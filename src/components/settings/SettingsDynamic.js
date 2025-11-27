@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.js'
-import { supabase } from '../../lib/supabase.js'
 import googleDriveAuthServiceDynamic from '../../lib/googleDriveAuthServiceDynamic.js'
 import googleDrivePersistenceService from '../../services/googleDrivePersistenceService.js'
 import brevoService from '../../services/brevoService.js'
@@ -261,8 +260,57 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
 
       console.log('🔍 Cargando credenciales de Google Drive para empresa:', companyId)
       
+      // ✅ SOLUCIÓN CORREGIDA: Importar supabaseClient directamente desde supabaseClient.js
+      let supabaseClient
+      try {
+        // Importar directamente el cliente de Supabase (no el módulo wrapper)
+        const supabaseModule = await import('../../lib/supabaseClient.js')
+        supabaseClient = supabaseModule.supabase
+        console.log('✅ Supabase importado dinámicamente:', typeof supabaseClient)
+        console.log('✅ Métodos disponibles:', Object.keys(supabaseClient).slice(0, 10))
+      } catch (importError) {
+        console.error('❌ Error importando supabase:', importError)
+        toast.error('Error de conexión con la base de datos')
+        setAvailableGoogleDriveCredentials([])
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        return
+      }
+      
+      if (!supabaseClient) {
+        console.error('❌ Error crítico: supabase es null después de importar')
+        toast.error('Error de conexión con la base de datos')
+        setAvailableGoogleDriveCredentials([])
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        return
+      }
+      
+      // Verificar que tenga el método rpc
+      if (typeof supabaseClient.rpc !== 'function') {
+        console.error('❌ Error crítico: supabase no tiene método rpc')
+        console.error('📊 Métodos disponibles:', Object.keys(supabaseClient))
+        toast.error('Error de conexión con la base de datos: cliente incompleto')
+        setAvailableGoogleDriveCredentials([])
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        return
+      }
+      
+      console.log('✅ Supabase cliente válido con método rpc')
+      
       // Cargar credenciales usando el servicio dinámico
-      await googleDriveAuthServiceDynamic.initialize(supabase, companyId)
+      const initialized = await googleDriveAuthServiceDynamic.initialize(supabaseClient, companyId)
+      
+      if (!initialized) {
+        console.error('❌ Error inicializando servicio de Google Drive')
+        toast.error('Error al inicializar el servicio de Google Drive')
+        setAvailableGoogleDriveCredentials([])
+        setSelectedGoogleDriveCredential(null)
+        setIsGoogleDriveConnected(false)
+        return
+      }
+      
       const credentials = googleDriveAuthServiceDynamic.getAvailableCredentials()
       
       setAvailableGoogleDriveCredentials(credentials)
@@ -300,7 +348,7 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
       setSelectedGoogleDriveCredential(null)
       setIsGoogleDriveConnected(false)
     }
-  }, [])
+  }, [])  // ✅ CORREGIDO: Eliminar dependencia inválida
 
   const checkGoogleDriveConnection = useCallback(async () => {
     try {
@@ -744,21 +792,27 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
         return
       }
 
-      // Generar URL de autorización
+      // ✅ SOLUCIÓN: Generar URL de autorización con state correcto
       const redirectUri = window.location.origin + '/auth/google/callback'
-      const authUrl = googleDriveAuthServiceDynamic.generateAuthUrl({
-        clientId: clientConfig.clientId,
-        clientSecret: clientConfig.clientSecret,
-        redirectUri: redirectUri
-      }, JSON.stringify({
+      
+      // Preparar datos del state
+      const stateData = {
         companyId: selectedCompanyId,
         accountName: clientConfig.accountName,
         clientConfig: {
           clientId: clientConfig.clientId,
           clientSecret: clientConfig.clientSecret,
           redirectUri: redirectUri
-        }
-      }))
+        },
+        timestamp: Date.now(),
+        nonce: Math.random().toString(36).substring(7)
+      }
+      
+      const authUrl = googleDriveAuthServiceDynamic.generateAuthUrl({
+        clientId: clientConfig.clientId,
+        clientSecret: clientConfig.clientSecret,
+        redirectUri: redirectUri
+      }, JSON.stringify(stateData))
 
       if (authUrl) {
         // Guardar configuración temporal para el callback

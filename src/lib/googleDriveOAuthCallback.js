@@ -15,7 +15,7 @@ class GoogleDriveOAuthCallback {
     try {
       logger.info('GoogleDriveOAuthCallback', '🔄 Procesando callback de OAuth...')
       
-      // Obtener el código de autorización de la URL
+      // Obtener parámetros de la URL
       const params = new URLSearchParams(window.location.search)
       const code = params.get('code')
       const error = params.get('error')
@@ -24,8 +24,32 @@ class GoogleDriveOAuthCallback {
       logger.info('GoogleDriveOAuthCallback', `📍 URL: ${window.location.href}`)
       logger.info('GoogleDriveOAuthCallback', `🔑 Código presente: ${!!code}`)
       logger.info('GoogleDriveOAuthCallback', `❌ Error presente: ${!!error}`)
+      logger.info('GoogleDriveOAuthCallback', `🛡️ State presente: ${!!state}`)
       
-      // Verificar si hay error
+      // ✅ SOLUCIÓN: Validar state CSRF
+      if (state) {
+        const storedState = sessionStorage.getItem('google_oauth_state')
+        logger.info('GoogleDriveOAuthCallback', `🛡️ State recibido: ${state.substring(0, 50)}...`)
+        logger.info('GoogleDriveOAuthCallback', `🛡️ State almacenado: ${storedState ? storedState.substring(0, 50) + '...' : 'null'}`)
+        
+        if (state !== storedState) {
+          logger.error('GoogleDriveOAuthCallback', '❌ Estado CSRF inválido - posible ataque CSRF')
+          this.showErrorModal('Error de seguridad: estado de autorización inválido. Por favor, intenta nuevamente.')
+          window.history.replaceState({}, document.title, window.location.pathname)
+          sessionStorage.removeItem('google_oauth_state')
+          return false
+        }
+        logger.info('GoogleDriveOAuthCallback', '✅ Estado CSRF validado correctamente')
+        sessionStorage.removeItem('google_oauth_state')
+      } else if (!error) {
+        // Si no hay error y no hay state, es un problema de configuración
+        logger.error('GoogleDriveOAuthCallback', '❌ No se recibió parámetro state')
+        this.showErrorModal('Error de seguridad: falta el parámetro state en la respuesta de Google.')
+        window.history.replaceState({}, document.title, window.location.pathname)
+        return false
+      }
+      
+      // Verificar si hay error de Google
       if (error) {
         logger.error('GoogleDriveOAuthCallback', `❌ Error de autorización: ${error}`)
         
@@ -33,8 +57,9 @@ class GoogleDriveOAuthCallback {
         const errorMessage = this.getErrorMessage(error)
         this.showErrorModal(errorMessage)
         
-        // Limpiar URL
+        // Limpiar URL y state
         window.history.replaceState({}, document.title, window.location.pathname)
+        sessionStorage.removeItem('google_oauth_state')
         return false
       }
       
@@ -43,22 +68,57 @@ class GoogleDriveOAuthCallback {
         logger.error('GoogleDriveOAuthCallback', '❌ No se recibió código de autorización')
         this.showErrorModal('No se recibió código de autorización. Por favor, intenta nuevamente.')
         window.history.replaceState({}, document.title, window.location.pathname)
+        sessionStorage.removeItem('google_oauth_state')
         return false
       }
       
       logger.info('GoogleDriveOAuthCallback', `✅ Código de autorización recibido`)
       
+      // ✅ SOLUCIÓN: Extraer datos del state para el flujo dinámico
+      let companyId = null
+      let accountName = 'Cuenta de Google Drive'
+      let clientConfig = null
+      
+      if (state) {
+        try {
+          const stateData = JSON.parse(state)
+          companyId = stateData.companyId
+          accountName = stateData.accountName || accountName
+          clientConfig = stateData.clientConfig
+          logger.info('GoogleDriveOAuthCallback', `📊 Datos extraídos del state: companyId=${companyId}, accountName=${accountName}`)
+        } catch (e) {
+          logger.warn('GoogleDriveOAuthCallback', `⚠️ No se pudo parsear el state: ${e.message}`)
+        }
+      }
+      
       // Intercambiar código por tokens
       logger.info('GoogleDriveOAuthCallback', '🔄 Intercambiando código por tokens...')
-      const tokens = await googleDriveAuthService.exchangeCodeForTokens(code)
+      
+      let tokens
+      if (companyId && clientConfig) {
+        // ✅ SOLUCIÓN: Usar el flujo dinámico si tenemos datos de empresa
+        logger.info('GoogleDriveOAuthCallback', `🔄 Usando flujo dinámico para empresa ${companyId}`)
+        
+        // Inicializar servicio dinámico
+        const { supabase } = await import('./supabase.js')
+        await googleDriveAuthService.initialize(supabase, companyId)
+        
+        // Intercambiar código usando el servicio dinámico
+        tokens = await googleDriveAuthService.exchangeCodeForTokens(companyId, code, accountName, clientConfig)
+      } else {
+        // ✅ SOLUCIÓN: Usar flujo tradicional como fallback
+        logger.info('GoogleDriveOAuthCallback', `🔄 Usando flujo tradicional`)
+        tokens = await googleDriveAuthService.exchangeCodeForTokens(code)
+      }
       
       logger.info('GoogleDriveOAuthCallback', '✅ Tokens obtenidos exitosamente')
       
       // Mostrar éxito al usuario
       this.showSuccessModal('¡Conexión exitosa! Google Drive está configurado.')
       
-      // Limpiar URL
+      // Limpiar URL y state
       window.history.replaceState({}, document.title, window.location.pathname)
+      sessionStorage.removeItem('google_oauth_state')
       
       // Redirigir después de 2 segundos
       setTimeout(() => {
@@ -70,6 +130,7 @@ class GoogleDriveOAuthCallback {
       logger.error('GoogleDriveOAuthCallback', `❌ Error procesando callback: ${error.message}`)
       this.showErrorModal(`Error: ${error.message}`)
       window.history.replaceState({}, document.title, window.location.pathname)
+      sessionStorage.removeItem('google_oauth_state')
       return false
     }
   }
