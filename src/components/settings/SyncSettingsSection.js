@@ -60,7 +60,7 @@ const SyncSettingsSection = ({ selectedCompanyId }) => {
       setError(null);
       
       // Verificar si Google Drive está autenticado
-      const authStatus = await googleDriveConsolidatedService.authService.getAuthStatus(user.id);
+      const authStatus = await googleDriveConsolidatedService.getAuthStatus(user.id);
       setAuthStatus(authStatus);
       
       if (!authStatus.isAuthenticated) {
