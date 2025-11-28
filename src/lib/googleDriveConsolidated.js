@@ -560,6 +560,41 @@ class GoogleDriveConsolidatedService {
   }
 
   /**
+   * Obtiene el estado de autenticación del usuario
+   * @param {string} userId - ID del usuario
+   * @returns {Promise<object>} - Estado de autenticación
+   */
+  async getAuthStatus(userId) {
+    try {
+      if (!userId) {
+        return { isAuthenticated: false, hasValidToken: false, email: null }
+      }
+
+      logger.info('GoogleDriveConsolidated', `🔍 Verificando estado de autenticación para usuario ${userId}...`)
+
+      // Verificar si hay una cuenta autenticada para la empresa actual
+      const isAuthenticated = this.currentCompanyId &&
+                            multiGoogleDriveManager.isAuthenticated(this.currentCompanyId)
+      
+      // Obtener email desde el servicio de persistencia si está disponible
+      const status = await this.persistenceService.getConnectionStatus(userId)
+      
+      const authStatus = {
+        isAuthenticated: isAuthenticated || status.connected,
+        hasValidToken: isAuthenticated || status.connected,
+        email: status.email
+      }
+
+      logger.info('GoogleDriveConsolidated', `✅ Estado de autenticación: ${JSON.stringify(authStatus)}`)
+      return authStatus
+
+    } catch (error) {
+      logger.error('GoogleDriveConsolidated', `❌ Error en getAuthStatus: ${error.message}`)
+      return { isAuthenticated: false, hasValidToken: false, email: null }
+    }
+  }
+
+  /**
    * Limpia el servicio (útil en logout)
    */
   cleanup() {
