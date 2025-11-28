@@ -9,6 +9,7 @@ import organizedDatabaseService from '../../services/organizedDatabaseService.js
 import whatsappOfficialService from '../../services/whatsappOfficialService.js'
 import whatsappWahaService from '../../services/whatsappWahaService.js'
 import configurationService from '../../services/configurationService.js'
+import GoogleDriveDirectConnect from './GoogleDriveDirectConnect.js'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 import CompanyForm from './CompanyForm.js'
@@ -743,94 +744,60 @@ const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
 
       setConnectingGoogleDrive(true)
       
-      // Solicitar credenciales de cliente al usuario
-      const { value: clientConfig } = await Swal.fire({
-        title: '🔧 Configurar Credenciales de Google Drive',
-        html: `
-          <div style="text-align: left; max-width: 500px;">
-            <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-              <h4 style="margin: 0 0 8px 0; color: #495057;">Configuración OAuth 2.0</h4>
-              <p style="margin: 0; font-size: 14px; line-height: 1.5;">
-                Ingresa las credenciales de tu proyecto de Google Cloud Console para esta empresa.
-              </p>
-            </div>
-            <div style="margin-bottom: 16px;">
-              <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client ID:</label>
-              <input type="text" id="clientId" class="swal2-input" placeholder="tu_client_id.apps.googleusercontent.com" style="width: 100%;">
-            </div>
-            <div style="margin-bottom: 16px;">
-              <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client Secret:</label>
-              <input type="password" id="clientSecret" class="swal2-input" placeholder="tu_client_secret" style="width: 100%;">
-            </div>
-            <div style="margin-bottom: 16px;">
-              <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nombre de la Cuenta:</label>
-              <input type="text" id="accountName" class="swal2-input" placeholder="Cuenta Principal" style="width: 100%;">
-            </div>
-          </div>
-        `,
-        confirmButtonText: 'Continuar',
-        confirmButtonColor: '#3085d6',
+      // Obtener el nombre de la empresa para mostrarlo en el componente
+      const companyName = companies?.find(c => c.id === selectedCompanyId)?.name || 'Empresa'
+      
+      // ✅ SOLUCIÓN: Usar componente GoogleDriveDirectConnect en lugar de formulario manual
+      const { value: result } = await Swal.fire({
+        title: '🔧 Conectar Google Drive',
+        html: '<div id="google-drive-direct-connect-container"></div>',
+        showConfirmButton: false,
+        showCancelButton: true,
         cancelButtonText: 'Cancelar',
         cancelButtonColor: '#6c757d',
-        showCancelButton: true,
-        preConfirm: () => {
-          const clientId = document.getElementById('clientId').value
-          const clientSecret = document.getElementById('clientSecret').value
-          const accountName = document.getElementById('accountName').value || 'Cuenta Principal'
-          
-          if (!clientId || !clientSecret) {
-            Swal.showValidationMessage('Por favor completa todos los campos')
-            return false
+        width: '600px',
+        didOpen: () => {
+          // Renderizar el componente React dentro del modal
+          const container = document.getElementById('google-drive-direct-connect-container')
+          if (container) {
+            // Crear un div para montar el componente
+            const mountPoint = document.createElement('div')
+            container.appendChild(mountPoint)
+            
+            // Importar ReactDOM para renderizar el componente
+            import('react-dom').then(ReactDOM => {
+              const root = ReactDOM.createRoot(mountPoint)
+              root.render(
+                React.createElement(GoogleDriveDirectConnect, {
+                  companyId: selectedCompanyId,
+                  companyName: companyName,
+                  onConnectionSuccess: (data) => {
+                    console.log('✅ Conexión exitosa:', data)
+                    Swal.close()
+                    toast.success('✅ Google Drive conectado exitosamente')
+                    // Recargar credenciales después de conectar
+                    loadGoogleDriveCredentials(selectedCompanyId)
+                  },
+                  onConnectionError: (error) => {
+                    console.error('❌ Error en conexión:', error)
+                    Swal.close()
+                    toast.error(`❌ Error conectando Google Drive: ${error.message}`)
+                  }
+                })
+              )
+            })
           }
-          
-          return { clientId, clientSecret, accountName }
+        },
+        willClose: () => {
+          // Limpiar el contenedor al cerrar
+          const container = document.getElementById('google-drive-direct-connect-container')
+          if (container) {
+            container.innerHTML = ''
+          }
         }
       })
-
-      if (!clientConfig) {
-        setConnectingGoogleDrive(false)
-        return
-      }
-
-      // ✅ SOLUCIÓN: Generar URL de autorización con state correcto
-      const redirectUri = window.location.origin + '/auth/google/callback'
       
-      // Preparar datos del state
-      const stateData = {
-        companyId: selectedCompanyId,
-        accountName: clientConfig.accountName,
-        clientConfig: {
-          clientId: clientConfig.clientId,
-          clientSecret: clientConfig.clientSecret,
-          redirectUri: redirectUri
-        },
-        timestamp: Date.now(),
-        nonce: Math.random().toString(36).substring(7)
-      }
-      
-      const authUrl = googleDriveAuthServiceDynamic.generateAuthUrl({
-        clientId: clientConfig.clientId,
-        clientSecret: clientConfig.clientSecret,
-        redirectUri: redirectUri
-      }, JSON.stringify(stateData))
-
-      if (authUrl) {
-        // Guardar configuración temporal para el callback
-        sessionStorage.setItem('google_drive_temp_config', JSON.stringify({
-          companyId: selectedCompanyId,
-          accountName: clientConfig.accountName,
-          clientConfig: {
-            clientId: clientConfig.clientId,
-            clientSecret: clientConfig.clientSecret,
-            redirectUri: redirectUri
-          }
-        }))
-        
-        window.location.href = authUrl
-      } else {
-        setConnectingGoogleDrive(false)
-        toast.error('Error al generar URL de autenticación')
-      }
+      setConnectingGoogleDrive(false)
     } catch (error) {
       console.error('Error en connect Google Drive:', error)
       setConnectingGoogleDrive(false)
