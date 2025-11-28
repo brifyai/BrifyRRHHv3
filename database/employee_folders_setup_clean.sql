@@ -1,3 +1,4 @@
+
 -- Crear tabla principal de carpetas de empleados
 CREATE TABLE IF NOT EXISTS employee_folders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
