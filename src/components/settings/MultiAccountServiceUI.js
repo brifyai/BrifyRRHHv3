@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import MultiAccountServiceManager from '../../lib/multiAccountServiceManager.js'
 import googleDriveAuthServiceDynamic from '../../lib/googleDriveAuthServiceDynamic.js'
+import GoogleDriveDirectConnect from './GoogleDriveDirectConnect.js'
 import toast from 'react-hot-toast'
 import Swal from 'sweetalert2'
 
@@ -73,120 +74,63 @@ const MultiAccountServiceUI = ({
       setConnecting(true)
       console.log('✅ [MultiAccountServiceUI] Connecting set to true')
 
-      // ✅ SOLUCIÓN ESPECIAL PARA GOOGLE DRIVE: Usar OAuth en lugar de guardar credenciales directamente
+      // ✅ SOLUCIÓN ESPECIAL PARA GOOGLE DRIVE: Usar componente directo en lugar de formulario manual
       if (serviceName === 'googledrive') {
-        console.log('🔍 [MultiAccountServiceUI] Detectado Google Drive, usando flujo OAuth')
+        console.log('🔍 [MultiAccountServiceUI] Detectado Google Drive, usando componente directo')
         
-        // Solicitar credenciales de cliente
-        const { value: clientConfig } = await Swal.fire({
-          title: `🔧 Configurar ${displayName}`,
-          html: `
-            <div style="text-align: left; max-width: 500px;">
-              <div style="background-color: #f8f9fa; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
-                <h4 style="margin: 0 0 8px 0; color: #495057;">Credenciales OAuth 2.0</h4>
-                <p style="margin: 0; font-size: 14px; line-height: 1.5;">
-                  Ingresa las credenciales de tu proyecto de Google Cloud Console.
-                </p>
-              </div>
-              <div style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client ID:</label>
-                <input type="text" id="clientId" class="swal2-input" placeholder="client_id.apps.googleusercontent.com" style="width: 100%;">
-              </div>
-              <div style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client Secret:</label>
-                <input type="password" id="clientSecret" class="swal2-input" placeholder="client_secret" style="width: 100%;">
-              </div>
-              <div style="margin-bottom: 16px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nombre de la Cuenta:</label>
-                <input type="text" id="accountName" class="swal2-input" placeholder="Cuenta Principal" style="width: 100%;">
-              </div>
-            </div>
-          `,
-          confirmButtonText: 'Conectar',
-          confirmButtonColor: color,
+        // Obtener el nombre de la empresa para mostrarlo en el componente
+        const companyName = companies?.find(c => c.id === companyId)?.name || 'Empresa'
+        
+        // Mostrar el componente GoogleDriveDirectConnect en un modal
+        const { value: result } = await Swal.fire({
+          title: `🔧 Conectar ${displayName}`,
+          html: '<div id="google-drive-direct-connect-container"></div>',
+          showConfirmButton: false,
+          showCancelButton: true,
           cancelButtonText: 'Cancelar',
           cancelButtonColor: '#6c757d',
-          showCancelButton: true,
-          preConfirm: () => {
-            const clientId = document.getElementById('clientId').value
-            const clientSecret = document.getElementById('clientSecret').value
-            const accountName = document.getElementById('accountName').value || 'Cuenta Principal'
-            
-            if (!clientId || !clientSecret) {
-              Swal.showValidationMessage('Por favor completa Client ID y Client Secret')
-              return false
+          width: '600px',
+          didOpen: () => {
+            // Renderizar el componente React dentro del modal
+            const container = document.getElementById('google-drive-direct-connect-container')
+            if (container) {
+              // Crear un div para montar el componente
+              const mountPoint = document.createElement('div')
+              container.appendChild(mountPoint)
+              
+              // Importar ReactDOM para renderizar el componente
+              import('react-dom').then(ReactDOM => {
+                const root = ReactDOM.createRoot(mountPoint)
+                root.render(
+                  React.createElement(GoogleDriveDirectConnect, {
+                    companyId: companyId,
+                    companyName: companyName,
+                    onConnectionSuccess: (data) => {
+                      console.log('✅ [MultiAccountServiceUI] Conexión exitosa:', data)
+                      Swal.close()
+                      toast.success(`✅ Cuenta de ${displayName} conectada exitosamente`)
+                      loadAccounts(manager)
+                    },
+                    onConnectionError: (error) => {
+                      console.error('❌ [MultiAccountServiceUI] Error en conexión:', error)
+                      Swal.close()
+                      toast.error(`❌ Error conectando ${displayName}: ${error.message}`)
+                    }
+                  })
+                )
+              })
             }
-            
-            return { clientId, clientSecret, accountName }
+          },
+          willClose: () => {
+            // Limpiar el contenedor al cerrar
+            const container = document.getElementById('google-drive-direct-connect-container')
+            if (container) {
+              container.innerHTML = ''
+            }
           }
         })
-
-        if (!clientConfig) {
-          console.log('⚠️ [MultiAccountServiceUI] Usuario canceló el formulario')
-          setConnecting(false)
-          return
-        }
-
-        console.log('✅ [MultiAccountServiceUI] Formulario completado:', clientConfig)
-
-        // ✅ USAR googleDriveAuthServiceDynamic para generar URL correcta
-        const redirectUri = window.location.origin + '/auth/google/callback'
-        console.log('🔍 [MultiAccountServiceUI] Redirect URI:', redirectUri)
-        
-        const stateData = {
-          companyId: companyId,
-          accountName: clientConfig.accountName,
-          clientConfig: {
-            clientId: clientConfig.clientId,
-            clientSecret: clientConfig.clientSecret,
-            redirectUri: redirectUri
-          },
-          timestamp: Date.now(),
-          nonce: Math.random().toString(36).substring(7)
-        }
-
-        console.log('🔍 [MultiAccountServiceUI] State data preparado:', stateData)
-
-        // Inicializar el servicio dinámico
-        console.log('🔍 [MultiAccountServiceUI] Inicializando googleDriveAuthServiceDynamic...')
-        const initResult = await googleDriveAuthServiceDynamic.initialize(null, companyId)
-        console.log('✅ [MultiAccountServiceUI] Servicio inicializado:', initResult)
-        
-        console.log('🔍 [MultiAccountServiceUI] Generando auth URL...')
-        const authUrl = googleDriveAuthServiceDynamic.generateAuthUrl({
-          clientId: clientConfig.clientId,
-          clientSecret: clientConfig.clientSecret,
-          redirectUri: redirectUri
-        }, JSON.stringify(stateData))
-
-        console.log('✅ [MultiAccountServiceUI] Auth URL generada:', authUrl)
-
-        if (authUrl) {
-          console.log('✅ [MultiAccountServiceUI] URL válida, guardando configuración temporal...')
-          // Guardar configuración temporal
-          sessionStorage.setItem('google_drive_temp_config', JSON.stringify({
-            companyId: companyId,
-            accountName: clientConfig.accountName,
-            clientConfig: {
-              clientId: clientConfig.clientId,
-              clientSecret: clientConfig.clientSecret,
-              redirectUri: redirectUri
-            }
-          }))
-          
-          console.log('✅ [MultiAccountServiceUI] Configuración guardada en sessionStorage')
-          console.log('🚀 [MultiAccountServiceUI] REDIRIGIENDO A:', authUrl)
-          
-          // ✅ REDIRIGIR A LA URL CORRECTA DE GOOGLE
-          window.location.href = authUrl
-          console.log('✅ [MultiAccountServiceUI] Redirección ejecutada')
-        } else {
-          console.error('❌ [MultiAccountServiceUI] Auth URL es null o inválida')
-          toast.error('Error al generar URL de autorización')
-        }
         
         setConnecting(false)
-        console.log('✅ [MultiAccountServiceUI] Connecting set to false')
         return
       }
 

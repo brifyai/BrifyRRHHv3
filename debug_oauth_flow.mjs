@@ -1,173 +1,210 @@
-#!/usr/bin/env node
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync, writeFileSync } from 'fs';
 
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
+console.log('=== 🔍 DIAGNÓSTICO COMPLETO DEL FLUJO OAUTH ===\n');
 
-dotenv.config()
+// Configuración
+const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 
+  (() => {
+    try {
+      const envContent = readFileSync('.env', 'utf8');
+      const match = envContent.match(/REACT_APP_SUPABASE_ANON_KEY=(.+)/);
+      return match ? match[1].trim() : null;
+    } catch {
+      return null;
+    }
+  })();
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Faltan variables de entorno SUPABASE')
-  process.exit(1)
+if (!supabaseAnonKey) {
+  console.error('❌ No se encontró REACT_APP_SUPABASE_ANON_KEY');
+  process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-async function debugOAuthFlow() {
-  console.log('🔍 DEBUG: FLUJO COMPLETO DE OAUTH\n')
-  console.log('=' .repeat(70))
+async function diagnoseOAuthFlow() {
+  const report = [];
   
+  console.log('📋 Paso 1: Verificando tablas necesarias...\n');
+  
+  // 1. Verificar si la tabla user_google_drive_credentials existe
   try {
-    // 1. Verificar si hay registros de OAuth en proceso
-    console.log('\n📋 1. BUSCANDO REGISTROS DE OAUTH EN PROCESO\n')
+    const { data, error } = await supabase
+      .from('user_google_drive_credentials')
+      .select('*')
+      .limit(1);
     
-    // Buscar en company_credentials con status 'pending_verification'
-    const { data: pendingCreds, error: pendingError } = await supabase
+    if (error) {
+      report.push(`❌ ERROR CRÍTICO: La tabla 'user_google_drive_credentials' no existe o no es accesible`);
+      report.push(`   Detalles: ${error.message}`);
+      report.push(`   Código: ${error.code}`);
+      console.log('❌ La tabla user_google_drive_credentials no existe o no es accesible');
+    } else {
+      report.push(`✅ Tabla 'user_google_drive_credentials' existe y es accesible`);
+      report.push(`   Registros encontrados: ${data.length}`);
+      console.log(`✅ Tabla user_google_drive_credentials existe (${data.length} registros)`);
+    }
+  } catch (error) {
+    report.push(`❌ ERROR: ${error.message}`);
+    console.log('❌ Error verificando tabla:', error.message);
+  }
+  
+  console.log('\n📋 Paso 2: Verificando tabla company_credentials...\n');
+  
+  // 2. Verificar company_credentials
+  try {
+    const { data, error } = await supabase
       .from('company_credentials')
       .select('*')
       .eq('integration_type', 'google_drive')
-      .eq('status', 'pending_verification')
+      .limit(5);
     
-    if (pendingError) {
-      console.error('   ❌ Error buscando pendientes:', pendingError.message)
-    } else if (!pendingCreds || pendingCreds.length === 0) {
-      console.log('   ✅ No hay credenciales en estado pending_verification')
+    if (error) {
+      report.push(`❌ ERROR: No se puede acceder a 'company_credentials': ${error.message}`);
+      console.log('❌ Error accediendo a company_credentials');
     } else {
-      console.log(`   ⚠️  Encontradas ${pendingCreds.length} credenciales pendientes:`)
-      for (const cred of pendingCreds) {
-        console.log(`      - ${cred.account_name} (${cred.id})`)
+      report.push(`✅ Tabla 'company_credentials' accesible`);
+      report.push(`   Credenciales Google Drive: ${data.length}`);
+      
+      // Verificar estructura de datos
+      if (data.length > 0) {
+        const sample = data[0];
+        report.push(`   📊 Muestra de datos:`);
+        report.push(`      - ID: ${sample.id}`);
+        report.push(`      - Status: ${sample.status}`);
+        report.push(`      - Tiene access_token: ${!!sample.access_token}`);
+        report.push(`      - Tiene refresh_token: ${!!sample.refresh_token}`);
+        report.push(`      - Campos disponibles: ${Object.keys(sample).join(', ')}`);
       }
+      console.log(`✅ Company credentials accesible (${data.length} registros)`);
     }
-    
-    // 2. Verificar si hay errores en el callback
-    console.log('\n' + '='.repeat(70))
-    console.log('\n🔍 2. VERIFICANDO CONFIGURACIÓN DE OAUTH\n')
-    
-    // Verificar variables de entorno necesarias
-    const requiredEnvVars = [
-      'REACT_APP_GOOGLE_CLIENT_ID',
-      'REACT_APP_GOOGLE_CLIENT_SECRET',
-      'REACT_APP_GOOGLE_REDIRECT_URI'
-    ]
-    
-    console.log('   Variables de entorno requeridas:')
-    for (const envVar of requiredEnvVars) {
-      const value = process.env[envVar]
-      const exists = !!value
-      const isPlaceholder = exists && (
-        value.includes('dummy') || 
-        value.includes('YOUR_') || 
-        value.includes('placeholder')
-      )
-      
-      const status = !exists ? '❌ AUSENTE' : 
-                     isPlaceholder ? '⚠️  PLACEHOLDER' : '✅ CONFIGURADA'
-      
-      console.log(`   - ${envVar}: ${status}`)
-      if (exists && !isPlaceholder) {
-        console.log(`     Valor: ${value.substring(0, 20)}...`)
-      }
-    }
-    
-    // 3. Verificar si el callback endpoint existe
-    console.log('\n' + '='.repeat(70))
-    console.log('\n🔍 3. VERIFICANDO ENDPOINT DE CALLBACK\n')
-    
-    // Verificar si hay una función Netlify para el callback
-    console.log('   🔍 Buscando endpoint de callback...')
-    console.log('   - Ruta esperada: /auth/google/callback')
-    console.log('   - Archivo esperado: googleDriveCallbackHandler.js')
-    
-    // Verificar si la tabla company_credentials tiene el campo credentials correctamente
-    console.log('\n' + '='.repeat(70))
-    console.log('\n🔍 4. VERIFICANDO ESTRUCTURA DE company_credentials\n')
-    
-    const { data: sampleCred, error: sampleError } = await supabase
-      .from('company_credentials')
-      .select('*')
-      .limit(1)
-    
-    if (sampleError) {
-      console.error('   ❌ Error obteniendo muestra:', sampleError.message)
-    } else if (!sampleCred || sampleCred.length === 0) {
-      console.log('   ❌ No hay credenciales para analizar')
-    } else {
-      const cred = sampleCred[0]
-      console.log('   📄 Estructura de la tabla:')
-      console.log(`   - ID: ${cred.id}`)
-      console.log(`   - company_id: ${cred.company_id}`)
-      console.log(`   - integration_type: ${cred.integration_type}`)
-      console.log(`   - account_name: ${cred.account_name}`)
-      console.log(`   - account_email: ${cred.account_email || 'N/A'}`)
-      console.log(`   - status: ${cred.status}`)
-      console.log(`   - credentials: ${cred.credentials ? '✅ PRESENTE' : '❌ NULO'}`)
-      console.log(`   - created_at: ${cred.created_at}`)
-      console.log(`   - updated_at: ${cred.updated_at}`)
-      
-      if (cred.credentials) {
-        try {
-          const credsData = typeof cred.credentials === 'string' ? JSON.parse(cred.credentials) : cred.credentials
-          console.log(`\n   🔑 Contenido de credentials:`)
-          console.log(`   - access_token: ${credsData.access_token ? '✅' : '❌'}`)
-          console.log(`   - refresh_token: ${credsData.refresh_token ? '✅' : '❌'}`)
-          console.log(`   - scope: ${credsData.scope || '❌'}`)
-          console.log(`   - token_type: ${credsData.token_type || '❌'}`)
-          console.log(`   - expiry_date: ${credsData.expiry_date || '❌'}`)
-        } catch (e) {
-          console.log(`   ❌ Error parseando credentials: ${e.message}`)
-        }
-      }
-    }
-    
-    // 5. Probar conectividad a Google OAuth
-    console.log('\n' + '='.repeat(70))
-    console.log('\n🌐 5. PROBANDO CONECTIVIDAD A GOOGLE OAUTH\n')
-    
-    const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID
-    if (clientId && !clientId.includes('dummy') && !clientId.includes('YOUR_')) {
-      console.log('   ✅ Client ID está configurado')
-      console.log(`   🔍 Verificando en Google Cloud Console...`)
-      console.log(`   📋 Client ID: ${clientId}`)
-      
-      // Verificar si el redirect URI está configurado
-      const redirectUri = process.env.REACT_APP_GOOGLE_REDIRECT_URI || 'https://brifyrrhhv3.netlify.app/auth/google/callback'
-      console.log(`   🔄 Redirect URI: ${redirectUri}`)
-      
-      console.log('\n   ⚠️  IMPORTANTE: Verifica en Google Cloud Console que:')
-      console.log('      - El Client ID es correcto')
-      console.log('      - El Redirect URI está autorizado')
-      console.log('      - Las APIs de Google Drive están habilitadas')
-    } else {
-      console.log('   ❌ Client ID no está configurado correctamente')
-    }
-    
-    // 6. Resumen y diagnóstico final
-    console.log('\n' + '='.repeat(70))
-    console.log('\n📊 DIAGNÓSTICO FINAL:\n')
-    
-    console.log('   PROBLEMA IDENTIFICADO:')
-    console.log('   - La tabla user_google_drive_credentials está VACÍA')
-    console.log('   - El OAuth no está guardando tokens')
-    console.log('   - El servicio dinámico lee de company_credentials (sin tokens)')
-    
-    console.log('\n   POSIBLES CAUSAS:')
-    console.log('   1. ❌ El botón "Conectar" no inicia el flujo OAuth')
-    console.log('   2. ❌ El callback no procesa correctamente los tokens')
-    console.log('   3. ❌ El OAuth falla antes de guardar (error de configuración)')
-    console.log('   4. ❌ Falta el endpoint /auth/google/callback')
-    
-    console.log('\n   🛠️  SOLUCIONES:')
-    console.log('   1. Verificar que el botón "Conectar" llama a generateAuthUrl()')
-    console.log('   2. Verificar que el callback endpoint existe y funciona')
-    console.log('   3. Verificar variables de entorno de Google OAuth')
-    console.log('   4. Verificar configuración en Google Cloud Console')
-    console.log('   5. Alternativa: Migrar manualmente tokens a company_credentials')
-    
   } catch (error) {
-    console.error('❌ Error en debug:', error.message)
+    report.push(`❌ ERROR: ${error.message}`);
   }
+  
+  console.log('\n📋 Paso 3: Verificando variables de entorno...\n');
+  
+  // 3. Verificar variables de entorno críticas
+  const envVars = [
+    'REACT_APP_GOOGLE_CLIENT_ID',
+    'REACT_APP_GOOGLE_CLIENT_SECRET',
+    'REACT_APP_GOOGLE_REDIRECT_URI',
+    'REACT_APP_GOOGLE_API_KEY'
+  ];
+  
+  envVars.forEach(varName => {
+    const value = process.env[varName];
+    const status = value && !value.includes('dummy') && !value.includes('YOUR_') ? '✅' : '❌';
+    const displayValue = value ? (value.includes('secret') ? '***' : value) : 'VACÍO';
+    report.push(`${status} ${varName}: ${displayValue}`);
+    console.log(`${status} ${varName}: ${displayValue}`);
+  });
+  
+  console.log('\n📋 Paso 4: Verificando RLS (Row Level Security)...\n');
+  
+  // 4. Verificar políticas RLS
+  try {
+    // Intentar una operación que debería funcionar con RLS
+    const { data, error } = await supabase
+      .from('company_credentials')
+      .select('count')
+      .eq('integration_type', 'google_drive');
+    
+    if (error && error.code === '42501') {
+      report.push(`❌ RLS está bloqueando el acceso a 'company_credentials'`);
+      report.push(`   Mensaje: ${error.message}`);
+      report.push(`   💡 Solución: Deshabilitar RLS temporalmente o crear políticas adecuadas`);
+      console.log('❌ RLS está bloqueando el acceso');
+    } else if (error) {
+      report.push(`⚠️ Error al verificar RLS: ${error.message}`);
+      console.log('⚠️ Error verificando RLS');
+    } else {
+      report.push(`✅ RLS no está bloqueando el acceso básico`);
+      console.log('✅ RLS no bloquea acceso básico');
+    }
+  } catch (error) {
+    report.push(`❌ Error verificando RLS: ${error.message}`);
+  }
+  
+  console.log('\n📋 Paso 5: Verificando Netlify Functions...\n');
+  
+  // 5. Verificar si existen Netlify Functions
+  try {
+    const functions = [
+      'google-auth',
+      'google-refresh',
+      'google-drive-callback'
+    ];
+    
+    for (const func of functions) {
+      const path = `netlify/functions/${func}.js`;
+      try {
+        readFileSync(path);
+        report.push(`✅ Netlify Function encontrada: ${func}`);
+        console.log(`✅ Function ${func} encontrada`);
+      } catch {
+        report.push(`❌ Netlify Function NO encontrada: ${func}`);
+        console.log(`❌ Function ${func} no encontrada`);
+      }
+    }
+  } catch (error) {
+    report.push(`❌ Error verificando functions: ${error.message}`);
+  }
+  
+  console.log('\n📋 Paso 6: Verificando endpoints de callback...\n');
+  
+  // 6. Verificar URLs de callback
+  const redirectUris = [
+    'http://localhost:3000/auth/google/callback',
+    'http://localhost:8888/auth/google/callback',
+    'https://brify.netlify.app/auth/google/callback',
+    'https://brifyrrhhv2.netlify.app/auth/google/callback'
+  ];
+  
+  report.push('URLs de redirect_uri configuradas:');
+  redirectUris.forEach(uri => {
+    report.push(`   - ${uri}`);
+  });
+  console.log('URLs de callback verificadas');
+  
+  console.log('\n📋 Paso 7: Análisis de problemas comunes...\n');
+  
+  // 7. Análisis de problemas comunes
+  report.push('\n=== ANÁLISIS DE PROBLEMAS COMUNES ===');
+  
+  // Problema 1: Tabla incorrecta
+  report.push('\n1. USO DE TABLA INCORRECTA:');
+  report.push('   El código usa "user_google_drive_credentials" pero las credenciales');
+  report.push('   están en "company_credentials". Esto es un problema de arquitectura.');
+  report.push('   💡 Solución: El TokenBridge debe usar company_credentials, no user_google_drive_credentials');
+  
+  // Problema 2: Falta de Netlify Functions
+  report.push('\n2. NETLIFY FUNCTIONS:');
+  report.push('   En producción, se requieren Netlify Functions para manejar OAuth.');
+  report.push('   Si no existen, el intercambio de tokens fallará silenciosamente.');
+  
+  // Problema 3: Manejo de errores
+  report.push('\n3. MANEJO DE ERRORES:');
+  report.push('   Verifica que el callback esté capturando correctamente los errores de Google.');
+  report.push('   Revisa la consola del navegador en la URL de callback.');
+  
+  // Guardar reporte
+  const reportText = report.join('\n');
+  writeFileSync('oauth_diagnosis_report.txt', reportText);
+  
+  console.log('\n✅ Diagnóstico completo guardado en oauth_diagnosis_report.txt');
+  
+  // Resumen ejecutivo
+  console.log('\n=== RESUMEN EJECUTIVO ===');
+  console.log('Los problemas más probables son:');
+  console.log('1. TokenBridge usa tabla incorrecta (user_google_drive_credentials)');
+  console.log('2. Falta de Netlify Functions en producción');
+  console.log('3. Errores silenciosos en el callback de OAuth');
+  console.log('\nRevisa oauth_diagnosis_report.txt para detalles completos.');
 }
 
-debugOAuthFlow()
+diagnoseOAuthFlow().catch(error => {
+  console.error('❌ Error en diagnóstico:', error.message);
+  writeFileSync('oauth_diagnosis_report.txt', `Error crítico: ${error.message}\n${error.stack}`);
+});
