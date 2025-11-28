@@ -15,19 +15,19 @@ class GoogleDriveTokenBridge {
   }
 
   /**
-   * Inicializa el puente para un usuario específico
+   * Inicializa el puente para una empresa específica
    */
-  async initializeForUser(userId) {
+  async initializeForCompany(companyId) {
     try {
-      logger.info('GoogleDriveTokenBridge', `🔗 Inicializando puente para usuario: ${userId}`)
+      logger.info('GoogleDriveTokenBridge', `🔗 Inicializando puente para empresa: ${companyId}`)
       
-      this.currentUserId = userId
+      this.currentCompanyId = companyId
       
       // Sincronizar tokens inmediatamente
-      await this.syncTokensFromSupabase(userId)
+      await this.syncTokensFromSupabase(companyId)
       
       // Configurar sincronización periódica cada 5 minutos
-      this.startPeriodicSync(userId)
+      this.startPeriodicSync(companyId)
       
       logger.info('GoogleDriveTokenBridge', '✅ Puente inicializado')
       return true
@@ -40,15 +40,17 @@ class GoogleDriveTokenBridge {
   /**
    * Sincroniza tokens de Supabase a localStorage
    */
-  async syncTokensFromSupabase(userId) {
+  async syncTokensFromSupabase(companyId) {
     try {
-      logger.info('GoogleDriveTokenBridge', `🔄 Sincronizando tokens de Supabase para ${userId}...`)
+      logger.info('GoogleDriveTokenBridge', `🔄 Sincronizando tokens de Supabase para company ${companyId}...`)
       
-      // Obtener credenciales de Google Drive del usuario desde Supabase
+      // Obtener credenciales de Google Drive de la empresa desde Supabase
+      // CORREGIDO: Usar company_credentials en lugar de user_google_drive_credentials
       const { data: credentials, error } = await supabase
-        .from('user_google_drive_credentials')
-        .select('access_token, refresh_token, token_expires_at, is_connected, is_active')
-        .eq('user_id', userId)
+        .from('company_credentials')
+        .select('access_token, refresh_token, token_expires_at, status, email, account_email')
+        .eq('company_id', companyId)
+        .eq('integration_type', 'google_drive')
         .maybeSingle()
       
       if (error) {
@@ -58,27 +60,22 @@ class GoogleDriveTokenBridge {
       }
       
       if (!credentials) {
-        logger.warn('GoogleDriveTokenBridge', `⚠️ No hay credenciales para ${userId}`)
-        logger.info('GoogleDriveTokenBridge', `📊 Verificar que la tabla user_google_drive_credentials existe en Supabase`)
+        logger.warn('GoogleDriveTokenBridge', `⚠️ No hay credenciales para company ${companyId}`)
+        logger.info('GoogleDriveTokenBridge', `📊 Verificar que la tabla company_credentials tiene registros`)
         googleDriveAuthService.clearTokens()
         return false
       }
       
       logger.info('GoogleDriveTokenBridge', `📋 Credenciales encontradas:`)
-      logger.info('GoogleDriveTokenBridge', `  - is_active: ${credentials.is_active}`)
-      logger.info('GoogleDriveTokenBridge', `  - is_connected: ${credentials.is_connected}`)
+      logger.info('GoogleDriveTokenBridge', `  - status: ${credentials.status}`)
+      logger.info('GoogleDriveTokenBridge', `  - email: ${credentials.email || credentials.account_email}`)
       logger.info('GoogleDriveTokenBridge', `  - has_access_token: ${!!credentials.access_token}`)
       logger.info('GoogleDriveTokenBridge', `  - has_refresh_token: ${!!credentials.refresh_token}`)
       logger.info('GoogleDriveTokenBridge', `  - expires_at: ${credentials.token_expires_at}`)
       
-      if (!credentials.is_active) {
-        logger.warn('GoogleDriveTokenBridge', `⚠️ Credenciales no están activas`)
-        googleDriveAuthService.clearTokens()
-        return false
-      }
-      
-      if (!credentials.is_connected) {
-        logger.warn('GoogleDriveTokenBridge', `⚠️ Usuario no está conectado a Google Drive`)
+      // Validar status
+      if (credentials.status !== 'active') {
+        logger.warn('GoogleDriveTokenBridge', `⚠️ Credenciales no están activas (status: ${credentials.status})`)
         googleDriveAuthService.clearTokens()
         return false
       }
@@ -98,7 +95,7 @@ class GoogleDriveTokenBridge {
       }
       
       googleDriveAuthService.setTokens(tokens)
-      logger.info('GoogleDriveTokenBridge', `✅ Tokens sincronizados para ${userId}`)
+      logger.info('GoogleDriveTokenBridge', `✅ Tokens sincronizados para company ${companyId}`)
       logger.info('GoogleDriveTokenBridge', `✅ googleDriveAuthService.isAuthenticated() = ${googleDriveAuthService.isAuthenticated()}`)
       return true
     } catch (error) {
@@ -111,7 +108,7 @@ class GoogleDriveTokenBridge {
   /**
    * Inicia sincronización periódica de tokens
    */
-  startPeriodicSync(userId) {
+  startPeriodicSync(companyId) {
     try {
       // Limpiar intervalo anterior
       if (this.syncInterval) {
@@ -123,7 +120,7 @@ class GoogleDriveTokenBridge {
       // Sincronizar cada 5 minutos
       this.syncInterval = setInterval(async () => {
         try {
-          await this.syncTokensFromSupabase(userId)
+          await this.syncTokensFromSupabase(companyId)
         } catch (error) {
           logger.error('GoogleDriveTokenBridge', `❌ Error en sincronización periódica: ${error.message}`)
         }
@@ -155,7 +152,7 @@ class GoogleDriveTokenBridge {
     try {
       logger.info('GoogleDriveTokenBridge', '🧹 Limpiando puente...')
       this.stopPeriodicSync()
-      this.currentUserId = null
+      this.currentCompanyId = null
       googleDriveAuthService.clearTokens()
       logger.info('GoogleDriveTokenBridge', '✅ Puente limpiado')
     } catch (error) {
@@ -164,10 +161,10 @@ class GoogleDriveTokenBridge {
   }
 
   /**
-   * Obtiene el usuario actual
+   * Obtiene la empresa actual
    */
-  getCurrentUserId() {
-    return this.currentUserId
+  getCurrentCompanyId() {
+    return this.currentCompanyId
   }
 
   /**

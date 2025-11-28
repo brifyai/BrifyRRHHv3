@@ -269,10 +269,41 @@ class GoogleDrivePersistenceService {
     try {
       const { data: credentials, error: getError } = await this.getCredentials(userId);
 
-      if (getError || !credentials || !credentials.refresh_token) {
-        console.warn('No se pueden refrescar tokens: credenciales no disponibles');
+      // ✅ VALIDACIÓN MEJORADA: Verificar que existan credenciales y refresh token
+      if (getError) {
+        console.warn('❌ Error obteniendo credenciales:', getError.message);
+        return { success: false, error: { message: `Error getting credentials: ${getError.message}` } };
+      }
+
+      if (!credentials) {
+        console.warn('⚠️ No hay credenciales guardadas para este usuario');
+        return { success: false, error: { message: 'No credentials found' } };
+      }
+
+      if (!credentials.refresh_token) {
+        console.warn('⚠️ No hay refresh token disponible:', {
+          userId,
+          hasAccessToken: !!credentials.access_token,
+          status: credentials.status
+        });
         return { success: false, error: { message: 'No refresh token available' } };
       }
+
+      // ✅ VALIDAR VARIABLES DE ENTORNO
+      const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.REACT_APP_GOOGLE_CLIENT_SECRET;
+
+      if (!clientId || clientId === 'undefined') {
+        console.error('❌ REACT_APP_GOOGLE_CLIENT_ID no está configurado');
+        return { success: false, error: { message: 'Google Client ID not configured' } };
+      }
+
+      if (!clientSecret || clientSecret === 'undefined') {
+        console.error('❌ REACT_APP_GOOGLE_CLIENT_SECRET no está configurado');
+        return { success: false, error: { message: 'Google Client Secret not configured' } };
+      }
+
+      console.log('🔄 Intentando refrescar token para usuario:', userId);
 
       // Llamar a endpoint de refresh de Google
       const response = await fetch('https://oauth2.googleapis.com/token', {
@@ -281,15 +312,22 @@ class GoogleDrivePersistenceService {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: new URLSearchParams({
-          client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
-          client_secret: process.env.REACT_APP_GOOGLE_CLIENT_SECRET,
+          client_id: clientId,
+          client_secret: clientSecret,
           refresh_token: credentials.refresh_token,
           grant_type: 'refresh_token'
         })
       });
 
       if (!response.ok) {
-        throw new Error(`Google token refresh failed: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ Google token refresh failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText,
+          userId
+        });
+        throw new Error(`Google token refresh failed: ${response.status} - ${errorText}`);
       }
 
       const newTokens = await response.json();
@@ -298,14 +336,14 @@ class GoogleDrivePersistenceService {
       const { success, error } = await this.updateTokens(userId, newTokens);
 
       if (!success) {
-        console.error('Error actualizando tokens refrescados:', error);
+        console.error('❌ Error actualizando tokens refrescados:', error);
         return { success: false, error };
       }
 
-      console.log('Tokens refrescados exitosamente');
+      console.log('✅ Tokens refrescados exitosamente para usuario:', userId);
       return { success: true, error: null };
     } catch (error) {
-      console.error('Error en attemptTokenRefresh:', error);
+      console.error('❌ Error en attemptTokenRefresh:', error);
       return { success: false, error: { message: error.message } };
     }
   }
