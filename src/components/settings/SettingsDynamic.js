@@ -20,7 +20,7 @@ import CompaniesSection from './CompaniesSection.js'
 import IntegrationsSection from './IntegrationsSection.js'
 import NotificationsSection from './NotificationsSection.js'
 import SecuritySection from './SecuritySection.js'
-import SyncSettingsSection from './SyncSettingsSection.js'
+import SyncSettingsSection from './SyncSettingsSection_v2.js'
 import CompanySyncSettingsSection from './CompanySyncSettingsSection.js'
 
 const Settings = ({ activeTab: propActiveTab, companyId: propCompanyId }) => {
