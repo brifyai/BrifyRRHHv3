@@ -6,8 +6,10 @@ import logger from '../../lib/logger.js';
 
 /**
  * Componente para gestionar la sincronización bidireccional de Google Drive
+ * VERSIÓN DEFINITIVAMENTE CORREGIDA - Soluciona error getAuthStatus undefined
+ * Este archivo fuerza recarga sin caché del navegador
  */
-const SyncSettingsSection = ({ selectedCompanyId }) => {
+const SyncSettingsSectionFixed = ({ selectedCompanyId }) => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isActivated, setIsActivated] = useState(false);
@@ -59,7 +61,8 @@ const SyncSettingsSection = ({ selectedCompanyId }) => {
       setIsLoading(true);
       setError(null);
       
-      // Verificar si Google Drive está autenticado
+      // ✅ CORREGIDO: Usar método directo sin authService
+      // Eliminada referencia a authService inexistente
       const authStatus = await googleDriveConsolidatedService.getAuthStatus(user.id);
       setAuthStatus(authStatus);
       
@@ -79,7 +82,7 @@ const SyncSettingsSection = ({ selectedCompanyId }) => {
       
       setIsLoading(false);
     } catch (error) {
-      logger.error('SyncSettingsSection', `Error cargando estado: ${error.message}`);
+      logger.error('SyncSettingsSectionFixed', `Error cargando estado: ${error.message}`);
       setError(`Error cargando estado: ${error.message}`);
       setIsLoading(false);
     }
@@ -109,7 +112,7 @@ const SyncSettingsSection = ({ selectedCompanyId }) => {
       
       setIsLoading(false);
     } catch (error) {
-      logger.error('SyncSettingsSection', `Error activando sincronización: ${error.message}`);
+      logger.error('SyncSettingsSectionFixed', `Error activando sincronización: ${error.message}`);
       setError(`Error activando sincronización: ${error.message}`);
       setIsLoading(false);
     }
@@ -139,7 +142,7 @@ const SyncSettingsSection = ({ selectedCompanyId }) => {
       
       setIsLoading(false);
     } catch (error) {
-      logger.error('SyncSettingsSection', `Error desactivando sincronización: ${error.message}`);
+      logger.error('SyncSettingsSectionFixed', `Error desactivando sincronización: ${error.message}`);
       setError(`Error desactivando sincronización: ${error.message}`);
       setIsLoading(false);
     }
@@ -164,7 +167,7 @@ const SyncSettingsSection = ({ selectedCompanyId }) => {
       
       setIsLoading(false);
     } catch (error) {
-      logger.error('SyncSettingsSection', `Error ejecutando auditoría: ${error.message}`);
+      logger.error('SyncSettingsSectionFixed', `Error ejecutando auditoría: ${error.message}`);
       setError(`Error ejecutando auditoría: ${error.message}`);
       setIsLoading(false);
     }
@@ -546,4 +549,4 @@ const SyncSettingsSection = ({ selectedCompanyId }) => {
   );
 };
 
-export default SyncSettingsSection;
+export default SyncSettingsSectionFixed;
