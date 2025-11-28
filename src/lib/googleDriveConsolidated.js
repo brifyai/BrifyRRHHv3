@@ -94,7 +94,8 @@ class GoogleDriveConsolidatedService {
    */
   generateAuthUrl() {
     try {
-      const authUrl = this.authService.generateAuthUrl()
+      // ✅ SOLUCIÓN: Usar multiGoogleDriveManager directamente
+      const authUrl = multiGoogleDriveManager.generateAuthUrl(this.currentCompanyId)
       if (!authUrl) {
         logger.warn('GoogleDriveConsolidated', '⚠️ No se pudo generar URL de autorización')
         return null
@@ -116,7 +117,8 @@ class GoogleDriveConsolidatedService {
     try {
       logger.info('GoogleDriveConsolidated', '🔄 Intercambiando código por tokens...')
       
-      const tokens = await this.authService.exchangeCodeForTokens(code)
+      // ✅ SOLUCIÓN: Usar multiGoogleDriveManager directamente
+      const tokens = await multiGoogleDriveManager.exchangeCodeForTokens(this.currentCompanyId, code)
       
       // Guardar en Supabase
       await this.persistenceService.saveCredentials(this.currentUserId, tokens, {
@@ -170,7 +172,7 @@ class GoogleDriveConsolidatedService {
         // Si es error de autorización, intentar refresh
         if (response.status === 401) {
           logger.info('GoogleDriveConsolidated', '🔄 Token expirado, intentando refresh...')
-          const refreshed = await this.authService.refreshAccessToken(this.authService.refreshToken)
+          const refreshed = await multiGoogleDriveManager.refreshAccessToken(this.currentCompanyId)
           if (refreshed) {
             return this.createFolder(name, parentId) // Reintentar
           }
@@ -222,7 +224,7 @@ class GoogleDriveConsolidatedService {
         
         if (response.status === 401) {
           logger.info('GoogleDriveConsolidated', '🔄 Token expirado, intentando refresh...')
-          const refreshed = await this.authService.refreshAccessToken(this.authService.refreshToken)
+          const refreshed = await multiGoogleDriveManager.refreshAccessToken(this.currentCompanyId)
           if (refreshed) {
             return this.listFiles(parentId, pageSize) // Reintentar
           }
@@ -277,7 +279,7 @@ class GoogleDriveConsolidatedService {
         
         if (response.status === 401) {
           logger.info('GoogleDriveConsolidated', '🔄 Token expirado, intentando refresh...')
-          const refreshed = await this.authService.refreshAccessToken(this.authService.refreshToken)
+          const refreshed = await multiGoogleDriveManager.refreshAccessToken(this.currentCompanyId)
           if (refreshed) {
             return this.uploadFile(file, parentId) // Reintentar
           }
@@ -316,7 +318,7 @@ class GoogleDriveConsolidatedService {
         
         if (response.status === 401) {
           logger.info('GoogleDriveConsolidated', '🔄 Token expirado, intentando refresh...')
-          const refreshed = await this.authService.refreshAccessToken(this.authService.refreshToken)
+          const refreshed = await multiGoogleDriveManager.refreshAccessToken(this.currentCompanyId)
           if (refreshed) {
             return this.downloadFile(fileId) // Reintentar
           }
@@ -356,7 +358,7 @@ class GoogleDriveConsolidatedService {
         
         if (response.status === 401) {
           logger.info('GoogleDriveConsolidated', '🔄 Token expirado, intentando refresh...')
-          const refreshed = await this.authService.refreshAccessToken(this.authService.refreshToken)
+          const refreshed = await multiGoogleDriveManager.refreshAccessToken(this.currentCompanyId)
           if (refreshed) {
             return this.deleteFile(fileId) // Reintentar
           }
@@ -399,7 +401,7 @@ class GoogleDriveConsolidatedService {
         
         if (response.status === 401) {
           logger.info('GoogleDriveConsolidated', '🔄 Token expirado, intentando refresh...')
-          const refreshed = await this.authService.refreshAccessToken(this.authService.refreshToken)
+          const refreshed = await multiGoogleDriveManager.refreshAccessToken(this.currentCompanyId)
           if (refreshed) {
             return this.getFileInfo(fileId) // Reintentar
           }
@@ -450,7 +452,7 @@ class GoogleDriveConsolidatedService {
         
         if (response.status === 401) {
           logger.info('GoogleDriveConsolidated', '🔄 Token expirado, intentando refresh...')
-          const refreshed = await this.authService.refreshAccessToken(this.authService.refreshToken)
+          const refreshed = await multiGoogleDriveManager.refreshAccessToken(this.currentCompanyId)
           if (refreshed) {
             return this.shareFolder(folderId, email, role) // Reintentar
           }
@@ -478,7 +480,17 @@ class GoogleDriveConsolidatedService {
         return { connected: false, email: null, lastSync: null }
       }
 
-      return await this.persistenceService.getConnectionStatus(this.currentUserId)
+      // ✅ SOLUCIÓN: Verificar autenticación via multiGoogleDriveManager
+      const isAuthenticated = this.currentCompanyId &&
+                            multiGoogleDriveManager.isAuthenticated(this.currentCompanyId)
+      
+      const status = await this.persistenceService.getConnectionStatus(this.currentUserId)
+      
+      return {
+        connected: isAuthenticated || status.connected,
+        email: status.email,
+        lastSync: status.lastSync
+      }
     } catch (error) {
       logger.error('GoogleDriveConsolidated', `❌ Error obteniendo estado: ${error.message}`)
       return { connected: false, email: null, lastSync: null }
@@ -503,8 +515,8 @@ class GoogleDriveConsolidatedService {
       // Limpiar credenciales en Supabase
       const result = await this.persistenceService.disconnect(this.currentUserId)
       
-      // Limpiar tokens en auth service
-      this.authService.clearTokens()
+      // ✅ SOLUCIÓN: Limpiar tokens via multiGoogleDriveManager
+      multiGoogleDriveManager.clearTokens(this.currentCompanyId)
       
       logger.info('GoogleDriveConsolidated', '✅ Google Drive desconectado exitosamente')
       return result
@@ -543,7 +555,8 @@ class GoogleDriveConsolidatedService {
    * @returns {boolean} - true si las credenciales están configuradas
    */
   hasValidCredentials() {
-    return this.authService.hasValidCredentials()
+    // ✅ SOLUCIÓN: Verificar credenciales via multiGoogleDriveManager
+    return multiGoogleDriveManager.hasValidCredentials()
   }
 
   /**
@@ -552,7 +565,10 @@ class GoogleDriveConsolidatedService {
   cleanup() {
     logger.info('GoogleDriveConsolidated', '🧹 Limpiando servicio...')
     this.persistenceService.cleanup()
-    this.authService.clearTokens()
+    // ✅ SOLUCIÓN: Limpiar tokens via multiGoogleDriveManager
+    if (this.currentCompanyId) {
+      multiGoogleDriveManager.clearTokens(this.currentCompanyId)
+    }
     this.currentUserId = null
     this.initialized = false
     logger.info('GoogleDriveConsolidated', '✅ Servicio limpiado')
