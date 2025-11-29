@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import logger from '../../lib/logger';
-import googleDriveCallbackHandler from '../../lib/googleDriveCallbackHandler';
+import logger from '../../lib/logger.js';
+import googleDriveCallbackHandler from '../../lib/googleDriveCallbackHandler.js';
 
 /**
  * GoogleDriveDirectConnect
