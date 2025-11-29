@@ -1067,6 +1067,144 @@ export const db = {
         return { data: null, error: { message: error.message } }
       }
     }
+  },
+
+  // Credenciales de empresa (para MultiAccountServiceUI)
+  companyCredentials: {
+    create: async (credentialsData) => {
+      try {
+        if (!credentialsData || typeof credentialsData !== 'object') {
+          throw new Error('credentialsData debe ser un objeto válido');
+        }
+        if (!credentialsData.company_id) {
+          throw new Error('company_id es requerido');
+        }
+        if (!credentialsData.integration_type) {
+          throw new Error('integration_type es requerido');
+        }
+
+        const { data, error } = await supabase
+          .from('company_credentials')
+          .insert([credentialsData])
+          .select()
+        return { data, error }
+      } catch (error) {
+        console.error('Error en companyCredentials.create:', error);
+        return { data: null, error: { message: error.message } }
+      }
+    },
+    
+    upsert: async (credentialsData) => {
+      try {
+        if (!credentialsData || typeof credentialsData !== 'object') {
+          throw new Error('credentialsData debe ser un objeto válido');
+        }
+        if (!credentialsData.company_id) {
+          throw new Error('company_id es requerido para upsert');
+        }
+        if (!credentialsData.integration_type) {
+          throw new Error('integration_type es requerido para upsert');
+        }
+
+        const { data, error } = await supabase
+          .from('company_credentials')
+          .upsert([credentialsData], {
+            onConflict: 'company_id,integration_type',
+            ignoreDuplicates: false
+          })
+          .select()
+        return { data, error }
+      } catch (error) {
+        console.error('Error en companyCredentials.upsert:', error);
+        return { data: null, error: { message: error.message } }
+      }
+    },
+    
+    getByCompanyId: async (companyId, integrationType = null) => {
+      try {
+        if (!companyId) {
+          throw new Error('Company ID es requerido');
+        }
+
+        let query = supabase
+          .from('company_credentials')
+          .select('*')
+          .eq('company_id', companyId);
+
+        if (integrationType) {
+          query = query.eq('integration_type', integrationType);
+        }
+
+        const { data, error } = await query;
+        return { data, error }
+      } catch (error) {
+        console.error('Error en companyCredentials.getByCompanyId:', error);
+        return { data: null, error: { message: error.message } }
+      }
+    },
+    
+    getByType: async (integrationType) => {
+      try {
+        if (!integrationType) {
+          throw new Error('Integration type es requerido');
+        }
+
+        const { data, error } = await supabase
+          .from('company_credentials')
+          .select('*')
+          .eq('integration_type', integrationType);
+        return { data, error }
+      } catch (error) {
+        console.error('Error en companyCredentials.getByType:', error);
+        return { data: null, error: { message: error.message } }
+      }
+    },
+    
+    update: async (companyId, integrationType, updates) => {
+      try {
+        if (!companyId) {
+          throw new Error('Company ID es requerido');
+        }
+        if (!integrationType) {
+          throw new Error('Integration type es requerido');
+        }
+        if (!updates || typeof updates !== 'object') {
+          throw new Error('Updates debe ser un objeto válido');
+        }
+
+        const { data, error } = await supabase
+          .from('company_credentials')
+          .update(updates)
+          .eq('company_id', companyId)
+          .eq('integration_type', integrationType)
+          .select()
+        return { data, error }
+      } catch (error) {
+        console.error('Error en companyCredentials.update:', error);
+        return { data: null, error: { message: error.message } }
+      }
+    },
+    
+    delete: async (companyId, integrationType) => {
+      try {
+        if (!companyId) {
+          throw new Error('Company ID es requerido');
+        }
+        if (!integrationType) {
+          throw new Error('Integration type es requerido');
+        }
+
+        const { data, error } = await supabase
+          .from('company_credentials')
+          .delete()
+          .eq('company_id', companyId)
+          .eq('integration_type', integrationType)
+        return { data, error }
+      } catch (error) {
+        console.error('Error en companyCredentials.delete:', error);
+        return { data: null, error: { message: error.message } }
+      }
+    }
   }
 }
 

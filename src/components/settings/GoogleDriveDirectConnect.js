@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import logger from '../../lib/logger.js';
 import googleDriveCallbackHandler from '../../lib/googleDriveCallbackHandler.js';
 import auth from '../../lib/supabaseAuth.js';
+import supabaseDatabase from '../../lib/supabaseDatabase.js';
 
 /**
  * GoogleDriveDirectConnect
@@ -100,6 +101,37 @@ const GoogleDriveDirectConnect = ({ companyId, companyName, onConnectionSuccess,
       }
 
       logger.info('GoogleDriveDirectConnect', `✅ Conexión exitosa para ${result.data.email}`);
+
+      // ✅ GUARDAR TAMBIÉN EN COMPANY_CREDENTIALS para MultiAccountServiceUI
+      try {
+        logger.info('GoogleDriveDirectConnect', `💾 Guardando también en company_credentials para company: ${companyId}`);
+        
+        const companyCredentialsData = {
+          company_id: companyId,
+          integration_type: 'google_drive',
+          credentials: {
+            access_token: result.data.access_token || 'oauth_token',
+            refresh_token: result.data.refresh_token || null,
+            account_email: result.data.email,
+            account_name: result.data.name || result.data.email
+          },
+          status: 'active',
+          account_email: result.data.email,
+          account_name: result.data.name || result.data.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: companyError } = await supabaseDatabase.companyCredentials.upsert(companyCredentialsData);
+
+        if (companyError) {
+          logger.error('GoogleDriveDirectConnect', `❌ Error guardando en company_credentials: ${companyError.message}`);
+        } else {
+          logger.info('GoogleDriveDirectConnect', `✅ Credenciales guardadas exitosamente en company_credentials`);
+        }
+      } catch (companyError) {
+        logger.error('GoogleDriveDirectConnect', `❌ Error en guardado secundario: ${companyError.message}`);
+      }
 
       // Limpiar sessionStorage
       sessionStorage.removeItem('google_oauth_company_id');
