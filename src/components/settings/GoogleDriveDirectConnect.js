@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import logger from '../../lib/logger.js';
 import googleDriveCallbackHandler from '../../lib/googleDriveCallbackHandler.js';
-import { supabaseAuth } from '../../lib/supabaseAuth.js';
+import auth from '../../lib/supabaseAuth.js';
 
 /**
  * GoogleDriveDirectConnect
@@ -84,7 +84,7 @@ const GoogleDriveDirectConnect = ({ companyId, companyName, onConnectionSuccess,
       }
 
       // ✅ OBTENER USERID REAL DEL USUARIO AUTENTICADO
-      const { data: { user } } = await supabaseAuth.getUser();
+      const { data: { user } } = await auth.getCurrentUser();
       if (!user?.id) {
         throw new Error('No hay usuario autenticado');
       }
