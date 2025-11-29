@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import logger from '../../lib/logger.js';
 import googleDriveCallbackHandler from '../../lib/googleDriveCallbackHandler.js';
+import { supabaseAuth } from '../../lib/supabaseAuth.js';
 
 /**
  * GoogleDriveDirectConnect
@@ -82,10 +83,17 @@ const GoogleDriveDirectConnect = ({ companyId, companyName, onConnectionSuccess,
         throw new Error('No se encontró company_id en sessionStorage');
       }
 
-      logger.info('GoogleDriveDirectConnect', `📥 Procesando callback para company: ${companyId}`);
+      // ✅ OBTENER USERID REAL DEL USUARIO AUTENTICADO
+      const { data: { user } } = await supabaseAuth.getUser();
+      if (!user?.id) {
+        throw new Error('No hay usuario autenticado');
+      }
+      const userId = user.id;
 
-      // Procesar el código de autorización
-      const result = await googleDriveCallbackHandler.handleAuthorizationCode(code, companyId);
+      logger.info('GoogleDriveDirectConnect', `📥 Procesando callback para company: ${companyId}, user: ${userId}`);
+
+      // ✅ Procesar el código de autorización con USERID REAL
+      const result = await googleDriveCallbackHandler.handleAuthorizationCode(code, userId);
 
       if (!result.success) {
         throw new Error(result.error?.message || 'Error desconocido en el callback');
