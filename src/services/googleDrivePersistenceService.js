@@ -36,14 +36,14 @@ class GoogleDrivePersistenceService {
         google_email: userInfo.email || null,
         google_name: userInfo.name || null,
         google_avatar_url: userInfo.picture || null,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token || null,
-        token_expires_at: tokenExpiresAt.toISOString(),
-        scope: tokens.scope || 'https://www.googleapis.com/auth/drive',
-        is_active: true,
+        google_access_token: tokens.access_token,
+        google_refresh_token: tokens.refresh_token || null,
+        google_token_expires_at: tokenExpiresAt.toISOString(),
+        google_scope: tokens.scope || 'https://www.googleapis.com/auth/drive',
         is_connected: true,
+        sync_status: 'connected',
         last_sync_at: new Date().toISOString(),
-        sync_status: 'success'
+        last_used_at: new Date().toISOString()
       };
 
       // Usar upsert para crear o actualizar
@@ -133,13 +133,13 @@ class GoogleDrivePersistenceService {
       const tokenExpiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);
 
       const updates = {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token || undefined,
-        token_expires_at: tokenExpiresAt.toISOString(),
+        google_access_token: tokens.access_token,
+        google_refresh_token: tokens.refresh_token || undefined,
+        google_token_expires_at: tokenExpiresAt.toISOString(),
         last_sync_at: new Date().toISOString(),
-        is_active: true,
+        last_used_at: new Date().toISOString(),
         is_connected: true,
-        sync_status: 'success'
+        sync_status: 'connected'
       };
 
       // Remover undefined

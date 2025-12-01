@@ -144,7 +144,7 @@ class GoogleDriveAuthServiceDynamic {
         .select('*')
         .eq('company_id', companyId)
         .eq('integration_type', 'google_drive')
-        .in('status', ['pending_verification', 'active'])
+        .in('sync_status', ['connected', 'connecting'])
       
       if (result.error) {
         logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta: ${result.error.message}`)

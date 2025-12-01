@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }) => {
             .from('user_google_drive_credentials')
             .select('*')
             .eq('user_id', userId)
-            .in('status', ['pending_verification', 'active']),
+            .in('sync_status', ['connected', 'connecting']),
           'loadUserProfile.getUserCredentials'
         )
         
