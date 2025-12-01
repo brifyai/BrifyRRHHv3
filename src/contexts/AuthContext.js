@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       let googleCredentials = null
       try {
         // ✅ CORRECCIÓN: Solo consultar company_credentials
-        const { data: companyCredentials } = await protectedSupabaseRequest(
+        const { data: companyCredentials, error: credError } = await protectedSupabaseRequest(
           () => supabase
             .from('company_credentials')
             .select('*')
@@ -108,7 +108,12 @@ export const AuthProvider = ({ children }) => {
           'loadUserProfile.getCompanyCredentials'
         )
         
-        googleCredentials = companyCredentials?.[0] || null
+        if (credError) {
+          console.log('Error consultando credenciales:', credError.message)
+          googleCredentials = null
+        } else {
+          googleCredentials = Array.isArray(companyCredentials) ? companyCredentials[0] : null
+        }
         
         console.log(`✅ ${googleCredentials ? 1 : 0} credenciales cargadas para usuario ${userId}`)
         if (googleCredentials) {
