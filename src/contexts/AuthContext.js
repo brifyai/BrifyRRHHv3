@@ -96,9 +96,10 @@ export const AuthProvider = ({ children }) => {
       
       // Cargar también las credenciales de Google Drive (solo company_credentials)
       let googleCredentials = null
+      
       try {
-        // ✅ CORRECCIÓN: Solo consultar company_credentials
-        const result = await protectedSupabaseRequest(
+        // ✅ CORRECCIÓN DEFINITIVA: Manejar múltiples formatos de respuesta
+        const rawResult = await protectedSupabaseRequest(
           () => supabase
             .from('company_credentials')
             .select('*')
@@ -108,13 +109,26 @@ export const AuthProvider = ({ children }) => {
           'loadUserProfile.getCompanyCredentials'
         )
         
-        if (result.error) {
-          console.log('Error consultando credenciales:', result.error.message)
-          googleCredentials = null
+        // MANEJO DE CASOS: protectedSupabaseRequest puede devolver diferentes formatos
+        let companyCredentials = []
+        
+        if (Array.isArray(rawResult)) {
+          // CASO 1: Devuelve directamente el array de datos
+          companyCredentials = rawResult
+        } else if (rawResult !== null && typeof rawResult === 'object' && !Array.isArray(rawResult)) {
+          // CASO 2: Devuelve objeto con {data, error}
+          if (rawResult.error) {
+            console.log('Error consultando credenciales:', rawResult.error.message)
+          } else {
+            companyCredentials = rawResult.data || []
+          }
         } else {
-          const companyCredentials = result.data || []
-          googleCredentials = Array.isArray(companyCredentials) && companyCredentials.length > 0 ? companyCredentials[0] : null
+          // CASO 3: Formato inesperado
+          console.error('Formato inesperado de protectedSupabaseRequest:', rawResult)
         }
+        
+        // Extraer la primera credencial si existe
+        googleCredentials = companyCredentials && companyCredentials.length > 0 ? companyCredentials[0] : null
         
         console.log(`✅ ${googleCredentials ? 1 : 0} credenciales cargadas para usuario ${userId}`)
         if (googleCredentials) {
@@ -122,6 +136,7 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (credError) {
         console.log('Error loading Google credentials:', credError.message)
+        googleCredentials = null
       }
       
       // Si el usuario no existe (data es null), crearlo
@@ -237,11 +252,19 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Combinar datos del usuario con credenciales de Google Drive
+      console.log('🔍 Combinando perfil con credenciales:', {
+        hasData: !!data,
+        hasGoogleCredentials: !!googleCredentials,
+        googleCredentialsKeys: googleCredentials ? Object.keys(googleCredentials) : []
+      })
+      
       const profileWithCredentials = {
         ...data,
-        google_refresh_token: googleCredentials?.google_refresh_token || null,
-        google_access_token: googleCredentials?.google_access_token || null
+        google_refresh_token: googleCredentials?.credentials?.refresh_token || null,
+        google_access_token: googleCredentials?.credentials?.access_token || null
       }
+      
+      console.log('✅ Perfil combinado:', profileWithCredentials)
       
       setUserProfile(profileWithCredentials)
       return profileWithCredentials
