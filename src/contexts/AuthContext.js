@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
-import { auth, db } from '../lib/supabase.js'
+import { auth, db, supabase } from '../lib/supabase.js'
 import toast from 'react-hot-toast'
 import unifiedEmployeeFolderService from '../services/unifiedEmployeeFolderService.js'
 import { showFriendlyError, showSimpleError, showAuthError } from '../utils/friendlyErrorHandler.js'
@@ -97,27 +97,38 @@ export const AuthProvider = ({ children }) => {
       // Cargar también las credenciales de Google Drive (consultar AMBAS tablas)
       let googleCredentials = null
       try {
-        // ✅ NUEVO: Consultar tanto user_credentials como company_credentials
-        const { data: userCredData } = await protectedSupabaseRequest(
-          () => db.userCredentials.getByUserId(userId),
+        // ✅ CORRECCIÓN: Consultar AMBAS tablas directamente con Supabase
+        const { data: userCredentials } = await protectedSupabaseRequest(
+          () => supabase
+            .from('user_google_drive_credentials')
+            .select('*')
+            .eq('user_id', userId)
+            .in('status', ['pending_verification', 'active']),
           'loadUserProfile.getUserCredentials'
         )
         
-        // También consultar company_credentials si el usuario tiene empresas asociadas
-        let companyCredData = null
+        // También consultar company_credentials para la empresa del usuario
+        let companyCredentials = null
         if (data?.company_id) {
           const { data: companyCreds } = await protectedSupabaseRequest(
-            () => db.companyCredentials.getByCompanyId(data.company_id, 'google_drive'),
+            () => supabase
+              .from('company_credentials')
+              .select('*')
+              .eq('company_id', data.company_id)
+              .eq('google_drive_connected', true),
             'loadUserProfile.getCompanyCredentials'
           )
-          companyCredData = companyCreds?.[0] || null
+          companyCredentials = companyCreds?.[0] || null
         }
         
-        // Combinar credenciales (priorizar company_credentials si existe)
-        googleCredentials = companyCredData || userCredData
+        // ✅ PRIORIZACIÓN: company_credentials tiene prioridad sobre user_credentials
+        googleCredentials = companyCredentials?.length > 0 
+          ? companyCredentials 
+          : userCredentials?.[0] || null
         
-        if (!googleCredentials) {
-          console.log('No Google credentials found for user:', userId)
+        console.log(`✅ ${googleCredentials?.length || 0} credenciales cargadas para usuario ${userId}`)
+        if (googleCredentials) {
+          console.log('   Status encontrados:', googleCredentials.status)
         }
       } catch (credError) {
         console.log('Error loading Google credentials:', credError.message)
