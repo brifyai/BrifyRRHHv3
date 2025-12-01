@@ -4,7 +4,7 @@
  * Maneja el flujo completo: código → tokens → Supabase
  */
 
-import googleDrivePersistenceService from '../services/googleDrivePersistenceService.js';
+// import googleDrivePersistenceService from '../services/googleDrivePersistenceService.js'; // ELIMINADO - ya no se usa
 import supabaseDatabase from '../lib/supabaseDatabase.js';
 
 class GoogleDriveCallbackHandler {
@@ -37,20 +37,7 @@ class GoogleDriveCallbackHandler {
       const userInfo = await this.getUserInfo(tokens.access_token);
       console.log('Información del usuario obtenida:', userInfo?.email);
 
-      // Paso 3: Guardar credenciales en Supabase (user_google_drive_credentials)
-      const { success, error } = await googleDrivePersistenceService.saveCredentials(
-        userId,
-        tokens,
-        userInfo
-      );
-
-      if (!success) {
-        throw new Error(`Error guardando credenciales: ${error?.message}`);
-      }
-
-      console.log('Credenciales guardadas exitosamente en user_google_drive_credentials');
-
-      // Paso 4: También guardar en company_credentials si hay companyId en sessionStorage
+      // Paso 3: Guardar credenciales en company_credentials si hay companyId en sessionStorage
       const companyId = sessionStorage.getItem('google_oauth_company_id');
       if (companyId) {
         try {
@@ -231,7 +218,20 @@ class GoogleDriveCallbackHandler {
    */
   async isUserConnected(userId) {
     try {
-      return await googleDrivePersistenceService.isConnected(userId);
+      // ✅ NUEVO: Verificar en company_credentials en lugar de googleDrivePersistenceService
+      const { data, error } = await supabaseDatabase.companyCredentials
+        .select('id, status, credentials')
+        .eq('integration_type', 'google_drive')
+        .eq('status', 'active')
+        .contains('credentials', { user_id: userId })
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error verificando conexión:', error);
+        return false;
+      }
+
+      return !!(data && data.credentials && data.credentials.access_token);
     } catch (error) {
       console.error('Error verificando conexión:', error);
       return false;
@@ -245,10 +245,17 @@ class GoogleDriveCallbackHandler {
    */
   async disconnectUser(userId) {
     try {
-      const { success, error } = await googleDrivePersistenceService.disconnect(userId);
+      // ✅ NUEVO: Desactivar credenciales en company_credentials
+      const { error } = await supabaseDatabase.companyCredentials
+        .update({ 
+          status: 'inactive',
+          updated_at: new Date().toISOString()
+        })
+        .eq('integration_type', 'google_drive')
+        .contains('credentials', { user_id: userId });
 
-      if (!success) {
-        throw new Error(error?.message || 'Error desconectando Google Drive');
+      if (error) {
+        throw new Error(error.message || 'Error desconectando Google Drive');
       }
 
       console.log(`Usuario ${userId} desconectado de Google Drive`);
@@ -267,29 +274,43 @@ class GoogleDriveCallbackHandler {
    */
   async getConnectionStatus(userId) {
     try {
-      const { data, error } = await googleDrivePersistenceService.getCredentials(userId);
+      // ✅ NUEVO: Obtener credenciales desde company_credentials
+      const { data, error } = await supabaseDatabase.companyCredentials
+        .select('credentials, account_email, account_name, status')
+        .eq('integration_type', 'google_drive')
+        .eq('status', 'active')
+        .contains('credentials', { user_id: userId })
+        .maybeSingle();
 
       if (error || !data) {
         return {
           connected: false,
           email: null,
-          expiresAt: null
+          expiresAt: null,
+          name: null,
+          picture: null
         };
       }
 
+      const credentials = data.credentials || {};
+      const isConnected = !!(credentials.access_token && data.status === 'active');
+      const isExpired = credentials.expires_at ? new Date(credentials.expires_at) < new Date() : false;
+
       return {
-        connected: data.is_connected === true && !data.is_expired,
-        email: data.google_email || data.user_email,
-        expiresAt: data.token_expires_at || data.expires_at,
-        name: data.google_name || data.user_name,
-        picture: data.google_avatar_url || data.user_picture
+        connected: isConnected && !isExpired,
+        email: data.account_email,
+        expiresAt: credentials.expires_at,
+        name: data.account_name,
+        picture: credentials.picture
       };
     } catch (error) {
       console.error('Error obteniendo estado de conexión:', error);
       return {
         connected: false,
         email: null,
-        expiresAt: null
+        expiresAt: null,
+        name: null,
+        picture: null
       };
     }
   }
@@ -301,7 +322,31 @@ class GoogleDriveCallbackHandler {
    */
   async getValidAccessToken(userId) {
     try {
-      return await googleDrivePersistenceService.getValidAccessToken(userId);
+      // ✅ NUEVO: Obtener token válido desde company_credentials
+      const { data, error } = await supabaseDatabase.companyCredentials
+        .select('credentials, status')
+        .eq('integration_type', 'google_drive')
+        .eq('status', 'active')
+        .contains('credentials', { user_id: userId })
+        .maybeSingle();
+
+      if (error || !data) {
+        return { token: null, error: { message: 'No se encontraron credenciales' } };
+      }
+
+      const credentials = data.credentials || {};
+      
+      // Verificar si el token es válido (no expirado)
+      if (!credentials.access_token) {
+        return { token: null, error: { message: 'No hay access token' } };
+      }
+
+      // Verificar expiración
+      if (credentials.expires_at && new Date(credentials.expires_at) < new Date()) {
+        return { token: null, error: { message: 'Token expirado' } };
+      }
+
+      return { token: credentials.access_token, error: null };
     } catch (error) {
       console.error('Error obteniendo token válido:', error);
       return { token: null, error: { message: error.message } };

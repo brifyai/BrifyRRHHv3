@@ -1,0 +1,38 @@
+✅ Tabla 'user_google_drive_credentials' existe y es accesible
+   Registros encontrados: 0
+✅ Tabla 'company_credentials' accesible
+   Credenciales Google Drive: 5
+   📊 Muestra de datos:
+      - ID: 0d55ddcf-a339-43b5-9adc-cf4a72124c53
+      - Status: pending_verification
+      - Tiene access_token: false
+      - Tiene refresh_token: false
+      - Campos disponibles: id, company_id, integration_type, account_name, status, credentials, settings, account_email, account_display_name, created_at, updated_at, last_used_at, expires_at, created_by, updated_by
+❌ REACT_APP_GOOGLE_CLIENT_ID: VACÍO
+❌ REACT_APP_GOOGLE_CLIENT_SECRET: VACÍO
+❌ REACT_APP_GOOGLE_REDIRECT_URI: VACÍO
+❌ REACT_APP_GOOGLE_API_KEY: VACÍO
+✅ RLS no está bloqueando el acceso básico
+❌ Netlify Function NO encontrada: google-auth
+❌ Netlify Function NO encontrada: google-refresh
+❌ Netlify Function NO encontrada: google-drive-callback
+URLs de redirect_uri configuradas:
+   - http://localhost:3000/auth/google/callback
+   - http://localhost:8888/auth/google/callback
+   - https://brify.netlify.app/auth/google/callback
+   - https://brifyrrhhv2.netlify.app/auth/google/callback
+
+=== ANÁLISIS DE PROBLEMAS COMUNES ===
+
+1. USO DE TABLA INCORRECTA:
+   El código usa "user_google_drive_credentials" pero las credenciales
+   están en "company_credentials". Esto es un problema de arquitectura.
+   💡 Solución: El TokenBridge debe usar company_credentials, no user_google_drive_credentials
+
+2. NETLIFY FUNCTIONS:
+   En producción, se requieren Netlify Functions para manejar OAuth.
+   Si no existen, el intercambio de tokens fallará silenciosamente.
+
+3. MANEJO DE ERRORES:
+   Verifica que el callback esté capturando correctamente los errores de Google.
+   Revisa la consola del navegador en la URL de callback.

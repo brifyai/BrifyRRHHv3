@@ -94,39 +94,23 @@ export const AuthProvider = ({ children }) => {
         'loadUserProfile.getById'
       )
       
-      // Cargar también las credenciales de Google Drive (consultar AMBAS tablas)
+      // Cargar también las credenciales de Google Drive (solo company_credentials)
       let googleCredentials = null
       try {
-        // ✅ CORRECCIÓN: Consultar AMBAS tablas directamente con Supabase
-        const { data: userCredentials } = await protectedSupabaseRequest(
+        // ✅ CORRECCIÓN: Solo consultar company_credentials
+        const { data: companyCredentials } = await protectedSupabaseRequest(
           () => supabase
-            .from('user_google_drive_credentials')
+            .from('company_credentials')
             .select('*')
-            .eq('user_id', userId)
-            .in('sync_status', ['connected', 'connecting']),
-          'loadUserProfile.getUserCredentials'
+            .eq('integration_type', 'google_drive')
+            .eq('status', 'active')
+            .contains('credentials', { user_id: userId }),
+          'loadUserProfile.getCompanyCredentials'
         )
         
-        // También consultar company_credentials para la empresa del usuario
-        let companyCredentials = null
-        if (data?.company_id) {
-          const { data: companyCreds } = await protectedSupabaseRequest(
-            () => supabase
-              .from('company_credentials')
-              .select('*')
-              .eq('company_id', data.company_id)
-              .eq('google_drive_connected', true),
-            'loadUserProfile.getCompanyCredentials'
-          )
-          companyCredentials = companyCreds?.[0] || null
-        }
+        googleCredentials = companyCredentials?.[0] || null
         
-        // ✅ PRIORIZACIÓN: company_credentials tiene prioridad sobre user_credentials
-        googleCredentials = companyCredentials?.length > 0 
-          ? companyCredentials 
-          : userCredentials?.[0] || null
-        
-        console.log(`✅ ${googleCredentials?.length || 0} credenciales cargadas para usuario ${userId}`)
+        console.log(`✅ ${googleCredentials ? 1 : 0} credenciales cargadas para usuario ${userId}`)
         if (googleCredentials) {
           console.log('   Status encontrados:', googleCredentials.status)
         }
@@ -510,18 +494,27 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No hay usuario autenticado')
       }
 
-      // Importar el servicio de persistencia
-      const googleDrivePersistenceService = (await import('../services/googleDrivePersistenceService.js')).default
+      // ✅ NUEVO: Guardar directamente en company_credentials
+      const { error } = await supabase
+        .from('company_credentials')
+        .upsert({
+          integration_type: 'google_drive',
+          credentials: {
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            expires_at: tokens.expires_at,
+            user_id: user.id,
+            account_email: userInfo.email,
+            account_name: userInfo.name
+          },
+          status: 'active',
+          account_email: userInfo.email,
+          account_name: userInfo.name,
+          updated_at: new Date().toISOString()
+        })
 
-      // Guardar credenciales en Supabase
-      const { success, error } = await googleDrivePersistenceService.saveCredentials(
-        user.id,
-        tokens,
-        userInfo
-      )
-
-      if (!success) {
-        throw new Error(error?.message || 'Error guardando credenciales')
+      if (error) {
+        throw new Error(error.message || 'Error guardando credenciales')
       }
 
       // Recargar perfil para actualizar estado de Google Drive
@@ -546,8 +539,29 @@ export const AuthProvider = ({ children }) => {
         return { connected: false, email: null }
       }
 
-      const googleDrivePersistenceService = (await import('../services/googleDrivePersistenceService.js')).default
-      return await googleDrivePersistenceService.getConnectionStatus(user.id)
+      // ✅ NUEVO: Consultar directamente company_credentials
+      const { data, error } = await supabase
+        .from('company_credentials')
+        .select('credentials, account_email, status')
+        .eq('integration_type', 'google_drive')
+        .eq('status', 'active')
+        .contains('credentials', { user_id: user.id })
+        .maybeSingle()
+
+      if (error || !data) {
+        return { connected: false, email: null }
+      }
+
+      const credentials = data.credentials || {}
+      const isConnected = !!(credentials.access_token && data.status === 'active')
+      const isExpired = credentials.expires_at ? new Date(credentials.expires_at) < new Date() : false
+
+      return {
+        connected: isConnected && !isExpired,
+        email: data.account_email,
+        expiresAt: credentials.expires_at,
+        name: data.account_name
+      }
     } catch (error) {
       console.error('Error técnico obteniendo estado de Google Drive:', error)
       // No mostramos error al usuario porque es una verificación en background
@@ -562,11 +576,18 @@ export const AuthProvider = ({ children }) => {
         throw new Error('No hay usuario autenticado')
       }
 
-      const googleDrivePersistenceService = (await import('../services/googleDrivePersistenceService.js')).default
-      const { success, error } = await googleDrivePersistenceService.disconnect(user.id)
+      // ✅ NUEVO: Desactivar credenciales en company_credentials
+      const { error } = await supabase
+        .from('company_credentials')
+        .update({ 
+          status: 'inactive',
+          updated_at: new Date().toISOString()
+        })
+        .eq('integration_type', 'google_drive')
+        .contains('credentials', { user_id: user.id })
 
-      if (!success) {
-        throw new Error(error?.message || 'Error desconectando Google Drive')
+      if (error) {
+        throw new Error(error.message || 'Error desconectando Google Drive')
       }
 
       // Recargar perfil
@@ -591,8 +612,32 @@ export const AuthProvider = ({ children }) => {
         return { token: null, error: { message: 'No hay usuario autenticado' } }
       }
 
-      const googleDrivePersistenceService = (await import('../services/googleDrivePersistenceService.js')).default
-      return await googleDrivePersistenceService.getValidAccessToken(user.id)
+      // ✅ NUEVO: Consultar directamente company_credentials
+      const { data, error } = await supabase
+        .from('company_credentials')
+        .select('credentials, status')
+        .eq('integration_type', 'google_drive')
+        .eq('status', 'active')
+        .contains('credentials', { user_id: user.id })
+        .maybeSingle()
+
+      if (error || !data) {
+        return { token: null, error: { message: 'No se encontraron credenciales' } }
+      }
+
+      const credentials = data.credentials || {}
+      
+      // Verificar si el token es válido (no expirado)
+      if (!credentials.access_token) {
+        return { token: null, error: { message: 'No hay access token' } }
+      }
+
+      // Verificar expiración
+      if (credentials.expires_at && new Date(credentials.expires_at) < new Date()) {
+        return { token: null, error: { message: 'Token expirado' } }
+      }
+
+      return { token: credentials.access_token, error: null }
     } catch (error) {
       console.error('Error técnico obteniendo token válido:', error)
       // No mostramos error al usuario porque es una operación en background
