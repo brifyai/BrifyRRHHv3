@@ -5,6 +5,7 @@
  */
 
 import googleDrivePersistenceService from '../services/googleDrivePersistenceService.js';
+import supabaseDatabase from '../lib/supabaseDatabase.js';
 
 class GoogleDriveCallbackHandler {
   /**
@@ -36,7 +37,7 @@ class GoogleDriveCallbackHandler {
       const userInfo = await this.getUserInfo(tokens.access_token);
       console.log('Información del usuario obtenida:', userInfo?.email);
 
-      // Paso 3: Guardar credenciales en Supabase
+      // Paso 3: Guardar credenciales en Supabase (user_google_drive_credentials)
       const { success, error } = await googleDrivePersistenceService.saveCredentials(
         userId,
         tokens,
@@ -47,7 +48,42 @@ class GoogleDriveCallbackHandler {
         throw new Error(`Error guardando credenciales: ${error?.message}`);
       }
 
-      console.log('Credenciales guardadas exitosamente en Supabase');
+      console.log('Credenciales guardadas exitosamente en user_google_drive_credentials');
+
+      // Paso 4: También guardar en company_credentials si hay companyId en sessionStorage
+      const companyId = sessionStorage.getItem('google_oauth_company_id');
+      if (companyId) {
+        try {
+          console.log(`💾 Guardando también en company_credentials para company: ${companyId}`);
+          
+          const companyCredentialsData = {
+            company_id: companyId,
+            integration_type: 'google_drive',
+            credentials: {
+              access_token: tokens.access_token || 'oauth_token',
+              refresh_token: tokens.refresh_token || null,
+              account_email: userInfo.email,
+              account_name: userInfo.name || userInfo.email,
+              user_id: userId
+            },
+            status: 'active',
+            account_email: userInfo.email,
+            account_name: userInfo.name || userInfo.email,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          const { error: companyError } = await supabaseDatabase.companyCredentials.upsert(companyCredentialsData);
+
+          if (companyError) {
+            console.error('❌ Error guardando en company_credentials:', companyError.message);
+          } else {
+            console.log('✅ Credenciales guardadas exitosamente en company_credentials');
+          }
+        } catch (companyError) {
+          console.error('❌ Error en guardado secundario:', companyError.message);
+        }
+      }
 
       return {
         success: true,
