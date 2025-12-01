@@ -66,7 +66,7 @@ class GoogleDriveCallbackHandler {
               account_name: userInfo.name || userInfo.email,
               user_id: userId
             },
-            google_drive_connected: true,
+            status: 'active',
             account_email: userInfo.email,
             account_name: userInfo.name || userInfo.email,
             created_at: new Date().toISOString(),

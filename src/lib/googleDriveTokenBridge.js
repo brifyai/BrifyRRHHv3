@@ -48,10 +48,10 @@ class GoogleDriveTokenBridge {
       // CORREGIDO: Usar company_credentials en lugar de user_google_drive_credentials
       const { data: credentials, error } = await supabase
         .from('company_credentials')
-        .select('credentials, google_drive_connected, account_email, account_name, created_at')
+        .select('credentials, status, account_email, account_name, created_at')
         .eq('company_id', companyId)
         .eq('integration_type', 'google_drive')
-        .eq('google_drive_connected', true)
+        .eq('status', 'active')
         .maybeSingle()
       
       if (error) {
@@ -71,7 +71,7 @@ class GoogleDriveTokenBridge {
       const creds = credentials.credentials || {}
       
       logger.info('GoogleDriveTokenBridge', `📋 Credenciales encontradas:`)
-      logger.info('GoogleDriveTokenBridge', `  - google_drive_connected: ${credentials.google_drive_connected}`)
+      logger.info('GoogleDriveTokenBridge', `  - status: ${credentials.status}`)
       logger.info('GoogleDriveTokenBridge', `  - email: ${credentials.account_email}`)
       logger.info('GoogleDriveTokenBridge', `  - has_access_token: ${!!creds.access_token}`)
       logger.info('GoogleDriveTokenBridge', `  - has_refresh_token: ${!!creds.refresh_token}`)

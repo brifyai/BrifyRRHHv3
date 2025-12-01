@@ -136,13 +136,13 @@ class GoogleDriveAuthServiceDynamic {
       logger.info('GoogleDriveAuthServiceDynamic', `✅ Cliente validado: tipo=${typeof this.supabase}, tiene_rpc=${typeof this.supabase.rpc}`)
       
       // ✅ AHORA sí podemos ejecutar la consulta con seguridad
-      // ✅ CORREGIDO: Usar google_drive_connected en lugar de sync_status
+      // ✅ CORREGIDO: Usar status='active' según estructura real de BD
       const result = await this.supabase
         .from('company_credentials')
         .select('*')
         .eq('company_id', companyId)
         .eq('integration_type', 'google_drive')
-        .eq('google_drive_connected', true)
+        .eq('status', 'active')
       
       if (result.error) {
         logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta: ${result.error.message}`)
