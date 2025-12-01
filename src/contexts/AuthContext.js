@@ -94,16 +94,33 @@ export const AuthProvider = ({ children }) => {
         'loadUserProfile.getById'
       )
       
-      // Cargar también las credenciales de Google Drive
+      // Cargar también las credenciales de Google Drive (consultar AMBAS tablas)
       let googleCredentials = null
       try {
-        const { data: credData } = await protectedSupabaseRequest(
+        // ✅ NUEVO: Consultar tanto user_credentials como company_credentials
+        const { data: userCredData } = await protectedSupabaseRequest(
           () => db.userCredentials.getByUserId(userId),
-          'loadUserProfile.getCredentials'
+          'loadUserProfile.getUserCredentials'
         )
-        googleCredentials = credData
+        
+        // También consultar company_credentials si el usuario tiene empresas asociadas
+        let companyCredData = null
+        if (data?.company_id) {
+          const { data: companyCreds } = await protectedSupabaseRequest(
+            () => db.companyCredentials.getByCompanyId(data.company_id, 'google_drive'),
+            'loadUserProfile.getCompanyCredentials'
+          )
+          companyCredData = companyCreds?.[0] || null
+        }
+        
+        // Combinar credenciales (priorizar company_credentials si existe)
+        googleCredentials = companyCredData || userCredData
+        
+        if (!googleCredentials) {
+          console.log('No Google credentials found for user:', userId)
+        }
       } catch (credError) {
-        console.log('No Google credentials found for user:', userId)
+        console.log('Error loading Google credentials:', credError.message)
       }
       
       // Si el usuario no existe (data es null), crearlo
