@@ -6,6 +6,8 @@
 
 // import googleDrivePersistenceService from '../services/googleDrivePersistenceService.js'; // ELIMINADO - ya no se usa
 import supabaseDatabase from '../lib/supabaseDatabase.js';
+import { protectedSupabaseRequest } from './supabaseCircuitBreaker.js';
+import { supabase } from './supabase.js';
 
 class GoogleDriveCallbackHandler {
   /**
@@ -37,39 +39,57 @@ class GoogleDriveCallbackHandler {
       const userInfo = await this.getUserInfo(tokens.access_token);
       console.log('Información del usuario obtenida:', userInfo?.email);
 
-      // Paso 3: Guardar credenciales en company_credentials si hay companyId en sessionStorage
+      // Paso 3: Guardar credenciales en company_credentials usando método unificado
       const companyId = sessionStorage.getItem('google_oauth_company_id');
-      if (companyId) {
-        try {
-          console.log(`💾 Guardando también en company_credentials para company: ${companyId}`);
-          
-          const companyCredentialsData = {
-            company_id: companyId,
-            integration_type: 'google_drive',
-            credentials: {
-              access_token: tokens.access_token || 'oauth_token',
-              refresh_token: tokens.refresh_token || null,
-              account_email: userInfo.email,
-              account_name: userInfo.name || userInfo.email,
-              user_id: userId
-            },
-            status: 'active',
+      
+      try {
+        console.log(`💾 Guardando credenciales en company_credentials para usuario: ${userId}`);
+        if (companyId) {
+          console.log(`   Company ID: ${companyId}`);
+        } else {
+          console.log('   ⚠️ No hay company_id en sessionStorage, guardando sin company_id');
+        }
+        
+        const companyCredentialsData = {
+          company_id: companyId || null,
+          integration_type: 'google_drive',
+          credentials: {
+            access_token: tokens.access_token || 'oauth_token',
+            refresh_token: tokens.refresh_token || null,
             account_email: userInfo.email,
             account_name: userInfo.name || userInfo.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
+            user_id: userId,
+            expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString()
+          },
+          status: 'active',
+          account_email: userInfo.email,
+          account_name: userInfo.name || userInfo.email,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
 
-          const { error: companyError } = await supabaseDatabase.companyCredentials.upsert(companyCredentialsData);
+        console.log('🔍 Datos a guardar:', JSON.stringify(companyCredentialsData, null, 2));
 
-          if (companyError) {
-            console.error('❌ Error guardando en company_credentials:', companyError.message);
-          } else {
-            console.log('✅ Credenciales guardadas exitosamente en company_credentials');
-          }
-        } catch (companyError) {
-          console.error('❌ Error en guardado secundario:', companyError.message);
+        // ✅ USAR MÉTODO UNIFICADO: protectedSupabaseRequest
+        const result = await protectedSupabaseRequest(
+          () => supabase
+            .from('company_credentials')
+            .upsert(companyCredentialsData),
+          'googleDriveCallbackHandler.saveCompanyCredentials'
+        );
+
+        console.log('🔍 Resultado del guardado:', result);
+
+        if (result.error) {
+          console.error('❌ Error guardando en company_credentials:', result.error.message);
+          console.error('❌ Error completo:', result.error);
+        } else {
+          console.log('✅ Credenciales guardadas exitosamente en company_credentials');
+          console.log('   Datos guardados:', result.data);
         }
+      } catch (companyError) {
+        console.error('❌ Error en guardado secundario:', companyError.message);
+        console.error('❌ Stack trace:', companyError.stack);
       }
 
       return {
@@ -218,20 +238,24 @@ class GoogleDriveCallbackHandler {
    */
   async isUserConnected(userId) {
     try {
-      // ✅ NUEVO: Verificar en company_credentials en lugar de googleDrivePersistenceService
-      const { data, error } = await supabaseDatabase.companyCredentials
-        .select('id, status, credentials')
-        .eq('integration_type', 'google_drive')
-        .eq('status', 'active')
-        .contains('credentials', { user_id: userId })
-        .maybeSingle();
+      // ✅ NUEVO: Verificar en company_credentials usando método unificado
+      const result = await protectedSupabaseRequest(
+        () => supabase
+          .from('company_credentials')
+          .select('id, status, credentials')
+          .eq('integration_type', 'google_drive')
+          .eq('status', 'active')
+          .contains('credentials', { user_id: userId })
+          .maybeSingle(),
+        'googleDriveCallbackHandler.isUserConnected'
+      );
 
-      if (error) {
-        console.error('Error verificando conexión:', error);
+      if (result.error) {
+        console.error('Error verificando conexión:', result.error);
         return false;
       }
 
-      return !!(data && data.credentials && data.credentials.access_token);
+      return !!(result.data && result.data.credentials && result.data.credentials.access_token);
     } catch (error) {
       console.error('Error verificando conexión:', error);
       return false;
@@ -245,17 +269,21 @@ class GoogleDriveCallbackHandler {
    */
   async disconnectUser(userId) {
     try {
-      // ✅ NUEVO: Desactivar credenciales en company_credentials
-      const { error } = await supabaseDatabase.companyCredentials
-        .update({ 
-          status: 'inactive',
-          updated_at: new Date().toISOString()
-        })
-        .eq('integration_type', 'google_drive')
-        .contains('credentials', { user_id: userId });
+      // ✅ NUEVO: Desactivar credenciales en company_credentials usando método unificado
+      const result = await protectedSupabaseRequest(
+        () => supabase
+          .from('company_credentials')
+          .update({ 
+            status: 'inactive',
+            updated_at: new Date().toISOString()
+          })
+          .eq('integration_type', 'google_drive')
+          .contains('credentials', { user_id: userId }),
+        'googleDriveCallbackHandler.disconnectUser'
+      );
 
-      if (error) {
-        throw new Error(error.message || 'Error desconectando Google Drive');
+      if (result.error) {
+        throw new Error(result.error.message || 'Error desconectando Google Drive');
       }
 
       console.log(`Usuario ${userId} desconectado de Google Drive`);
@@ -274,15 +302,19 @@ class GoogleDriveCallbackHandler {
    */
   async getConnectionStatus(userId) {
     try {
-      // ✅ NUEVO: Obtener credenciales desde company_credentials
-      const { data, error } = await supabaseDatabase.companyCredentials
-        .select('credentials, account_email, account_name, status')
-        .eq('integration_type', 'google_drive')
-        .eq('status', 'active')
-        .contains('credentials', { user_id: userId })
-        .maybeSingle();
+      // ✅ NUEVO: Obtener credenciales desde company_credentials usando método unificado
+      const result = await protectedSupabaseRequest(
+        () => supabase
+          .from('company_credentials')
+          .select('credentials, account_email, account_name, status')
+          .eq('integration_type', 'google_drive')
+          .eq('status', 'active')
+          .contains('credentials', { user_id: userId })
+          .maybeSingle(),
+        'googleDriveCallbackHandler.getConnectionStatus'
+      );
 
-      if (error || !data) {
+      if (result.error || !result.data) {
         return {
           connected: false,
           email: null,
@@ -292,15 +324,15 @@ class GoogleDriveCallbackHandler {
         };
       }
 
-      const credentials = data.credentials || {};
-      const isConnected = !!(credentials.access_token && data.status === 'active');
+      const credentials = result.data.credentials || {};
+      const isConnected = !!(credentials.access_token && result.data.status === 'active');
       const isExpired = credentials.expires_at ? new Date(credentials.expires_at) < new Date() : false;
 
       return {
         connected: isConnected && !isExpired,
-        email: data.account_email,
+        email: result.data.account_email,
         expiresAt: credentials.expires_at,
-        name: data.account_name,
+        name: result.data.account_name,
         picture: credentials.picture
       };
     } catch (error) {
@@ -322,19 +354,23 @@ class GoogleDriveCallbackHandler {
    */
   async getValidAccessToken(userId) {
     try {
-      // ✅ NUEVO: Obtener token válido desde company_credentials
-      const { data, error } = await supabaseDatabase.companyCredentials
-        .select('credentials, status')
-        .eq('integration_type', 'google_drive')
-        .eq('status', 'active')
-        .contains('credentials', { user_id: userId })
-        .maybeSingle();
+      // ✅ NUEVO: Obtener token válido desde company_credentials usando método unificado
+      const result = await protectedSupabaseRequest(
+        () => supabase
+          .from('company_credentials')
+          .select('credentials, status')
+          .eq('integration_type', 'google_drive')
+          .eq('status', 'active')
+          .contains('credentials', { user_id: userId })
+          .maybeSingle(),
+        'googleDriveCallbackHandler.getValidAccessToken'
+      );
 
-      if (error || !data) {
+      if (result.error || !result.data) {
         return { token: null, error: { message: 'No se encontraron credenciales' } };
       }
 
-      const credentials = data.credentials || {};
+      const credentials = result.data.credentials || {};
       
       // Verificar si el token es válido (no expirado)
       if (!credentials.access_token) {
