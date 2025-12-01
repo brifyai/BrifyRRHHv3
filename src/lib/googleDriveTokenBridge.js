@@ -48,9 +48,10 @@ class GoogleDriveTokenBridge {
       // CORREGIDO: Usar company_credentials en lugar de user_google_drive_credentials
       const { data: credentials, error } = await supabase
         .from('company_credentials')
-        .select('access_token, refresh_token, token_expires_at, status, email, account_email')
+        .select('credentials, google_drive_connected, account_email, account_name, created_at')
         .eq('company_id', companyId)
         .eq('integration_type', 'google_drive')
+        .eq('google_drive_connected', true)
         .maybeSingle()
       
       if (error) {
@@ -66,22 +67,18 @@ class GoogleDriveTokenBridge {
         return false
       }
       
-      logger.info('GoogleDriveTokenBridge', `📋 Credenciales encontradas:`)
-      logger.info('GoogleDriveTokenBridge', `  - status: ${credentials.status}`)
-      logger.info('GoogleDriveTokenBridge', `  - email: ${credentials.email || credentials.account_email}`)
-      logger.info('GoogleDriveTokenBridge', `  - has_access_token: ${!!credentials.access_token}`)
-      logger.info('GoogleDriveTokenBridge', `  - has_refresh_token: ${!!credentials.refresh_token}`)
-      logger.info('GoogleDriveTokenBridge', `  - expires_at: ${credentials.token_expires_at}`)
+      // Extraer tokens del JSON credentials
+      const creds = credentials.credentials || {}
       
-      // Validar status
-      if (credentials.status !== 'active') {
-        logger.warn('GoogleDriveTokenBridge', `⚠️ Credenciales no están activas (status: ${credentials.status})`)
-        googleDriveAuthService.clearTokens()
-        return false
-      }
+      logger.info('GoogleDriveTokenBridge', `📋 Credenciales encontradas:`)
+      logger.info('GoogleDriveTokenBridge', `  - google_drive_connected: ${credentials.google_drive_connected}`)
+      logger.info('GoogleDriveTokenBridge', `  - email: ${credentials.account_email}`)
+      logger.info('GoogleDriveTokenBridge', `  - has_access_token: ${!!creds.access_token}`)
+      logger.info('GoogleDriveTokenBridge', `  - has_refresh_token: ${!!creds.refresh_token}`)
+      logger.info('GoogleDriveTokenBridge', `  - user_id: ${creds.user_id}`)
       
       // Validar que los tokens existan
-      if (!credentials.access_token) {
+      if (!creds.access_token) {
         logger.error('GoogleDriveTokenBridge', '❌ No hay access token en Supabase')
         googleDriveAuthService.clearTokens()
         return false
@@ -89,9 +86,9 @@ class GoogleDriveTokenBridge {
       
       // Sincronizar tokens a googleDriveAuthService
       const tokens = {
-        access_token: credentials.access_token,
-        refresh_token: credentials.refresh_token,
-        expires_at: credentials.token_expires_at
+        access_token: creds.access_token,
+        refresh_token: creds.refresh_token,
+        expires_at: creds.expires_at || null
       }
       
       googleDriveAuthService.setTokens(tokens)
