@@ -136,12 +136,13 @@ class GoogleDriveAuthServiceDynamic {
       logger.info('GoogleDriveAuthServiceDynamic', `✅ Cliente validado: tipo=${typeof this.supabase}, tiene_rpc=${typeof this.supabase.rpc}`)
       
       // ✅ AHORA sí podemos ejecutar la consulta con seguridad
+      // ✅ CORREGIDO: Buscar tanto 'pending_verification' como 'active'
       const result = await this.supabase
         .from('company_credentials')
         .select('*')
         .eq('company_id', companyId)
         .eq('integration_type', 'google_drive')
-        .eq('status', 'pending_verification')
+        .in('status', ['pending_verification', 'active'])
       
       if (result.error) {
         logger.error('GoogleDriveAuthServiceDynamic', `❌ Error en consulta: ${result.error.message}`)
