@@ -48,18 +48,26 @@ const loadSupabaseDatabase = async () => {
 };
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3004;
 
 // Middleware
 const corsOptions = {
   origin: function (origin, callback) {
+    // Si CORS_ALLOW_ALL está habilitado, permitir todos los orígenes
+    if (process.env.CORS_ALLOW_ALL === 'true') {
+      callback(null, true);
+      return;
+    }
+
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:3003',
+      'http://localhost:3004',
       'http://localhost:3005',
       'https://brifyrrhhv2.netlify.app',
       'https://staffhub.vercel.app',
+      'https://supabase.imetricsstaffhub.cl',
       'null' // Para archivos locales abiertos en navegador
     ];
 
@@ -78,6 +86,13 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Servir archivos estáticos en producción
+if (process.env.NODE_ENV === 'production') {
+  const buildPath = join(__dirname, 'build');
+  app.use(express.static(buildPath));
+  console.log('📦 Sirviendo archivos estáticos desde:', buildPath);
+}
 
 // Middleware de seguridad básico
 app.use((req, res, next) => {
@@ -286,9 +301,22 @@ async function saveGoogleCredentials(userId, tokens, userInfo = {}) {
   }
 }
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Catch-all route para servir React app en producción
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, 'build', 'index.html'));
+  });
+}
+
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor simple ejecutándose en puerto ${PORT}`);
   console.log(`📡 API disponible en http://localhost:${PORT}/api`);
   console.log(`🔍 Endpoint de Google Drive: http://localhost:${PORT}/api/google-drive/status`);
+  console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
 });

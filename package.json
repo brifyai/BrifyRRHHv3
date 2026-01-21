@@ -47,7 +47,7 @@
     "start": "react-scripts start",
     "server": "node server-simple.mjs",
     "dev": "concurrently \"npm run server\" \"npm start\"",
-    "dev:win": "concurrently \"npm run server\" \"npm start\"",
+    "dev:win": "npm start",
     "build": "set \"CI=false\" && set \"ESLINT_NO_DEV_ERRORS=true\" && react-scripts build",
     "test": "react-scripts test",
     "test:sentiment": "node test_sentiment_analysis.mjs",
@@ -80,7 +80,7 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:3000",
+  "proxy": "http://localhost:3004",
   "devDependencies": {
     "@types/react": "^18.2.42",
     "@types/react-dom": "^18.2.17",
