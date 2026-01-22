@@ -8,9 +8,9 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-// Configuración correcta del proyecto
-const SUPABASE_URL = 'https://tmqglnycivlcjijoymwe.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcWdsbnljaXZsY2ppam95bXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NTQ1NDYsImV4cCI6MjA3NjEzMDU0Nn0.ILwxm7pKdFZtG-Xz8niMSHaTwMvE4S7VlU8yDSgxOpE'
+// Configuración correcta del proyecto StaffHub
+const SUPABASE_URL = 'https://supabase.staffhub.cl'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY5MTE2MzU4LCJleHAiOjIwODQ0NzYzNTh9.cwqdhcN50CUWMvJty9sTm-ptAngUPto3wnfggG0ImWo'
 
 // Crear una única instancia del cliente con configuración completa
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
