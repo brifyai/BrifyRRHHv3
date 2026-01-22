@@ -12,8 +12,8 @@ El CSP solo permite:
 - Pero tu Supabase está en: `https://uwbxyaszdqwypbebogvw.supabase.co`
 
 ### 3. **Redirect URI Incorrecto**
-- ❌ Actual: `https://www.imetrics.cl/callback`
-- ✅ Esperado: `https://imetrics.cl/auth/callback`
+- ❌ Actual: `https://www.staffhub.cl/callback`
+- ✅ Esperado: `https://staffhub.cl/auth/callback`
 
 ---
 
@@ -29,7 +29,7 @@ REACT_APP_SUPABASE_URL=https://tmqglnycivlcjijoymwe.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=tu_anon_key_real
 
 # Google OAuth
-REACT_APP_GOOGLE_REDIRECT_URI=https://imetrics.cl/auth/google/callback
+REACT_APP_GOOGLE_REDIRECT_URI=https://staffhub.cl/auth/google/callback
 
 # Entorno
 REACT_APP_ENVIRONMENT=production

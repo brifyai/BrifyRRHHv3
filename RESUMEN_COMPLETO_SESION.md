@@ -98,7 +98,7 @@
 2. Rules → Transform Rules → Modify Response Header
 3. Create rule:
    - Name: `Allow Supabase CSP`
-   - If: `Hostname equals www.imetrics.cl`
+   - If: `Hostname equals www.staffhub.cl`
    - Then: Set dynamic → `Content-Security-Policy`
    - Value:
    ```
@@ -107,7 +107,7 @@
 
 ### **3. En Easypanel (Opcional - Si usas Supabase Self-Hosted)**
 
-Si decides usar `supabase.imetrics.cl`:
+Si decides usar `supabase.staffhub.cl`:
 1. Actualizar variables en servicio `supastaff` con las keys generadas
 2. Actualizar variables en servicio `staffhub`
 3. Rebuild ambos servicios
@@ -152,8 +152,8 @@ BrifyRRHHv3/
 
 ## 🎯 **CONFIGURACIÓN ACTUAL:**
 
-### **Producción (www.imetrics.cl):**
-- URL Supabase: `https://uwbxyaszdqwypbebogvw.supabase.co`
+### **Producción (www.staffhub.cl):**
+- URL Supabase: `https://supabase.staffhub.cl`
 - Puerto: 3004
 - Estado: ✅ Funcionando (con errores de CSP a resolver)
 

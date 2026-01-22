@@ -19,20 +19,20 @@ LOGFLARE_PUBLIC_ACCESS_TOKEN=Qi+zSKWSd3FxJyWwaD49m1SvSRuzQB3h
 LOGFLARE_PRIVATE_ACCESS_TOKEN=uzfZoJZhHFlVzAm72t9f4ZIhQAqGbfFz
 
 # URLs (CORREGIDAS - HTTPS)
-SUPABASE_PUBLIC_URL=https://supabase.imetrics.cl
-SITE_URL=https://www.imetrics.cl
-API_EXTERNAL_URL=https://supabase.imetrics.cl
-ADDITIONAL_REDIRECT_URLS=https://www.imetrics.cl/auth/callback,https://imetrics.cl/auth/callback
-GOTRUE_SITE_URL=https://www.imetrics.cl
-GOTRUE_URI_ALLOW_LIST=https://www.imetrics.cl/**,https://imetrics.cl/**
+SUPABASE_PUBLIC_URL=https://supabase.staffhub.cl
+SITE_URL=https://www.staffhub.cl
+API_EXTERNAL_URL=https://supabase.staffhub.cl
+ADDITIONAL_REDIRECT_URLS=https://www.staffhub.cl/auth/callback,https://staffhub.cl/auth/callback
+GOTRUE_SITE_URL=https://www.staffhub.cl
+GOTRUE_URI_ALLOW_LIST=https://www.staffhub.cl/**,https://staffhub.cl/**
 ```
 
 ### Para tu Aplicación React (servicio staffhub en Easypanel):
 
 ```bash
-REACT_APP_SUPABASE_URL=https://supabase.imetrics.cl
-REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY5MTEzNzk4LCJleHAiOjIwODQ0NzM3OTh9.5bKRVp-u2I1m_RWsOZBYQR522YUcYFBlBUTR_d9E3JQ
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjkxMTM3OTgsImV4cCI6MjA4NDQ3Mzc5OH0.OWa5cKVo35c3g--PAwxaL9fcGOpU2scua16KQD4zc2o
+REACT_APP_SUPABASE_URL=https://supabase.staffhub.cl
+REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY5MTE2MzU4LCJleHAiOjIwODQ0NzYzNTh9.cwqdhcN50CUWMvJty9sTm-ptAngUPto3wnfggG0ImWo
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjkxMTYzNTgsImV4cCI6MjA4NDQ3NjM1OH0.ck89urip20NQN4WgOLVCLTXc97JQYIX_-QqyJ4lDwco
 ```
 
 ---
@@ -53,18 +53,18 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2Vyd
 2. **Environment Variables** Y **Build Arguments**
 3. Actualiza:
    ```bash
-   REACT_APP_SUPABASE_URL=https://supabase.imetrics.cl
-   REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY5MTEzNzk4LCJleHAiOjIwODQ0NzM3OTh9.5bKRVp-u2I1m_RWsOZBYQR522YUcYFBlBUTR_d9E3JQ
+   REACT_APP_SUPABASE_URL=https://supabase.staffhub.cl
+   REACT_APP_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY5MTE2MzU4LCJleHAiOjIwODQ0NzYzNTh9.cwqdhcN50CUWMvJty9sTm-ptAngUPto3wnfggG0ImWo
    ```
 4. **Rebuild** (no solo redeploy)
 
 ### 3. Verificar Conexión
 
-Después del rebuild, abre la consola en `https://www.imetrics.cl`:
+Después del rebuild, abre la consola en `https://www.staffhub.cl`:
 
 ```javascript
 // Deberías ver:
-✅ URL: https://supabase.imetrics.cl
+✅ URL: https://supabase.staffhub.cl
 ✅ Cliente de Supabase creado exitosamente
 ```
 
@@ -88,10 +88,10 @@ Después del rebuild, abre la consola en `https://www.imetrics.cl`:
 
 - [ ] Actualizar variables en servicio **supastaff**
 - [ ] Reiniciar servicio supastaff
-- [ ] Verificar que Supabase esté funcionando: `https://supabase.imetrics.cl`
+- [ ] Verificar que Supabase esté funcionando: `https://supabase.staffhub.cl`
 - [ ] Actualizar variables en servicio **staffhub**
 - [ ] Rebuild servicio staffhub
-- [ ] Verificar login en `https://www.imetrics.cl`
+- [ ] Verificar login en `https://www.staffhub.cl`
 - [ ] Crear usuario Camilo con `create_user_camilo_fixed.sql`
 - [ ] Probar login con: camiloalegriabarra@gmail.com / Antonito26$
 
@@ -117,8 +117,8 @@ Después del rebuild, abre la consola en `https://www.imetrics.cl`:
 ## ✅ RESULTADO ESPERADO:
 
 Después de aplicar todo:
-1. ✅ Supabase funcionando en `https://supabase.imetrics.cl`
-2. ✅ App funcionando en `https://www.imetrics.cl`
+1. ✅ Supabase funcionando en `https://supabase.staffhub.cl`
+2. ✅ App funcionando en `https://www.staffhub.cl`
 3. ✅ Login funcionando correctamente
 4. ✅ Sin errores de CSP
 5. ✅ Sin errores de conexión
