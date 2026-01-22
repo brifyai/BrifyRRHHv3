@@ -7,7 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuración de Supabase para Node.js
-const supabaseUrl = process.env.SUPABASE_URL || 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = process.env.SUPABASE_URL || 'https://supabase.staffhub.cl';
 const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcWdsbnljaXZscGppam95bXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2MDYzNjcsImV4cCI6MjA1MDE4MjM2N30.f5n0xG3L8l9Z7l8rN5xJ4H2qT6sQ9bM8cR2wE1tY5k';
 
 const supabase = createClient(supabaseUrl, supabaseKey);

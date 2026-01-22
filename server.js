@@ -22,9 +22,12 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3003',
+      'http://localhost:3004',
+      'https://www.staffhub.cl',
+      'https://staffhub.cl',
+      'https://supabase.staffhub.cl',
       'https://brifyrrhhv2.netlify.app',
-      'https://staffhub.vercel.app',
-      'https://tmqglnycivlcjijoymwe.supabase.co'
+      'https://staffhub.vercel.app'
     ];
     
     // Permitir solicitudes sin origen (como apps móviles) solo en desarrollo

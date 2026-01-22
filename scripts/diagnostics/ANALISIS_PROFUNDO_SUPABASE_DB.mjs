@@ -13,7 +13,7 @@ console.log('🔍 ANÁLISIS SUPER PROFUNDO: Estructura Real de Base de Datos Sup
 console.log('=' .repeat(80));
 
 // Configuración de Supabase
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://supabase.staffhub.cl';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseKey) {

@@ -4,7 +4,7 @@ import dotenv from 'dotenv'
 // Cargar variables de entorno
 dotenv.config()
 
-const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co'
+const supabaseUrl = 'https://supabase.staffhub.cl'
 const supabaseKey = process.env.SUPABASE_KEY
 
 if (!supabaseKey) {

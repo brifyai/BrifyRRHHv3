@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuración de Supabase
-const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = 'https://supabase.staffhub.cl';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcWdnbH55Y3l2bGNqaWpveW13ZSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM0MDU1MjI1LCJleHAiOjIwNDk2MzEyMjV9.1h8bN8k5Q5v5l7v8Y4b5c9d2e1f3g6h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6';
 
 const supabase = createClient(supabaseUrl, supabaseKey);

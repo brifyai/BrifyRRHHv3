@@ -176,10 +176,10 @@ Esto es una advertencia, no un error crítico. Pero deberías actualizar a Node.
 
 ### **Sobre las URLs diferentes:**
 ```
-Frontend: supabase.staffhub.cl (debe ser esta)
-Backend interno: tmqglnycivlcjijoymwe.supabase.co (está bien)
+Frontend: supabase.staffhub.cl (correcto)
+Backend: supabase.staffhub.cl (correcto)
 ```
-El backend puede usar una URL diferente para operaciones internas. Lo importante es que el frontend use `supabase.staffhub.cl`.
+Tanto el frontend como el backend deben usar `supabase.staffhub.cl`.
 
 ---
 

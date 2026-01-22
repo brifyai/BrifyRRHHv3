@@ -7,7 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuración directa
-const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = 'https://supabase.staffhub.cl';
 const supabaseKey = 'sb_publishable_VA7jn9YjiV0YiiLS3cPSvw_ESWO_SP0';
 
 const supabase = createClient(supabaseUrl, supabaseKey);

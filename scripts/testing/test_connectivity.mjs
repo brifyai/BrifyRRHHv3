@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 console.log('🧪 Iniciando Test de Conectividad Simple...\n');
 
 // Configuración de Supabase
-const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = 'https://supabase.staffhub.cl';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcWdsbnljaXZscGppam95bXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ2MDYzNjcsImV4cCI6MjA1MDE4MjM2N30.f5n0xG3L8l9Z7l8rN5xJ4H2qT6sQ9bM8cR2wE1tY5k';
 
 console.log('📡 Configurando cliente Supabase...');

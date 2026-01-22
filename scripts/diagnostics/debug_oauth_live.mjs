@@ -9,7 +9,7 @@ import { readFileSync } from 'fs';
 console.log('=== 🔍 DEBUG EN VIVO DE OAUTH ===\n');
 
 // Configuración
-const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = 'https://supabase.staffhub.cl';
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 
   (() => {
     try {

@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuración de Supabase
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://supabase.staffhub.cl';
 const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcWdsbnljaXZsY2ppam95bXdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI5MjI0MzUsImV4cCI6MjA0ODQ5ODQzNX0.FQ1lW9VTRxDyQfBPZon81G7bE7tSvH_yjO3R_zAW1i0';
 
 const supabase = createClient(supabaseUrl, supabaseKey);

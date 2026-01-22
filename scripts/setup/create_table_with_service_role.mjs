@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Configurar las credenciales de Supabase
-const supabaseUrl = 'https://tmqglnycivlcjijoymwe.supabase.co'
+const supabaseUrl = 'https://supabase.staffhub.cl'
 const supabaseServiceKey = 'sb_secret_ET72-lW7_FI_OLZ25GgDBA_U8fmd3VG'
 
 // Crear cliente de Supabase

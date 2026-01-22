@@ -8,7 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuración de Supabase
-const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://tmqglnycivlcjijoymwe.supabase.co';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://supabase.staffhub.cl';
 const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseKey) {

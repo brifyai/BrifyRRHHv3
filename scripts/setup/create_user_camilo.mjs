@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 // Cargar variables de entorno
 dotenv.config();
 
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://tmqglnycivlcjijoymwe.supabase.co';
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://supabase.staffhub.cl';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_KEY; // Service Role Key
 
 // Datos del usuario

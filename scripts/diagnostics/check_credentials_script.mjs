@@ -26,7 +26,7 @@ if (!supabaseAnonKey) {
 }
 
 const supabase = createClient(
-  'https://tmqglnycivlcjijoymwe.supabase.co',
+  'https://supabase.staffhub.cl',
   supabaseAnonKey
 );
 
