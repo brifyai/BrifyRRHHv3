@@ -7,6 +7,9 @@ import App from './App.js'
 // Detecta y resuelve errores ERR_INSUFFICIENT_RESOURCES
 import resourceRecoveryService from './lib/resourceRecoveryService.js'
 
+// Build version: 2.0.0 - Custom Auth Implementation
+console.log('🔐 StaffHub v2.0.0 - Custom Authentication Active')
+
 // Inicializar el sistema de recuperación de recursos al arrancar la app
 resourceRecoveryService.init()
 
