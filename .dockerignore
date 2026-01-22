@@ -33,6 +33,3 @@ scripts/*.mjs
 *.bat
 *.html
 !public/**/*.html
-netlify
-vercel.json
-render.yaml

@@ -65,8 +65,8 @@ const corsOptions = {
       'http://localhost:3003',
       'http://localhost:3004',
       'http://localhost:3005',
-      'https://brifyrrhhv2.netlify.app',
-      'https://staffhub.vercel.app',
+      'https://www.staffhub.cl',
+      'https://staffhub.cl',
       'https://supabase.staffhub.cl',
       'null' // Para archivos locales abiertos en navegador
     ];

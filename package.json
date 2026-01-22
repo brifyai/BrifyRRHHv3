@@ -52,15 +52,8 @@
     "test": "react-scripts test",
     "test:sentiment": "node test_sentiment_analysis.mjs",
     "eject": "react-scripts eject",
-    "start:prod": "NODE_ENV=production node server.js",
-    "build:prod": "NODE_ENV=production npm run build",
-    "deploy:check": "node scripts/deploy-production.js",
-    "deploy:prepare": "npm run deploy:check && npm run build:prod",
-    "deploy:netlify": "npm run deploy:prepare && echo 'Listo para despliegue en Netlify'",
-    "deploy:backend": "echo 'Despliega el backend en Vercel/Render manualmente'",
-    "deploy:full": "npm run deploy:prepare && npm run deploy:netlify && npm run deploy:backend",
-    "prod:test": "node scripts/test-production.js",
-    "prod:verify": "npm run deploy:check && npm run prod:test"
+    "start:prod": "NODE_ENV=production node server-simple.mjs",
+    "build:prod": "NODE_ENV=production npm run build"
   },
   "eslintConfig": {
     "extends": [

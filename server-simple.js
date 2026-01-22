@@ -20,9 +20,7 @@ const corsOptions = {
       'http://localhost:3004',
       'https://www.staffhub.cl',
       'https://staffhub.cl',
-      'https://supabase.staffhub.cl',
-      'https://brifyrrhhv2.netlify.app',
-      'https://staffhub.vercel.app'
+      'https://supabase.staffhub.cl'
     ];
     
     // Permitir solicitudes sin origen (como apps móviles) solo en desarrollo
