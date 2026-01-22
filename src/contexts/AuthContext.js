@@ -5,7 +5,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { supabase } from '../lib/supabaseConfig.js';
+import { supabase } from '../lib/supabaseClient.js';
 import { customAuth } from '../services/customAuthService.js';
 import toast from 'react-hot-toast';
 import { showFriendlyError, showAuthError } from '../utils/friendlyErrorHandler.js';

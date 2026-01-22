@@ -3,7 +3,7 @@
  * Usa public.users en lugar de Supabase Auth
  */
 
-import { supabase } from '../lib/supabaseConfig.js';
+import { supabase } from '../lib/supabaseClient.js';
 
 class CustomAuthService {
   /**
