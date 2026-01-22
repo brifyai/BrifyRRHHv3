@@ -1,30 +1,35 @@
 // Cargar variables de entorno GLOBALMENTE ANTES de cualquier import
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Cargar variables de entorno manualmente y asignarlas globalmente
-try {
-  const envPath = join(__dirname, '.env');
-  const envContent = readFileSync(envPath, 'utf8');
-  const envLines = envContent.split('\n');
+// Cargar variables de entorno manualmente solo si el archivo existe
+const envPath = join(__dirname, '.env');
+if (existsSync(envPath)) {
+  try {
+    const envContent = readFileSync(envPath, 'utf8');
+    const envLines = envContent.split('\n');
 
-  for (const line of envLines) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      const [key, ...valueParts] = trimmed.split('=');
-      if (key && valueParts.length > 0) {
-        const value = valueParts.join('=').replace(/^["']|["']$/g, '');
-        process.env[key.trim()] = value;
+    for (const line of envLines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        if (key && valueParts.length > 0) {
+          const value = valueParts.join('=').replace(/^["']|["']$/g, '');
+          process.env[key.trim()] = value;
+        }
       }
     }
+    console.log('✅ Variables de entorno cargadas desde .env');
+  } catch (error) {
+    console.error('❌ Error leyendo .env:', error.message);
   }
-  console.log('✅ Variables de entorno cargadas globalmente desde .env');
-} catch (error) {
-  console.error('❌ Error cargando .env:', error.message);
+} else {
+  // En producción, las variables vienen del contenedor
+  console.log('ℹ️  Usando variables de entorno del sistema (producción)');
 }
 
 import express from 'express';
