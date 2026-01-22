@@ -68,8 +68,27 @@ export const errorMessages = {
  * @returns {string} Mensaje amigable para el usuario
  */
 export const getFriendlyErrorMessage = (error, context = '') => {
-  const errorMessage = typeof error === 'string' ? error : error.message;
+  // Manejar casos donde error es null, undefined o vacío
+  if (!error) {
+    return context === 'auth' 
+      ? 'Error de autenticación. Por favor, verifica tus credenciales e intenta nuevamente.'
+      : 'Ocurrió un error inesperado. Por favor, intenta nuevamente.';
+  }
+
+  const errorMessage = typeof error === 'string' ? error : (error.message || '');
   const errorCode = typeof error === 'object' ? error.code : null;
+  
+  // Si el mensaje está vacío, usar mensaje por contexto
+  if (!errorMessage && !errorCode) {
+    const contextMessages = {
+      auth: 'Error de autenticación. Verifica tus credenciales.',
+      drive: 'Error con Google Drive. Revisa la configuración.',
+      whatsapp: 'Error con WhatsApp. Verifica la conexión.',
+      database: 'Error en la base de datos. Intenta nuevamente.',
+      network: 'Error de conexión. Verifica tu internet.'
+    };
+    return contextMessages[context] || errorMessages.UNKNOWN_ERROR;
+  }
   
   // Buscar coincidencia exacta primero
   if (errorMessages[errorMessage]) {

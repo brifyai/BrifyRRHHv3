@@ -27,8 +27,8 @@ export const showFriendlyError = (error, context = '', options = {}) => {
 
   // Obtener mensaje amigable
   const friendlyMessage = getFriendlyErrorMessage(error, context);
-  const technicalMessage = typeof error === 'string' ? error : error.message;
-  const errorStack = typeof error === 'object' ? error.stack : null;
+  const technicalMessage = typeof error === 'string' ? error : (error?.message || 'Error desconocido');
+  const errorStack = typeof error === 'object' && error?.stack ? error.stack : null;
 
   // Log técnico en consola para desarrollo
   if (showConsole) {
@@ -40,12 +40,15 @@ export const showFriendlyError = (error, context = '', options = {}) => {
     });
   }
 
+  // Asegurar que siempre haya un mensaje amigable
+  const displayMessage = friendlyMessage || 'Ocurrió un error inesperado. Por favor, intenta nuevamente.';
+
   // Mostrar al usuario el mensaje amigable
   if (showToast) {
     // Toast notification (menos intrusivo)
     MySwal.fire({
       title: title,
-      text: friendlyMessage,
+      text: displayMessage,
       icon: 'error',
       toast: true,
       position: 'top-end',
@@ -70,7 +73,7 @@ export const showFriendlyError = (error, context = '', options = {}) => {
       html: `
         <div class="text-left space-y-4">
           <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p class="text-red-800 font-medium">${friendlyMessage}</p>
+            <p class="text-red-800 font-medium">${displayMessage}</p>
           </div>
           ${showConsole && technicalMessage ? `
             <details class="bg-gray-50 border border-gray-200 rounded-lg p-3">
