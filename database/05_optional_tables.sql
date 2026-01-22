@@ -309,21 +309,28 @@ CREATE INDEX idx_knowledge_chunks_document ON knowledge_chunks(document_id);
 CREATE INDEX idx_knowledge_chunks_company ON knowledge_chunks(company_id);
 
 -- 19. USER_CREDENTIALS (Credenciales de usuario)
-CREATE TABLE IF NOT EXISTS user_credentials (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    service_name VARCHAR(100) NOT NULL,
-    credentials JSONB NOT NULL,
-    is_active BOOLEAN DEFAULT true,
-    expires_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(user_id, service_name)
-);
+-- NOTA: Esta tabla puede ya existir con estructura diferente en complete_database_setup.sql
+-- Solo crear si no existe
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'user_credentials') THEN
+        CREATE TABLE user_credentials (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            service_name VARCHAR(100) NOT NULL,
+            credentials JSONB NOT NULL,
+            is_active BOOLEAN DEFAULT true,
+            expires_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(user_id, service_name)
+        );
 
-CREATE INDEX idx_user_credentials_user ON user_credentials(user_id);
-CREATE INDEX idx_user_credentials_service ON user_credentials(service_name);
-CREATE INDEX idx_user_credentials_active ON user_credentials(is_active);
+        CREATE INDEX idx_user_credentials_user ON user_credentials(user_id);
+        CREATE INDEX idx_user_credentials_service ON user_credentials(service_name);
+        CREATE INDEX idx_user_credentials_active ON user_credentials(is_active);
+    END IF;
+END $$;
 
 -- ========================================
 -- RLS POLICIES
@@ -380,10 +387,23 @@ CREATE POLICY "Users can view documents in their companies"
     );
 
 -- User Credentials (solo el usuario propietario)
-ALTER TABLE user_credentials ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can manage their own credentials"
-    ON user_credentials FOR ALL
-    USING (user_id = auth.uid());
+-- Solo aplicar si la tabla fue creada en este script
+DO $$ 
+BEGIN
+    IF EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'user_credentials' 
+        AND column_name = 'service_name'
+    ) THEN
+        ALTER TABLE user_credentials ENABLE ROW LEVEL SECURITY;
+        
+        DROP POLICY IF EXISTS "Users can manage their own credentials" ON user_credentials;
+        CREATE POLICY "Users can manage their own credentials"
+            ON user_credentials FOR ALL
+            USING (user_id = auth.uid());
+    END IF;
+END $$;
 
 -- ========================================
 -- TRIGGERS
@@ -414,10 +434,22 @@ CREATE TRIGGER update_documents_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_user_credentials_updated_at
-    BEFORE UPDATE ON user_credentials
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Trigger para user_credentials (solo si existe con service_name)
+DO $$ 
+BEGIN
+    IF EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'user_credentials' 
+        AND column_name = 'service_name'
+    ) THEN
+        DROP TRIGGER IF EXISTS update_user_credentials_updated_at ON user_credentials;
+        CREATE TRIGGER update_user_credentials_updated_at
+            BEFORE UPDATE ON user_credentials
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column();
+    END IF;
+END $$;
 
 -- ========================================
 -- VERIFICACIÓN
