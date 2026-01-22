@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext.js'
 import { db, supabase } from '../../lib/supabase.js'
+import { customAuth } from '../../services/customAuthService.js'
 import {
   UserIcon,
   KeyIcon,
@@ -94,11 +95,11 @@ const Profile = () => {
     setSaving(true)
     
     try {
-      // Primero verificar la contraseña actual
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: passwordData.currentPassword
-      })
+      // Primero verificar la contraseña actual usando customAuth
+      const { error: signInError } = await customAuth.signIn(
+        user.email,
+        passwordData.currentPassword
+      )
       
       if (signInError) {
         toast.error('La contraseña actual es incorrecta')
@@ -106,10 +107,8 @@ const Profile = () => {
         return
       }
       
-      // Cambiar contraseña con Supabase
-      const { error } = await supabase.auth.updateUser({
-        password: passwordData.newPassword
-      })
+      // Cambiar contraseña con customAuth
+      const { error } = await customAuth.updatePassword(passwordData.newPassword)
       
       if (error) {
         console.error('Error:', error)

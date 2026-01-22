@@ -6,20 +6,20 @@
  *
  * Arquitectura:
  * - supabaseClient.js: Configuración del cliente Supabase
- * - supabaseAuth.js: Funciones de autenticación
+ * - customAuthService.js: Autenticación personalizada (NO usa Supabase Auth)
  * - supabaseDatabase.js: Funciones de base de datos
  */
 
 // Importaciones para exportaciones por defecto
 import { supabase } from './supabaseClient.js'
-import { auth } from './supabaseAuth.js'
+import { customAuth } from '../services/customAuthService.js'
 import { db } from './supabaseDatabase.js'
 
 // Exportar el cliente y configuración
 export { supabase, config } from './supabaseClient.js'
 
-// Exportar funciones de autenticación
-export { auth } from './supabaseAuth.js'
+// Exportar autenticación personalizada como 'auth' para compatibilidad
+export { customAuth as auth } from '../services/customAuthService.js'
 
 // Exportar funciones de base de datos
 export { db } from './supabaseDatabase.js'
@@ -27,7 +27,7 @@ export { db } from './supabaseDatabase.js'
 // Crear objeto con nombre para exportación por defecto
 const supabaseModule = {
   supabase,
-  auth,
+  auth: customAuth,
   db
 }
 

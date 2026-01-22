@@ -1,6 +1,9 @@
 # Build stage
 FROM node:20-alpine AS builder
 
+# Force cache invalidation
+ARG CACHEBUST=1
+
 WORKDIR /app
 
 # Copy package files
@@ -37,7 +40,12 @@ ENV ESLINT_NO_DEV_ERRORS=true
 ENV GENERATE_SOURCEMAP=false
 
 # Build the application
-RUN npm run build
+RUN echo "🔨 Starting React build..." && \
+    npm run build && \
+    echo "✅ Build completed successfully" && \
+    ls -la build/ && \
+    echo "📦 Build files:" && \
+    find build/static/js -name "main.*.js" -type f
 
 # Production stage
 FROM node:20-alpine
