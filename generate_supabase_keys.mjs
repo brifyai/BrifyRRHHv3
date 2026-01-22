@@ -76,21 +76,21 @@ console.log(`LOGFLARE_PUBLIC_ACCESS_TOKEN=${LOGFLARE_PUBLIC}`);
 console.log(`LOGFLARE_PRIVATE_ACCESS_TOKEN=${LOGFLARE_PRIVATE}`);
 
 console.log('\n# ========================================');
-console.log('# URLs - CORREGIDAS');
+console.log('# URLs - STAFFHUB.CL');
 console.log('# ========================================\n');
 
-console.log('SUPABASE_PUBLIC_URL=https://supabase.imetrics.cl');
-console.log('SITE_URL=https://www.imetrics.cl');
-console.log('API_EXTERNAL_URL=https://supabase.imetrics.cl');
-console.log('ADDITIONAL_REDIRECT_URLS=https://www.imetrics.cl/auth/callback,https://imetrics.cl/auth/callback');
-console.log('GOTRUE_SITE_URL=https://www.imetrics.cl');
-console.log('GOTRUE_URI_ALLOW_LIST=https://www.imetrics.cl/**,https://imetrics.cl/**');
+console.log('SUPABASE_PUBLIC_URL=http://supabase.staffhub.cl');
+console.log('SITE_URL=https://www.staffhub.cl');
+console.log('API_EXTERNAL_URL=http://supabase.staffhub.cl');
+console.log('ADDITIONAL_REDIRECT_URLS=https://www.staffhub.cl/auth/callback,https://staffhub.cl/auth/callback');
+console.log('GOTRUE_SITE_URL=https://www.staffhub.cl');
+console.log('GOTRUE_URI_ALLOW_LIST=https://www.staffhub.cl/**,https://staffhub.cl/**');
 
 console.log('\n# ========================================');
 console.log('# PARA TU APLICACIÓN REACT');
 console.log('# ========================================\n');
 
-console.log(`REACT_APP_SUPABASE_URL=https://supabase.imetrics.cl`);
+console.log(`REACT_APP_SUPABASE_URL=http://supabase.staffhub.cl`);
 console.log(`REACT_APP_SUPABASE_ANON_KEY=${ANON_KEY}`);
 console.log(`SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}`);
 
