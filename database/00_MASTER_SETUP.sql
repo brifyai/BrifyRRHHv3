@@ -1,0 +1,66 @@
+-- ========================================
+-- MASTER SETUP - BRIFY RRHH V3
+-- Script maestro para crear toda la base de datos
+-- ========================================
+-- 
+-- INSTRUCCIONES:
+-- 1. Ejecutar este script en Supabase SQL Editor
+-- 2. O ejecutar los scripts individuales en orden:
+--    - 01_core_tables.sql
+--    - 02_integrations_tables.sql
+--    - 03_employee_folders.sql (del archivo complete_database_setup.sql)
+--    - 04_knowledge_base.sql (del archivo supabase_knowledge_simple.sql)
+--    - 05_brevo_campaigns.sql (del archivo complete_database_setup.sql)
+--    - 06_triggers_and_functions.sql
+--    - 07_rls_policies.sql
+--
+-- ========================================
+
+-- Habilitar extensiones necesarias
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- ========================================
+-- RESUMEN DE TABLAS A CREAR:
+-- ========================================
+--
+-- CORE (01):
+-- - companies
+-- - users
+-- - user_companies
+-- - employees
+--
+-- INTEGRATIONS (02):
+-- - oauth_states
+-- - company_integrations
+-- - integration_logs
+-- - user_google_drive_credentials
+-- - system_configurations
+-- - operation_locks
+--
+-- EMPLOYEE FOLDERS (03):
+-- - employee_folders
+-- - employee_documents
+-- - employee_faqs
+-- - employee_conversations
+-- - employee_notification_settings
+--
+-- KNOWLEDGE BASE (04):
+-- - company_knowledge_bases
+-- - knowledge_folders
+-- - knowledge_categories
+-- - knowledge_documents
+-- - faq_entries
+-- - knowledge_permissions
+-- - knowledge_ai_config
+--
+-- BREVO CAMPAIGNS (05):
+-- - brevo_campaigns
+-- - brevo_campaign_recipients
+-- - brevo_templates
+-- - brevo_statistics
+-- - brevo_user_config
+--
+-- ========================================
+
+SELECT '🚀 Iniciando creación de base de datos completa...' as status;
