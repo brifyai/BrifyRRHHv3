@@ -70,14 +70,25 @@ export const showFriendlyError = (error, context = '', options = {}) => {
       html: `
         <div class="text-left space-y-4">
           <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p class="text-red-800 font-medium"></p>
+            <p class="text-red-800 font-medium">${friendlyMessage}</p>
           </div>
-          ${showConsole && errorStack ? `
+          ${showConsole && technicalMessage ? `
             <details class="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <summary class="text-sm font-medium text-gray-700 cursor-pointer">
-                Detalles técnicos (para soporte)
+              <summary class="text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900">
+                ▶ Detalles técnicos (para soporte)
               </summary>
-              <pre class="mt-2 text-xs text-gray-600 overflow-x-auto"></pre>
+              <div class="mt-3 space-y-2">
+                <div class="bg-white rounded p-2 border border-gray-200">
+                  <p class="text-xs font-semibold text-gray-500 mb-1">Mensaje técnico:</p>
+                  <pre class="text-xs text-gray-700 whitespace-pre-wrap break-words">${technicalMessage}</pre>
+                </div>
+                ${errorStack ? `
+                  <div class="bg-white rounded p-2 border border-gray-200">
+                    <p class="text-xs font-semibold text-gray-500 mb-1">Stack trace:</p>
+                    <pre class="text-xs text-gray-600 whitespace-pre-wrap break-words overflow-x-auto max-h-40">${errorStack}</pre>
+                  </div>
+                ` : ''}
+              </div>
             </details>
           ` : ''}
         </div>
