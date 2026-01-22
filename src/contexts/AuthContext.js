@@ -1,6 +1,7 @@
 /**
  * AuthContext con Autenticación Personalizada
  * Usa public.users en lugar de Supabase Auth
+ * Version: 2.0 - Custom Auth Implementation
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
