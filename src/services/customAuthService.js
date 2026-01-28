@@ -73,7 +73,7 @@ class CustomAuthService {
    */
   async signUp(email, password, fullName = null) {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .rpc('create_user_with_password', {
           user_email: email,
           password: password,

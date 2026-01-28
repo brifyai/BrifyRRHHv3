@@ -52,9 +52,10 @@ const EmployeeFolders = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
-  const [employeeCompanyIndex, setEmployeeCompanyIndex] = useState(new Map());
+  // const [employeeCompanyIndex, setEmployeeCompanyIndex] = useState(new Map()); // Reservado para filtrado por empresa
 
-  // Build employee company index
+  // Build employee company index (comentado temporalmente - no se usa actualmente)
+  /*
   useEffect(() => {
     let cancelled = false;
 
@@ -86,6 +87,7 @@ const EmployeeFolders = () => {
       cancelled = true;
     };
   }, []);
+  */
 
   // Initialize token bridge when user is authenticated
   useEffect(() => {

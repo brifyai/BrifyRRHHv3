@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { APP_CONFIG } from '../config/constants.js'
 import networkResourceManager from './networkResourceManager.js'
-import { SUPABASE_CONFIG, getClientConfig, validateSupabaseConfig } from './supabaseConfig.js'
+import { getClientConfig, validateSupabaseConfig } from './supabaseConfig.js'
 
 // Validar configuración al inicializar
 try {
