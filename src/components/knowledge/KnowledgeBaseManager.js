@@ -13,6 +13,10 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { supabase } from '../../lib/supabase.js';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 /**
  * Gestor de Base de Conocimiento para WhatsApp Business
@@ -212,7 +216,18 @@ const KnowledgeBaseManager = ({ companyId }) => {
   };
 
   const handleDeleteFAQ = async (faqId) => {
-    if (!window.confirm('¿Estás seguro de eliminar esta FAQ?')) return;
+    const result = await MySwal.fire({
+      title: '¿Estás seguro?',
+      text: '¿Deseas eliminar esta FAQ? Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       const { error } = await supabase
@@ -282,7 +297,18 @@ const KnowledgeBaseManager = ({ companyId }) => {
   };
 
   const handleDeleteDocument = async (docId) => {
-    if (!window.confirm('¿Estás seguro de eliminar este documento?')) return;
+    const result = await MySwal.fire({
+      title: '¿Estás seguro?',
+      text: '¿Deseas eliminar este documento? Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       // Obtener información del documento
@@ -365,7 +391,18 @@ const KnowledgeBaseManager = ({ companyId }) => {
   };
 
   const handleDeleteCategory = async (categoryId) => {
-    if (!window.confirm('¿Estás seguro de eliminar esta categoría?')) return;
+    const result = await MySwal.fire({
+      title: '¿Estás seguro?',
+      text: '¿Deseas eliminar esta categoría? Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       const { error } = await supabase

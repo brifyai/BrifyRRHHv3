@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FolderIcon, 
   DocumentIcon, 
@@ -27,11 +27,7 @@ const EmployeeFolderManager = () => {
   const [creatingFolders, setCreatingFolders] = useState(false);
 
   // Cargar carpetas al montar el componente
-  useEffect(() => {
-    loadFolders();
-  }, [loadFolders]);
-
-  const loadFolders = async () => {
+  const loadFolders = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -57,7 +53,12 @@ const EmployeeFolderManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Cargar carpetas al montar el componente
+  useEffect(() => {
+    loadFolders();
+  }, [loadFolders]);
 
   // Crear carpetas para todos los empleados
   const createAllFolders = async () => {
