@@ -50,6 +50,11 @@ class CustomAuthService {
 
       localStorage.setItem('custom_auth_session', JSON.stringify(session));
 
+      // Disparar evento manualmente para la pestaña actual
+      if (this.authStateCallback) {
+        this.authStateCallback('SIGNED_IN', session);
+      }
+
       return { 
         data: { user: session.user, session }, 
         error: null 
@@ -101,6 +106,12 @@ class CustomAuthService {
   async signOut() {
     try {
       localStorage.removeItem('custom_auth_session');
+      
+      // Disparar evento manualmente para la pestaña actual
+      if (this.authStateCallback) {
+        this.authStateCallback('SIGNED_OUT', null);
+      }
+      
       return { error: null };
     } catch (error) {
       console.error('Error en signOut:', error);
@@ -209,6 +220,9 @@ class CustomAuthService {
    * Escuchar cambios de autenticación
    */
   onAuthStateChange(callback) {
+    // Guardar callback para uso interno
+    this.authStateCallback = callback;
+    
     // Verificar sesión inicial
     const { data } = this.getSession();
     if (data.session) {
@@ -237,6 +251,7 @@ class CustomAuthService {
         subscription: {
           unsubscribe: () => {
             window.removeEventListener('storage', handleStorageChange);
+            this.authStateCallback = null;
           }
         }
       }
