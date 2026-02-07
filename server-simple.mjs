@@ -39,8 +39,21 @@ import dotenv from 'dotenv';
 // También intentar con dotenv como respaldo
 dotenv.config({ path: join(__dirname, '.env') });
 
-// Importar cliente de Supabase para servidor
-import { supabaseServer } from './src/lib/supabaseServer.js';
+// Importar cliente de Supabase para servidor con manejo de errores
+let supabaseServer = null;
+const loadSupabaseServer = async () => {
+  if (!supabaseServer) {
+    try {
+      const module = await import('./src/lib/supabaseServer.js');
+      supabaseServer = module.default || module.supabaseServer;
+      console.log('✅ Supabase Server cargado correctamente');
+    } catch (error) {
+      console.error('⚠️  Error cargando Supabase Server:', error.message);
+      console.log('ℹ️  El servidor continuará sin Supabase Server');
+    }
+  }
+  return supabaseServer;
+};
 
 // Importar supabaseDatabase dinámicamente para evitar problemas de módulos
 let supabaseDatabase = null;
@@ -259,8 +272,16 @@ async function getGoogleUserInfo(accessToken) {
   }
 }
 
-async function saveGoogleCredentials(userId, tokens, userInfo = {}) {
+async function saveGoogleCredentials(userId, tokens, userInfo = {}) => {
   try {
+    // Cargar supabaseServer dinámicamente
+    const supabase = await loadSupabaseServer();
+    
+    if (!supabase) {
+      console.error('Supabase Server no disponible');
+      return { success: false, error: { message: 'Supabase Server no disponible' } };
+    }
+    
     // Debug: Check environment variables at callback time
     console.log('🔍 Environment variables in callback:');
     console.log('- REACT_APP_SUPABASE_URL:', process.env.REACT_APP_SUPABASE_URL ? 'Present' : 'Missing');
@@ -287,7 +308,7 @@ async function saveGoogleCredentials(userId, tokens, userInfo = {}) {
       }
     };
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from('google_drive_credentials')
       .upsert(credentialsData, {
         onConflict: 'user_id'

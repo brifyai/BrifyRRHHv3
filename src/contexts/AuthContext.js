@@ -98,8 +98,8 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('Error en registro:', error);
-        showAuthError(error);
-        return { error };
+        // Lanzar el error para que sea capturado por el catch
+        throw error;
       }
 
       if (data.user) {
@@ -109,10 +109,7 @@ export const AuthProvider = ({ children }) => {
       return { data };
     } catch (error) {
       console.error('Error en signUp:', error);
-      showFriendlyError(error, 'auth', {
-        title: 'Error durante el registro',
-        confirmButtonText: 'Intentar nuevamente'
-      });
+      showAuthError(error);
       return { error };
     } finally {
       setLoading(false);
@@ -128,8 +125,8 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         console.error('Error en inicio de sesión:', error);
-        showAuthError(error);
-        return { error };
+        // Lanzar el error para que sea capturado por el catch
+        throw error;
       }
 
       if (data.user) {
@@ -139,10 +136,7 @@ export const AuthProvider = ({ children }) => {
       return { data };
     } catch (error) {
       console.error('Error en signIn:', error);
-      showFriendlyError(error, 'auth', {
-        title: 'Error durante el inicio de sesión',
-        confirmButtonText: 'Intentar nuevamente'
-      });
+      showAuthError(error);
       return { error };
     } finally {
       setLoading(false);
