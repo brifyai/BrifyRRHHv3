@@ -272,7 +272,7 @@ async function getGoogleUserInfo(accessToken) {
   }
 }
 
-async function saveGoogleCredentials(userId, tokens, userInfo = {}) => {
+async function saveGoogleCredentials(userId, tokens, userInfo = {}) {
   try {
     // Cargar supabaseServer dinámicamente
     const supabase = await loadSupabaseServer();
