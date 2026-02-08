@@ -18,7 +18,7 @@ COPY . .
 # Build arguments
 ARG NODE_ENV=production
 ARG REACT_APP_ENVIRONMENT=production
-ARG PORT=3004
+ARG PORT=4004
 ARG REACT_APP_GOOGLE_CLIENT_ID
 ARG REACT_APP_SUPABASE_URL
 ARG REACT_APP_SUPABASE_ANON_KEY
@@ -54,7 +54,7 @@ WORKDIR /app
 
 # Build arguments (needed in runtime too)
 ARG NODE_ENV=production
-ARG PORT=3004
+ARG PORT=4004
 ARG CORS_ALLOW_ALL=true
 
 # Set runtime environment variables
@@ -74,11 +74,11 @@ COPY --from=builder /app/server-simple.mjs ./
 COPY --from=builder /app/src ./src
 
 # Expose port
-EXPOSE ${PORT:-3004}
+EXPOSE ${PORT:-4004}
 
 # Health check (usando wget que está disponible en alpine)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3004}/api/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-4004}/api/health || exit 1
 
 # Start the server
 CMD ["node", "server-simple.mjs"]

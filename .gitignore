@@ -118,3 +118,7 @@ CREDENTIALS_PERSONALES.txt
 # Archivos temporales que pueden contener credenciales
 **/temp/*.env
 **/tmp/*.env
+
+# Claves JWT seguras generadas
+SUPABASE_SECURE_KEYS.txt
+*_SECURE_KEYS.txt

@@ -56,7 +56,7 @@ const loadSupabaseServer = async () => {
 };
 
 const app = express();
-const PORT = process.env.PORT || 3004;
+const PORT = process.env.PORT || 4004;
 
 // Middleware
 const corsOptions = {
