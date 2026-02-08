@@ -27,13 +27,97 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      realtime:
+        condition: service_started
+      storage:
+        condition: service_started
+      meta:
+        condition: service_started
     environment:
       KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /home/kong/kong.yml
+      KONG_DECLARATIVE_CONFIG_STRING: |
+        _format_version: "2.1"
+        _transform: true
+        services:
+          - name: auth-v1
+            url: http://auth:9999/
+            routes:
+              - name: auth-v1-all
+                strip_path: true
+                paths:
+                  - /auth/v1/
+            plugins:
+              - name: cors
+          - name: rest-v1
+            url: http://rest:3000/
+            routes:
+              - name: rest-v1-all
+                strip_path: true
+                paths:
+                  - /rest/v1/
+            plugins:
+              - name: cors
+          - name: realtime-v1
+            url: http://realtime:4000/socket/
+            routes:
+              - name: realtime-v1-all
+                strip_path: true
+                paths:
+                  - /realtime/v1/
+            plugins:
+              - name: cors
+          - name: storage-v1
+            url: http://storage:5000/
+            routes:
+              - name: storage-v1-all
+                strip_path: true
+                paths:
+                  - /storage/v1/
+            plugins:
+              - name: cors
+          - name: meta
+            url: http://meta:8080/
+            routes:
+              - name: meta-all
+                strip_path: true
+                paths:
+                  - /pg/
+            plugins:
+              - name: cors
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - "*"
+              methods:
+                - GET
+                - HEAD
+                - PUT
+                - PATCH
+                - POST
+                - DELETE
+                - OPTIONS
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-MD5
+                - Content-Type
+                - Date
+                - X-Auth-Token
+                - X-Client-Info
+                - apikey
+                - Authorization
+              exposed_headers:
+                - X-Request-Id
+              credentials: true
+              max_age: 3600
       KONG_DNS_ORDER: LAST,A,CNAME
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
     networks:
       - supabase-network
 
