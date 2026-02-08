@@ -76,9 +76,9 @@ COPY --from=builder /app/src ./src
 # Expose port
 EXPOSE ${PORT:-3004}
 
-# Health check
+# Health check (usando wget que está disponible en alpine)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:${PORT:-3004}/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3004}/api/health || exit 1
 
 # Start the server
 CMD ["node", "server-simple.mjs"]

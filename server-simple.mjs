@@ -166,10 +166,16 @@ app.get('/api/google-drive/status', (req, res) => {
   }
 });
 
-// Catch-all route para servir React app (debe estar al final)
-app.get('*', (req, res) => {
-  res.sendFile(join(__dirname, 'build', 'index.html'));
-});
+// Catch-all route para servir React app (debe estar al final, SOLO para rutas que NO son /api/*)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    // No capturar rutas de API
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    res.sendFile(join(__dirname, 'build', 'index.html'));
+  });
+}
 
 // Iniciar servidor
 app.listen(PORT, () => {
