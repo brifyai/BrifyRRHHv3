@@ -1,0 +1,20 @@
+# Docker Compose Override File
+# Este archivo sobrescribe configuraciones del docker-compose.yml principal
+# 
+# PROPÓSITO: Deshabilitar el servicio analytics que está causando conflictos de puertos
+#
+# INSTRUCCIONES:
+# 1. Sube este archivo a EasyPanel en el mismo directorio que docker-compose.yml
+# 2. O copia su contenido en la sección "Override" de EasyPanel
+# 3. Redeploy el servicio
+
+version: "3.8"
+
+services:
+  # Deshabilitar analytics completamente
+  analytics:
+    deploy:
+      replicas: 0
+    restart: "no"
+    profiles:
+      - disabled
