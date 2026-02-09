@@ -1,22 +1,21 @@
 # Docker Compose Override File
-# Este archivo ELIMINA completamente el servicio analytics
+# Este archivo ELIMINA completamente el servicio analytics y cambia puertos conflictivos
 # 
 # IMPORTANTE: Este override debe tener prioridad sobre el que genera EasyPanel
 
 version: "3.8"
 
 services:
-  # ELIMINAR analytics completamente - no iniciar, no crear, no exponer puertos
+  # ELIMINAR analytics completamente - usar scale=0 para que no se cree
   analytics:
-    image: tianon/true  # Imagen dummy que no hace nada
+    scale: 0
+    image: tianon/true
     restart: "no"
-    command: "true"
-    deploy:
-      replicas: 0
+    command: ["true"]
     profiles:
       - disabled
-    # NO exponer ningún puerto
     ports: []
+    networks: []
   
   # Kong NO debe depender de analytics
   kong:

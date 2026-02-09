@@ -1,0 +1,40 @@
+# Docker Compose Override para EasyPanel
+# Este archivo resuelve conflictos de puertos en el servidor
+
+version: "3.8"
+
+services:
+  # Deshabilitar analytics completamente
+  analytics:
+    deploy:
+      replicas: 0
+    entrypoint: ["/bin/true"]
+    command: []
+    ports: []
+    
+  # Si analytics debe existir, usar puerto alternativo
+  # analytics:
+  #   ports:
+  #     - "4001:4000"  # Cambiar puerto externo a 4001
+  
+  # Asegurar que realtime use su puerto interno correctamente
+  realtime:
+    environment:
+      PORT: 4000
+    # No exponer puerto externo si no es necesario
+    ports: []
+    
+  # Kong debe funcionar sin analytics
+  kong:
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      realtime:
+        condition: service_started
+      storage:
+        condition: service_started
+      # NO incluir analytics en depends_on
