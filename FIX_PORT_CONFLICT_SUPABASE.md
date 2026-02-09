@@ -1,0 +1,419 @@
+# 🔧 Solución: Conflicto de Puerto 4000
+
+## 🚨 Problema
+
+```
+Bind for 0.0.0.0:4000 failed: port is already allocated
+```
+
+El puerto **4000** está siendo usado por otro contenedor (probablemente Realtime).
+
+---
+
+## ✅ SOLUCIÓN: Deshabilitar Analytics
+
+Analytics no es esencial. Vamos a eliminarlo completamente.
+
+### Paso 1: Editar docker-compose.yml en EasyPanel
+
+**Ve a EasyPanel → Servicio Supabase → Docker Compose**
+
+### Paso 2: Eliminar Dependencia de Analytics en Kong
+
+Busca la sección `kong:` y cambia:
+
+```yaml
+# ANTES:
+kong:
+  container_name: supabase-kong
+  image: kong:2.8.1
+  restart: unless-stopped
+  depends_on:
+    analytics:
+      condition: service_healthy
+    db:
+      condition: service_healthy
+
+# DESPUÉS:
+kong:
+  container_name: supabase-kong
+  image: kong:2.8.1
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+```
+
+### Paso 3: Eliminar Completamente el Servicio Analytics
+
+Busca TODO el bloque que empieza con `analytics:` y **ELIMÍNALO COMPLETAMENTE** (no solo comentar, eliminar):
+
+```yaml
+# ELIMINA TODO ESTO:
+analytics:
+  container_name: supabase-analytics
+  image: supabase/logflare:1.4.0
+  healthcheck:
+    test: ["CMD", "curl", "http://localhost:4000/health"]
+    timeout: 5s
+    interval: 5s
+    retries: 10
+  restart: unless-stopped
+  depends_on:
+    db:
+      condition: service_healthy
+  ports:
+    - ${ANALYTICS_PORT}:4000
+  environment:
+    # ... todo el bloque
+```
+
+### Paso 4: Verificar que Realtime NO use puerto 4000 externamente
+
+Busca la sección `realtime:` y asegúrate que NO tenga `ports:` expuestos:
+
+```yaml
+realtime:
+  container_name: supabase-realtime
+  image: supabase/realtime:v2.25.50
+  depends_on:
+    db:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/localhost/4000"]
+    timeout: 5s
+    interval: 5s
+    retries: 3
+  restart: unless-stopped
+  environment:
+    PORT: 4000  # Puerto INTERNO (está bien)
+    # ... resto de variables
+  # NO debe tener "ports:" aquí
+```
+
+### Paso 5: Guardar y Redeploy
+
+1. Click en **"Save"**
+2. Click en **"Redeploy"**
+3. Espera 5 minutos
+
+---
+
+## 📋 docker-compose.yml Mínimo SIN Analytics
+
+Si prefieres, usa este docker-compose.yml completo (copia y pega TODO):
+
+```yaml
+version: "3.8"
+
+services:
+  db:
+    container_name: supabase-db
+    image: supabase/postgres:15.1.0.117
+    healthcheck:
+      test: pg_isready -U postgres -h localhost
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=fatal
+    restart: unless-stopped
+    ports:
+      - ${POSTGRES_PORT:-5432}:5432
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    volumes:
+      - db-data:/var/lib/postgresql/data:Z
+
+  kong:
+    container_name: supabase-kong
+    image: kong:2.8.1
+    restart: unless-stopped
+    ports:
+      - ${KONG_HTTP_PORT:-8000}:8000/tcp
+      - ${KONG_HTTPS_PORT:-8443}:8443/tcp
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-supabase}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-supabase}
+    volumes:
+      - ./volumes/api/kong.yml:/usr/local/kong/kong.yml:ro
+
+  auth:
+    container_name: supabase-auth
+    image: supabase/gotrue:v2.132.3
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    restart: unless-stopped
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${ENABLE_EMAIL_SIGNUP:-true}
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: ${ENABLE_ANONYMOUS_USERS:-false}
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM:-false}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
+      GOTRUE_MAILER_URLPATHS_INVITE: ${MAILER_URLPATHS_INVITE}
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: ${MAILER_URLPATHS_CONFIRMATION}
+      GOTRUE_MAILER_URLPATHS_RECOVERY: ${MAILER_URLPATHS_RECOVERY}
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: ${MAILER_URLPATHS_EMAIL_CHANGE}
+      GOTRUE_EXTERNAL_PHONE_ENABLED: ${ENABLE_PHONE_SIGNUP:-false}
+      GOTRUE_SMS_AUTOCONFIRM: ${ENABLE_PHONE_AUTOCONFIRM:-false}
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: ${GOTRUE_EXTERNAL_GOOGLE_ENABLED:-false}
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID}
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOTRUE_EXTERNAL_GOOGLE_SECRET}
+      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: ${GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI}
+
+  rest:
+    container_name: supabase-rest
+    image: postgrest/postgrest:v11.2.2
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public}
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY:-3600}
+
+  realtime:
+    container_name: supabase-realtime
+    image: supabase/realtime:v2.25.50
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/localhost/4000"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    restart: unless-stopped
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: ${POSTGRES_PORT:-5432}
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-postgres}
+      DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
+      DB_ENC_KEY: supabaserealtime
+      API_JWT_SECRET: ${JWT_SECRET}
+      FLY_ALLOC_ID: fly123
+      FLY_APP_NAME: realtime
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      ENABLE_TAILSCALE: "false"
+      DNS_NODES: "''"
+    command: >
+      sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
+
+  storage:
+    container_name: supabase-storage
+    image: supabase/storage-api:v0.43.11
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+      imgproxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/status"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    restart: unless-stopped
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://imgproxy:5001
+    volumes:
+      - storage-data:/var/lib/storage:z
+
+  imgproxy:
+    container_name: supabase-imgproxy
+    image: darthsim/imgproxy:v3.8.0
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":5001"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+      IMGPROXY_ENABLE_WEBP_DETECTION: ${IMGPROXY_ENABLE_WEBP_DETECTION:-true}
+    volumes:
+      - storage-data:/var/lib/storage:z
+
+  meta:
+    container_name: supabase-meta
+    image: supabase/postgres-meta:v0.68.0
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: ${POSTGRES_PORT:-5432}
+      PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
+      PG_META_DB_USER: supabase_admin
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+  studio:
+    container_name: supabase-studio
+    image: supabase/studio:20240101-5e5586d
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/profile', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION}
+      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT}
+      SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+
+  functions:
+    container_name: supabase-edge-functions
+    image: supabase/edge-runtime:v1.22.4
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
+      VERIFY_JWT: ${FUNCTIONS_VERIFY_JWT:-false}
+    volumes:
+      - ./volumes/functions:/home/deno/functions:Z
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+
+volumes:
+  db-data:
+  storage-data:
+```
+
+---
+
+## 🚀 Pasos Finales
+
+1. **Copia TODO el docker-compose.yml de arriba**
+2. **Ve a EasyPanel** → Servicio Supabase → Docker Compose
+3. **Reemplaza TODO** el contenido con el de arriba
+4. **Click "Save"**
+5. **Click "Redeploy"**
+6. **Espera 5 minutos**
+
+---
+
+## 🔍 Verificación
+
+Después de 5 minutos:
+
+```bash
+# Prueba:
+https://supabase.staffhub.cl/rest/v1/
+
+# Deberías ver:
+✅ {"message":"The server is running"}
+# O
+✅ Error 401 (también es válido)
+```
+
+---
+
+## ✅ Resultado Esperado
+
+```
+✅ Sin conflictos de puerto
+✅ Kong corriendo en puerto 8000
+✅ https://supabase.staffhub.cl responde
+✅ Auth funciona
+✅ Login funciona
+```
+
+---
+
+## 📞 Siguiente Paso
+
+Una vez que funcione:
+
+1. Verifica `https://supabase.staffhub.cl/rest/v1/`
+2. Prueba el login en tu app
+3. Avísame el resultado
+
+**¡Casi llegamos!** 🚀
