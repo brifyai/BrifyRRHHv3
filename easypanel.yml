@@ -1,0 +1,56 @@
+# Configuración de Easypanel para el proyecto StaffHub
+# Este archivo le dice a Easypanel cómo configurar los servicios
+
+name: staffhubbdv5
+type: docker-compose
+
+# Configuración de servicios
+services:
+  # Analytics con puerto modificado
+  analytics:
+    enabled: false  # Intentar deshabilitar
+    ports:
+      - external: 54000
+        internal: 4000
+    restart: "no"
+  
+  # Kong (API Gateway)
+  kong:
+    enabled: true
+    ports:
+      - external: 8000
+        internal: 8000
+    depends_on:
+      - db
+      - auth
+      - rest
+      - realtime
+      - storage
+  
+  # Studio (UI)
+  studio:
+    enabled: true
+    ports:
+      - external: 3000
+        internal: 3000
+  
+  # Database
+  db:
+    enabled: true
+    ports:
+      - external: 5432
+        internal: 5432
+
+# Variables de entorno globales
+env:
+  DISABLE_ANALYTICS: "true"
+  ANALYTICS_ENABLED: "false"
+  ANALYTICS_PORT: "54000"
+
+# Configuración de red
+network:
+  mode: bridge
+
+# Configuración de volúmenes
+volumes:
+  persist: true

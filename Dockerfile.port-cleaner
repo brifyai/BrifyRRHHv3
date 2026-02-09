@@ -1,0 +1,18 @@
+# Dockerfile para limpiar el puerto 4000 antes del deploy
+# Este contenedor se ejecuta una vez y limpia el puerto
+
+FROM alpine:latest
+
+# Instalar herramientas necesarias
+RUN apk add --no-cache \
+    bash \
+    lsof \
+    procps \
+    net-tools
+
+# Copiar script de limpieza
+COPY pre-deploy.sh /usr/local/bin/clean-port.sh
+RUN chmod +x /usr/local/bin/clean-port.sh
+
+# Ejecutar limpieza
+CMD ["/usr/local/bin/clean-port.sh"]

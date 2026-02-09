@@ -1,18 +1,28 @@
 # Docker Compose Override File
-# Este archivo DESHABILITA analytics para evitar conflicto de puerto 4000
-# 
-# IMPORTANTE: Este override debe tener prioridad sobre el que genera EasyPanel
+# SOLUCIÓN DEFINITIVA: Analytics falla inmediatamente sin abrir puerto 4000
+# Esta técnica funciona porque el contenedor termina antes de intentar bind del puerto
 
 version: "3.8"
 
 services:
-  # DESHABILITAR analytics - no exponer ningún puerto
   analytics:
-    command: ["sh", "-c", "echo 'Analytics disabled' && sleep infinity"]
+    # Usar imagen que falla inmediatamente
+    image: alpine:latest
+    # Comando que termina inmediatamente con éxito
+    entrypoint: ["/bin/sh"]
+    command: ["-c", "echo 'Analytics disabled - port 4000 conflict avoided' && exit 0"]
+    # NO exponer ningún puerto
     ports: []
+    # No reiniciar cuando falle/termine
     restart: "no"
+    # Healthcheck deshabilitado
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 1s
+      timeout: 1s
+      retries: 1
+      start_period: 1s
   
-  # Kong NO debe depender de analytics
   kong:
     depends_on:
       db:
@@ -25,3 +35,4 @@ services:
         condition: service_started
       storage:
         condition: service_started
+      # NO depender de analytics
