@@ -1,53 +1,87 @@
-# Solución: Conflicto Puerto 4000 en Easypanel
+# Solución DEFINITIVA: Conflicto Puerto 4000 en Easypanel
 
-## Problema
+## ⚠️ Problema Persistente
 ```
 Error: Bind for 0.0.0.0:4000 failed: port is already allocated
 ```
 
-El contenedor `analytics` está intentando usar el puerto 4000 que ya está ocupado en el servidor.
+El override no está siendo aplicado correctamente por Easypanel. El contenedor analytics sigue intentando usar el puerto 4000.
 
-## Causa
-- El puerto 4000 está siendo usado por otro servicio en el servidor
-- Easypanel genera un docker-compose.yml base que siempre incluye analytics
-- El override con `scale: 0` no funciona en la versión de docker-compose de Easypanel
+## 🎯 Solución DEFINITIVA
 
-## ✅ Solución Aplicada: Cambiar Puerto de Analytics
+Necesitas ejecutar un script directamente en el servidor Easypanel para forzar la solución.
 
-En lugar de deshabilitar analytics, cambiamos su puerto de **4000 a 4001**.
+### Paso 1: Acceder al Servidor
 
-### Cambios en docker-compose.override.yml:
+```bash
+ssh tu-usuario@tu-servidor-easypanel
+```
 
-```yaml
+### Paso 2: Ejecutar el Script de Solución
+
+```bash
+# Descargar el script desde el repositorio
+cd /tmp
+curl -O https://raw.githubusercontent.com/brifyai/BrifyRRHHv3/main/EJECUTAR_EN_EASYPANEL.sh
+
+# Hacer ejecutable
+chmod +x EJECUTAR_EN_EASYPANEL.sh
+
+# Ejecutar
+sudo bash EJECUTAR_EN_EASYPANEL.sh
+```
+
+### O Ejecutar Manualmente (Paso a Paso)
+
+Si prefieres hacerlo manual:
+
+```bash
+# 1. Navegar al proyecto
+cd /etc/easypanel/projects/staffhub/staffhubbdv5/code
+
+# 2. Detener todo
+docker compose -p staffhub_staffhubbdv5 down --remove-orphans
+
+# 3. Eliminar analytics
+docker rm -f staffhub_staffhubbdv5-analytics-1
+
+# 4. Ver qué usa el puerto 4000
+sudo netstat -tulpn | grep :4000
+# o
+sudo lsof -i :4000
+
+# 5. Si hay algo, matar el proceso
+sudo kill -9 <PID_DEL_PROCESO>
+
+# 6. Crear override que deshabilita analytics
+cat > docker-compose.override.yml << 'EOF'
 version: "3.8"
 
 services:
   analytics:
-    ports:
-      - "4001:4000"  # Puerto externo 4001, interno 4000
-```
+    command: ["sh", "-c", "echo 'Analytics disabled' && sleep infinity"]
+    ports: []
+    restart: "no"
+  
+  kong:
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      realtime:
+        condition: service_started
+      storage:
+        condition: service_started
+EOF
 
-Esto permite que:
-- Analytics funcione sin conflictos
-- El puerto 4000 quede libre para otros servicios
-- Easypanel pueda recrear el contenedor sin errores
+# 7. Iniciar servicios
+docker compose -f docker-compose.yml -f docker-compose.override.yml -p staffhub_staffhubbdv5 up -d --remove-orphans
 
-## Verificación Después del Deploy
-
-Una vez que Easypanel termine el deployment:
-
-```bash
-# Ver contenedores corriendo
+# 8. Verificar
 docker ps | grep staffhub
-
-# Verificar que analytics esté en puerto 4001
-docker ps | grep analytics
-# Debería mostrar: 0.0.0.0:4001->4000/tcp
-
-# Verificar logs de analytics
-docker logs staffhub_staffhubbdv5-analytics-1
-
-# Verificar que Kong esté funcionando
 docker logs staffhub_staffhubbdv5-kong-1
 ```
 

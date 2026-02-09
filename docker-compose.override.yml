@@ -1,25 +1,27 @@
 # Docker Compose Override File
-# Este archivo cambia el puerto de analytics para evitar conflictos
+# Este archivo DESHABILITA analytics para evitar conflicto de puerto 4000
 # 
 # IMPORTANTE: Este override debe tener prioridad sobre el que genera EasyPanel
 
 version: "3.8"
 
 services:
-  # Cambiar puerto de analytics de 4000 a 4001 para evitar conflicto
+  # DESHABILITAR analytics - no exponer ningún puerto
   analytics:
-    ports:
-      - "4001:4000"
-    environment:
-      LOGFLARE_API_KEY: ${LOGFLARE_API_KEY:-your-super-secret-and-long-logflare-key}
-      LOGFLARE_SOURCE_TOKEN: ${LOGFLARE_SOURCE_TOKEN:-your-super-secret-and-long-logflare-token}
-      POSTGRES_HOST: ${POSTGRES_HOST:-db}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your-super-secret-and-long-postgres-password}
+    command: ["sh", "-c", "echo 'Analytics disabled' && sleep infinity"]
+    ports: []
+    restart: "no"
   
   # Kong NO debe depender de analytics
   kong:
     depends_on:
       db:
         condition: service_healthy
+      auth:
+        condition: service_started
+      rest:
+        condition: service_started
+      realtime:
+        condition: service_started
+      storage:
+        condition: service_started
