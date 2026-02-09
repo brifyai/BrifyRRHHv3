@@ -1,38 +1,16 @@
 # Docker Compose Override File
-# SOLUCIÓN DEFINITIVA: Analytics falla inmediatamente sin abrir puerto 4000
-# Esta técnica funciona porque el contenedor termina antes de intentar bind del puerto
+# El docker-compose.yml principal ya NO incluye analytics
+# Este override está aquí por si Easypanel intenta agregarlo
 
 version: "3.8"
 
 services:
+  # Si Easypanel intenta crear analytics, este override lo deshabilita
   analytics:
-    # Usar imagen que falla inmediatamente
     image: alpine:latest
-    # Comando que termina inmediatamente con éxito
     entrypoint: ["/bin/sh"]
-    command: ["-c", "echo 'Analytics disabled - port 4000 conflict avoided' && exit 0"]
-    # NO exponer ningún puerto
+    command: ["-c", "echo 'Analytics disabled - not needed' && exit 0"]
     ports: []
-    # No reiniciar cuando falle/termine
     restart: "no"
-    # Healthcheck deshabilitado
-    healthcheck:
-      test: ["CMD", "true"]
-      interval: 1s
-      timeout: 1s
-      retries: 1
-      start_period: 1s
-  
-  kong:
-    depends_on:
-      db:
-        condition: service_healthy
-      auth:
-        condition: service_started
-      rest:
-        condition: service_started
-      realtime:
-        condition: service_started
-      storage:
-        condition: service_started
-      # NO depender de analytics
+    profiles:
+      - disabled
